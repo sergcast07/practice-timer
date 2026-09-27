@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Practice Timer</title>
+<style>
+  :root {
+    --bg: #fbf7f0; --card: #ffffff; --ink: #2b2522; --muted: #8a807a;
+    --accent: #e0653a; --good: #2f9e6e; --track: #eee6dc;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1d1a18; --card: #282421; --ink: #f3ece6; --muted: #a39890;
+            --accent: #f07a50; --good: #4cc08d; --track: #3a342f; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink);
+    font-family: ui-rounded, "SF Pro Rounded", system-ui, sans-serif;
+    display: flex; justify-content: center; padding: 24px 16px;
+  }
+  main { width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 18px; }
+  h1 { margin: 0; font-size: 22px; text-align: center; }
+  .card { background: var(--card); border-radius: 20px; padding: 20px;
+          box-shadow: 0 2px 12px rgba(0,0,0,.06); }
+
+  .ring { position: relative; width: 260px; height: 260px; margin: 0 auto; }
+  .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .ring circle { fill: none; stroke-width: 14; }
+  .ring .track { stroke: var(--track); }
+  .ring .prog { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset .3s, stroke .3s; }
+  .ring.done .prog { stroke: var(--good); }
+  .center { position: absolute; inset: 0; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; }
+  #time { font-size: 56px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  #status { font-size: 16px; color: var(--muted); margin-top: 4px; }
+  #status.playing { color: var(--good); font-weight: 600; }
+
+  .meter { height: 12px; background: var(--track); border-radius: 6px; position: relative; overflow: hidden; margin-top: 16px; }
+  #level { height: 100%; width: 0; background: var(--muted); transition: width .08s; }
+  #level.on { background: var(--good); }
+  #thresholdMark { position: absolute; top: 0; bottom: 0; width: 3px; background: var(--accent); }
+  .hint { font-size: 13px; color: var(--muted); margin-top: 6px; text-align: center; }
+
+  .buttons { display: flex; gap: 10px; }
+  button { flex: 1; font: inherit; font-size: 18px; font-weight: 600; padding: 14px;
+           border: 0; border-radius: 14px; cursor: pointer; background: var(--track); color: var(--ink); }
+  button.primary { background: var(--accent); color: #fff; }
+
+  label { display: flex; justify-content: space-between; font-size: 15px; margin-bottom: 6px; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  .row + .row { margin-top: 16px; }
+  #today { text-align: center; color: var(--muted); font-size: 15px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>🎵 Practice Timer</h1>
+
+  <div class="card">
+    <div class="ring" id="ring">
+      <svg viewBox="0 0 120 120">
+        <circle class="track" cx="60" cy="60" r="52"/>
+        <circle class="prog" id="prog" cx="60" cy="60" r="52"/>
+      </svg>
+      <div class="center">
+        <div id="time">0:00</div>
+        <div id="status">Press Start</div>
+      </div>
+    </div>
+    <div class="meter"><div id="level"></div><div id="thresholdMark"></div></div>
+    <div class="hint">The bar should cross the orange line when playing, and stay below it when quiet.</div>
+  </div>
+
+  <div class="buttons">
+    <button class="primary" id="startBtn">Start</button>
+    <button id="resetBtn">Reset</button>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <label>Sensitivity <span id="sensVal"></span></label>
+      <input type="range" id="sens" min="1" max="100" value="60">
+    </div>
+    <div class="row">
+      <label>Goal <span id="goalVal"></span></label>
+      <input type="range" id="goal" min="5" max="90" step="5" value="20">
+    </div>
+    <div class="row">
+      <label>Keep running during pauses <span id="graceVal"></span></label>
+      <input type="range" id="grace" min="0" max="10" step="0.5" value="3">
+    </div>
+  </div>
+
+  <div id="today"></div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const CIRC = 2 * Math.PI * 52;
+$('prog').style.strokeDasharray = CIRC;
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+
+// Settings (remembered between visits)
+for (const id of ['sens', 'goal', 'grace']) {
+  $(id).value = store.get(id, $(id).value);
+  $(id).addEventListener('input', () => { store.set(id, $(id).value); renderSettings(); });
+}
+
+let practicedMs = store.get('session', 0);   // current session total
+let listening = false, audioCtx, analyser, stream, buf, timer, wakeLock;
+let lastTick = 0, lastSoundAt = -Infinity, smoothLevel = 0, celebrated = false;
+
+const todayKey = () => 'day-' + new Date().toISOString().slice(0, 10);
+
+// Sensitivity 1..100 maps to a loudness threshold (0..1 meter scale). Higher sensitivity = lower threshold.
+const threshold = () => 0.6 - ($('sens').value / 100) * 0.55;
+const goalMs = () => $('goal').value * 60000;
+
+function fmt(ms) {
+  const s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, ss = s % 60;
+  return h ? `${h}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}` : `${m}:${String(ss).padStart(2, '0')}`;
+}
+
+function renderSettings() {
+  $('sensVal').textContent = $('sens').value;
+  $('goalVal').textContent = $('goal').value + ' min';
+  $('graceVal').textContent = $('grace').value + ' s';
+  $('thresholdMark').style.left = (threshold() * 100) + '%';
+  render();
+}
+
+function render(playing) {
+  $('time').textContent = fmt(practicedMs);
+  const frac = Math.min(practicedMs / goalMs(), 1);
+  $('prog').style.strokeDashoffset = CIRC * (1 - frac);
+  $('ring').classList.toggle('done', frac >= 1);
+  const st = $('status');
+  if (frac >= 1 && !celebrated && listening) { celebrated = true; celebrate(); }
+  if (!listening) { st.textContent = practicedMs ? 'Paused' : 'Press Start'; st.className = ''; }
+  else if (playing) { st.textContent = frac >= 1 ? '🎉 Goal reached!' : '▶ Playing'; st.className = 'playing'; }
+  else { st.textContent = 'Waiting for music…'; st.className = ''; }
+  $('today').textContent = 'Today: ' + fmt(store.get(todayKey(), 0));
+}
+
+function tick() {
+  const now = performance.now();
+  const dt = now - lastTick; lastTick = now;
+
+  analyser.getFloatTimeDomainData(buf);
+  let sum = 0;
+  for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+  const rms = Math.sqrt(sum / buf.length);
+  // Convert to a 0..1 scale on a log (dB) curve: -60 dB → 0, 0 dB → 1
+  const level = Math.max(0, Math.min(1, (20 * Math.log10(rms + 1e-8) + 60) / 60));
+  smoothLevel = smoothLevel * 0.7 + level * 0.3;
+
+  const loud = smoothLevel > threshold();
+  if (loud) lastSoundAt = now;
+  const playing = now - lastSoundAt < $('grace').value * 1000 + 150;
+
+  if (playing && dt < 5000) {        // ignore huge gaps (e.g. laptop was asleep)
+    practicedMs += dt;
+    store.set('session', practicedMs);
+    store.set(todayKey(), store.get(todayKey(), 0) + dt);
+  }
+
+  $('level').style.width = (smoothLevel * 100) + '%';
+  $('level').classList.toggle('on', loud);
+  render(playing);
+}
+
+async function start() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      // Turn off voice processing so it doesn't filter out the instrument
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+    });
+  } catch (e) {
+    $('status').textContent = 'Microphone access was blocked';
+    return;
+  }
+  audioCtx = new AudioContext();
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 2048;
+  buf = new Float32Array(analyser.fftSize);
+  audioCtx.createMediaStreamSource(stream).connect(analyser);
+
+  listening = true;
+  celebrated = practicedMs >= goalMs();
+  lastTick = performance.now();
+  timer = setInterval(tick, 100);
+  $('startBtn').textContent = 'Pause';
+  try { wakeLock = await navigator.wakeLock?.request('screen'); } catch {}
+}
+
+function stop() {
+  listening = false;
+  clearInterval(timer);
+  stream?.getTracks().forEach(t => t.stop());
+  audioCtx?.close();
+  wakeLock?.release?.(); wakeLock = null;
+  $('level').style.width = '0';
+  $('startBtn').textContent = 'Start';
+  render(false);
+}
+
+function celebrate() {
+  try {
+    const ctx = new AudioContext();
+    [523, 659, 784, 1047].forEach((f, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.frequency.value = f; o.connect(g); g.connect(ctx.destination);
+      const t = ctx.currentTime + i * 0.15;
+      g.gain.setValueAtTime(0.2, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+      o.start(t); o.stop(t + 0.4);
+    });
+  } catch {}
+}
+
+$('startBtn').onclick = () => listening ? stop() : start();
+$('resetBtn').onclick = () => {
+  if (practicedMs && !confirm('Reset the timer to 0:00?')) return;
+  practicedMs = 0; celebrated = false; store.set('session', 0); render(false);
+};
+document.addEventListener('visibilitychange', async () => {
+  if (listening && document.visibilityState === 'visible') {
+    try { wakeLock = await navigator.wakeLock?.request('screen'); } catch {}
+  }
+});
+
+renderSettings();
+</script>
+</body>
+</html>
