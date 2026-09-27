@@ -51,6 +51,11 @@
   input[type=range] { width: 100%; accent-color: var(--accent); }
   .row + .row { margin-top: 16px; }
   #today { text-align: center; color: var(--muted); font-size: 15px; }
+  #status.talking { color: var(--accent); font-weight: 600; }
+  #hears { font-size: 13px; color: var(--muted); text-align: center; margin-top: 10px; min-height: 1.2em; }
+  .check { display: flex; align-items: center; gap: 10px; justify-content: flex-start; margin: 0; cursor: pointer; }
+  .check input { width: 20px; height: 20px; accent-color: var(--accent); margin: 0; }
+  .sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
 </style>
 </head>
 <body>
@@ -70,6 +75,7 @@
     </div>
     <div class="meter"><div id="level"></div><div id="thresholdMark"></div></div>
     <div class="hint">The bar should cross the orange line when playing, and stay below it when quiet.</div>
+    <div id="hears"></div>
   </div>
 
   <div class="buttons">
@@ -78,6 +84,10 @@
   </div>
 
   <div class="card">
+    <div class="row">
+      <label class="check"><input type="checkbox" id="musicOnly" checked> Only count music, not talking</label>
+      <div class="sub" id="detectorNote"></div>
+    </div>
     <div class="row">
       <label>Sensitivity <span id="sensVal"></span></label>
       <input type="range" id="sens" min="1" max="100" value="60">
@@ -111,9 +121,80 @@ for (const id of ['sens', 'goal', 'grace']) {
   $(id).addEventListener('input', () => { store.set(id, $(id).value); renderSettings(); });
 }
 
+$('musicOnly').checked = store.get('musicOnly', true);
+$('musicOnly').addEventListener('change', () => {
+  store.set('musicOnly', $('musicOnly').checked);
+  if ($('musicOnly').checked) loadClassifier();
+  renderDetector();
+});
+
 let practicedMs = store.get('session', 0);   // current session total
 let listening = false, audioCtx, analyser, stream, buf, timer, wakeLock;
 let lastTick = 0, lastSoundAt = -Infinity, smoothLevel = 0, celebrated = false;
+
+// ---- Music vs. talking detection (Google's YAMNet sound classifier, runs on-device) ----
+const MP = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-audio@1.0.1';
+const MODEL = 'https://storage.googleapis.com/mediapipe-models/audio_classifier/yamnet/float32/1/yamnet.tflite';
+// YAMNet class indices: 0–4 are speech (Speech, Child speech, Conversation, Narration, Babbling);
+// 132–276 are music (Music, Musical instrument, Piano, Violin, Cello, … and music genres).
+const isSpeech = i => i <= 4;
+const isMusic = i => i >= 132 && i <= 276;
+const MUSIC_MIN = 0.15;        // music score needed to count
+const SPEECH_RATIO = 2;        // …unless speech is this many times stronger than music
+
+let classifier = null, classifierState = 'idle';   // idle | loading | ready | failed
+let processor, ring, ringPos = 0, lastClassify = 0;
+let lastMusicAt = -Infinity, lastSpeechAt = -Infinity;
+
+async function loadClassifier() {
+  if (classifierState !== 'idle' && classifierState !== 'failed') return;
+  classifierState = 'loading'; renderDetector();
+  try {
+    const { AudioClassifier, FilesetResolver } = await import(MP + '/audio_bundle.mjs');
+    const fileset = await FilesetResolver.forAudioTasks(MP + '/wasm');
+    classifier = await AudioClassifier.createFromOptions(fileset, { baseOptions: { modelAssetPath: MODEL } });
+    classifierState = 'ready';
+  } catch (e) {
+    console.error(e);
+    classifierState = 'failed';
+  }
+  renderDetector();
+}
+
+function renderDetector() {
+  const on = $('musicOnly').checked;
+  $('detectorNote').textContent = !on ? 'Any sound louder than the orange line counts.'
+    : { loading: 'Loading music detector… (first time only, about 10 MB)',
+        ready: 'Talking, singing and other noises won’t count.',
+        failed: 'Couldn’t load the music detector, so any loud sound counts for now. Check your internet connection and reload.',
+        idle: '' }[classifierState];
+  if (!on || classifierState !== 'ready') $('hears').textContent = '';
+}
+
+// Returns the most recent 1 second of audio from the ring buffer, oldest sample first.
+function lastSecond() {
+  const out = new Float32Array(ring.length);
+  out.set(ring.subarray(ringPos));
+  out.set(ring.subarray(0, ringPos), ring.length - ringPos);
+  return out;
+}
+
+function classify(now) {
+  const result = classifier.classify(lastSecond(), audioCtx.sampleRate);
+  // Model reads 0.975 s windows; the first one covers our clip (any later one is mostly padding)
+  const cats = result[0]?.classifications[0]?.categories || [];
+  let music = 0, speech = 0, top = null;
+  for (const c of cats) {
+    if (isMusic(c.index)) music = Math.max(music, c.score);
+    if (isSpeech(c.index)) speech = Math.max(speech, c.score);
+    if (!top || c.score > top.score) top = c;
+  }
+  const heardMusic = music >= MUSIC_MIN && speech < music * SPEECH_RATIO;
+  if (heardMusic) lastMusicAt = now;
+  // Talking ends the pause allowance right away, so chatting after playing isn't counted
+  if (!heardMusic && speech >= 0.3) { lastSpeechAt = now; lastSoundAt = -Infinity; }
+  $('hears').textContent = top ? `Hears: ${top.categoryName} (${Math.round(top.score * 100)}%)` : '';
+}
 
 const todayKey = () => 'day-' + new Date().toISOString().slice(0, 10);
 
@@ -134,7 +215,7 @@ function renderSettings() {
   render();
 }
 
-function render(playing) {
+function render(playing, talking) {
   $('time').textContent = fmt(practicedMs);
   const frac = Math.min(practicedMs / goalMs(), 1);
   $('prog').style.strokeDashoffset = CIRC * (1 - frac);
@@ -143,6 +224,7 @@ function render(playing) {
   if (frac >= 1 && !celebrated && listening) { celebrated = true; celebrate(); }
   if (!listening) { st.textContent = practicedMs ? 'Paused' : 'Press Start'; st.className = ''; }
   else if (playing) { st.textContent = frac >= 1 ? '🎉 Goal reached!' : '▶ Playing'; st.className = 'playing'; }
+  else if (talking) { st.textContent = '🗣 Talking – not counted'; st.className = 'talking'; }
   else { st.textContent = 'Waiting for music…'; st.className = ''; }
   $('today').textContent = 'Today: ' + fmt(store.get(todayKey(), 0));
 }
@@ -160,7 +242,12 @@ function tick() {
   smoothLevel = smoothLevel * 0.7 + level * 0.3;
 
   const loud = smoothLevel > threshold();
-  if (loud) lastSoundAt = now;
+  const detecting = $('musicOnly').checked && classifierState === 'ready';
+  if (detecting && loud && now - lastClassify >= 500) { lastClassify = now; classify(now); }
+  // Classifier looks at the last second, so allow a little slack after its last "music" verdict
+  const musicNow = !detecting || now - lastMusicAt < 1200;
+  if (loud && musicNow) lastSoundAt = now;
+  const talking = detecting && loud && !musicNow && now - lastSpeechAt < 1200;
   const playing = now - lastSoundAt < $('grace').value * 1000 + 150;
 
   if (playing && dt < 5000) {        // ignore huge gaps (e.g. laptop was asleep)
@@ -171,7 +258,7 @@ function tick() {
 
   $('level').style.width = (smoothLevel * 100) + '%';
   $('level').classList.toggle('on', loud);
-  render(playing);
+  render(playing, talking);
 }
 
 async function start() {
@@ -188,7 +275,19 @@ async function start() {
   analyser = audioCtx.createAnalyser();
   analyser.fftSize = 2048;
   buf = new Float32Array(analyser.fftSize);
-  audioCtx.createMediaStreamSource(stream).connect(analyser);
+  const source = audioCtx.createMediaStreamSource(stream);
+  source.connect(analyser);
+
+  // Keep a rolling 1-second copy of the audio for the music detector
+  ring = new Float32Array(audioCtx.sampleRate); ringPos = 0;
+  processor = audioCtx.createScriptProcessor(4096, 1, 1);
+  processor.onaudioprocess = e => {
+    const data = e.inputBuffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) { ring[ringPos] = data[i]; ringPos = (ringPos + 1) % ring.length; }
+  };
+  const mute = audioCtx.createGain(); mute.gain.value = 0;   // processor must reach the output to run
+  source.connect(processor); processor.connect(mute); mute.connect(audioCtx.destination);
+  lastMusicAt = lastSpeechAt = -Infinity;
 
   listening = true;
   celebrated = practicedMs >= goalMs();
@@ -234,6 +333,8 @@ document.addEventListener('visibilitychange', async () => {
 });
 
 renderSettings();
+renderDetector();
+if ($('musicOnly').checked) loadClassifier();
 </script>
 </body>
 </html>
