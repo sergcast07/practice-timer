@@ -110,7 +110,15 @@
   select { font: inherit; font-size: 16px; padding: 8px 10px; border-radius: 12px; border: 2px solid var(--track);
            background: var(--bg); color: var(--ink); }
   .player { display: grid; grid-template-columns: 36px 1fr auto; gap: 8px; align-items: center; }
-  .player select { grid-column: 2 / -1; }
+  .player select, .player .check { grid-column: 2 / -1; }
+  #confetti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 20; }
+  .overlay .card { animation: pop .45s cubic-bezier(.2, 1.5, .4, 1) both; }
+  @keyframes pop { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .bigEmoji { font-size: 56px; text-align: center; line-height: 1; margin-bottom: 6px; animation: bounce 1s ease-in-out .3s 2; }
+  @keyframes bounce { 0%, 100% { transform: translateY(0) rotate(0); } 30% { transform: translateY(-16px) rotate(-8deg); } 60% { transform: translateY(0) rotate(6deg); } }
+  #ring.cheer { animation: cheer .8s ease-in-out 2; }
+  @keyframes cheer { 50% { transform: scale(1.08); } }
+  @media (prefers-reduced-motion: reduce) { .overlay .card, .bigEmoji, #ring.cheer { animation: none; } }
   .player + .player { margin-top: 16px; }
 
   /* Tuner */
@@ -294,9 +302,11 @@
 
 </main>
 
+<canvas id="confetti" hidden></canvas>
 <div class="overlay" id="summary" hidden>
   <div class="card" style="--kid:var(--accent)">
-    <h2 id="sumTitle"></h2>
+    <div class="bigEmoji" id="sumEmoji"></div>
+    <h2 id="sumTitle" style="text-align:center"></h2>
     <div id="sumRows"></div>
     <button class="primary" id="sumOk" style="width:100%;margin-top:12px">OK</button>
   </div>
@@ -614,7 +624,10 @@ function addPractice(ms) {
   }
   sessionMs += ms;
   const goal = kid.goal * 60000;
-  if (before < goal && before + ms >= goal) celebrate();
+  if (before < goal && before + ms >= goal) {
+    celebrate(kid);
+    $('ring').classList.remove('cheer'); void $('ring').offsetWidth; $('ring').classList.add('cheer');
+  }
 }
 
 // ---------- End-of-session summary ----------
@@ -628,9 +641,11 @@ function showSummary(k, s, played) {
   if (tracksPitch(k) && s.notes >= 10) rows.push(['🎻', pct(s.inTune / s.notes) + ' in tune', `${s.notes} notes checked`]);
   if (s.beats >= 8) rows.push(['🥁', pct(s.steady / s.beats) + ' steady rhythm', `${s.beats} notes played with the metronome`]);
   rows.push(today >= goal ? ['✅', 'Daily goal reached!', `${mins(today)} today`] : ['🏁', `${mins(goal - today)} to go`, `for today’s ${k.goal} min goal`]);
-  $('sumTitle').textContent = focus >= 0.8 ? `Great focus, ${k.name}! 🌟` : `Nice work, ${k.name}!`;
+  $('sumTitle').textContent = today >= goal ? `Goal reached, ${k.name}!` : focus >= 0.8 ? `Great focus, ${k.name}!` : `Nice work, ${k.name}!`;
   $('sumRows').innerHTML = rows.map(([ic, big, small]) => `<div class="sumRow"><div class="ic">${ic}</div><div><b>${big}</b><div>${small}</div></div></div>`).join('');
+  $('sumEmoji').textContent = today >= goal ? '🏆' : focus >= 0.8 ? '🌟' : '🎉';
   $('summary').hidden = false;
+  confetti(today >= goal ? 260 : 150, k.color);
 }
 $('sumOk').onclick = () => { $('summary').hidden = true; };
 
@@ -712,11 +727,15 @@ function renderParent() {
       <button class="danger" data-remove="${k.id}">Remove</button>
       <select data-instr="${k.id}">${Object.entries(INSTRUMENTS).map(([v, l]) =>
         `<option value="${v}" ${(k.instrument || '') === v ? 'selected' : ''} ${v === '' ? 'disabled' : ''}>${l}</option>`).join('')}</select>
+      <label class="check"><input type="checkbox" data-chime="${k.id}" ${k.chime !== false ? 'checked' : ''}> 🔔 Play a sound when goal is reached</label>
     </div>`).join('') || '<div class="muted">Add each child who practices.</div>';
   document.querySelectorAll('[data-rename]').forEach(i => i.onchange = () => {
     const k = kids.find(k => k.id === i.dataset.rename);
     if (i.value.trim()) { k.name = i.value.trim(); saveKids(); }
     renderParent();
+  });
+  document.querySelectorAll('[data-chime]').forEach(c => c.onchange = () => {
+    kids.find(k => k.id === c.dataset.chime).chime = c.checked; saveKids();
   });
   document.querySelectorAll('[data-instr]').forEach(sel => sel.onchange = () => {
     kids.find(k => k.id === sel.dataset.instr).instrument = sel.value; saveKids();
@@ -745,7 +764,7 @@ $('addBtn').onclick = () => {
   const name = $('newName').value.trim();
   if (!name) return;
   const used = kids.map(k => k.color);
-  kids.push({ id: Date.now().toString(36), name, goal: 20, bpm: 80, instrument: '',
+  kids.push({ id: Date.now().toString(36), name, goal: 20, bpm: 80, instrument: '', chime: true,
               color: COLORS.find(c => !used.includes(c)) || COLORS[kids.length % COLORS.length] });
   saveKids(); $('newName').value = ''; renderParent();
 };
@@ -1115,7 +1134,37 @@ function stopAudio() {
   document.querySelectorAll('.meter .level').forEach(l => l.style.width = '0');
 }
 
-function celebrate() {
+// Confetti burst (plain canvas, no library). Skipped for people who've asked their device for less motion.
+function confetti(count = 150, color) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const cv = $('confetti'), ctx = cv.getContext('2d'), dpr = devicePixelRatio || 1;
+  const W = innerWidth, H = innerHeight;
+  cv.width = W * dpr; cv.height = H * dpr; ctx.scale(dpr, dpr); cv.hidden = false;
+  const colors = [color, ...COLORS, '#ffd23f'].filter(Boolean);
+  const bits = Array.from({ length: count }, (_, i) => {
+    const fromLeft = i % 2 === 0, a = (fromLeft ? -60 : -120) * Math.PI / 180 + (Math.random() - .5) * 0.9, v = 9 + Math.random() * 9;
+    return { x: fromLeft ? 0 : W, y: H * 0.75, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: Math.random() * 6.3, vr: (Math.random() - .5) * 0.4,
+             w: 6 + Math.random() * 6, h: 4 + Math.random() * 6, c: colors[i % colors.length], star: Math.random() < 0.15 };
+  });
+  const start = performance.now();
+  (function frame(now) {
+    const t = now - start;
+    ctx.clearRect(0, 0, W, H);
+    for (const b of bits) {
+      b.vy += 0.25; b.vx *= 0.99; b.vy *= 0.99; b.x += b.vx; b.y += b.vy; b.r += b.vr;
+      ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.r); ctx.globalAlpha = Math.max(0, 1 - t / 4000);
+      ctx.fillStyle = b.c;
+      if (b.star) { ctx.font = '16px system-ui'; ctx.fillText('⭐', -8, 6); }
+      else ctx.fillRect(-b.w / 2, -b.h / 2 * Math.abs(Math.cos(b.r * 2)), b.w, b.h * Math.abs(Math.cos(b.r * 2)) + 1);
+      ctx.restore();
+    }
+    if (t < 4000) requestAnimationFrame(frame); else { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); cv.hidden = true; }
+  })(start);
+}
+
+function celebrate(k) {
+  confetti(200, k?.color);
+  if (k?.chime === false) return;
   try {
     const ctx = new AudioContext();
     [523, 659, 784, 1047].forEach((f, i) => {
