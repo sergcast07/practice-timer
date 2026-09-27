@@ -24,7 +24,7 @@
   .card { background: var(--card); border-radius: 20px; padding: 20px;
           box-shadow: 0 2px 12px rgba(0,0,0,.06); }
 
-  .ring { position: relative; width: 260px; height: 260px; margin: 0 auto; }
+  .ring { position: relative; width: min(260px, 100%); aspect-ratio: 1; margin: 0 auto; }
   .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
   .ring circle { fill: none; stroke-width: 14; }
   .ring .track { stroke: var(--track); }
@@ -32,7 +32,7 @@
   .ring.done .prog { stroke: var(--good); }
   .center { position: absolute; inset: 0; display: flex; flex-direction: column;
             align-items: center; justify-content: center; }
-  #time { font-size: 56px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  #time { font-size: clamp(40px, 14vw, 56px); font-weight: 700; font-variant-numeric: tabular-nums; }
   #status { font-size: 16px; color: var(--muted); margin-top: 4px; }
   #status.playing { color: var(--good); font-weight: 600; }
 
