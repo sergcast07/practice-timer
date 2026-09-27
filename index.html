@@ -7,132 +7,443 @@
 <style>
   :root {
     --bg: #fbf7f0; --card: #ffffff; --ink: #2b2522; --muted: #8a807a;
-    --accent: #e0653a; --good: #2f9e6e; --track: #eee6dc;
+    --accent: #e0653a; --good: #2f9e6e; --track: #eee6dc; --kid: var(--accent);
   }
   @media (prefers-color-scheme: dark) {
     :root { --bg: #1d1a18; --card: #282421; --ink: #f3ece6; --muted: #a39890;
             --accent: #f07a50; --good: #4cc08d; --track: #3a342f; }
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   body {
     margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink);
     font-family: ui-rounded, "SF Pro Rounded", system-ui, sans-serif;
-    display: flex; justify-content: center; padding: 24px 16px;
+    display: flex; justify-content: center; padding: 20px 16px 32px;
   }
-  main { width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 18px; }
-  h1 { margin: 0; font-size: 22px; text-align: center; }
-  .card { background: var(--card); border-radius: 20px; padding: 20px;
+  main { width: 100%; max-width: 480px; }
+  .screen { display: flex; flex-direction: column; gap: 16px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; }
+  h1 { margin: 0; font-size: 24px; }
+  h2 { margin: 0 0 12px; font-size: 18px; }
+  .card { background: var(--card); border-radius: 20px; padding: 18px;
           box-shadow: 0 2px 12px rgba(0,0,0,.06); }
+  button { font: inherit; font-weight: 600; border: 0; border-radius: 14px; cursor: pointer;
+           background: var(--track); color: var(--ink); padding: 10px 14px; font-size: 16px; }
+  button.primary { background: var(--kid); color: #fff; font-size: 20px; padding: 16px; }
+  button.link { background: none; color: var(--muted); padding: 8px 4px; font-size: 15px; }
+  button.danger { color: #c0392b; background: none; padding: 6px 8px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 13px; }
 
+  /* Home */
+  .kids { display: grid; gap: 12px; }
+  .tile { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left;
+          background: var(--card); border-radius: 20px; padding: 16px; box-shadow: 0 2px 12px rgba(0,0,0,.06); }
+  .avatar { flex: none; width: 56px; height: 56px; border-radius: 50%; background: var(--kid); color: #fff;
+            display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 700; }
+  .tile .info { flex: 1; min-width: 0; }
+  .tile .name { font-size: 22px; font-weight: 700; }
+  .tile .sub { font-size: 14px; color: var(--muted); font-weight: 500; margin-top: 2px; }
+  .bar { height: 8px; border-radius: 4px; background: var(--track); overflow: hidden; margin-top: 8px; }
+  .bar > div { height: 100%; background: var(--kid); border-radius: 4px; }
+  .empty { text-align: center; padding: 30px 18px; }
+
+  /* Practice */
+  .who { display: flex; align-items: center; gap: 10px; font-size: 22px; font-weight: 700; }
+  .who .avatar { width: 40px; height: 40px; font-size: 18px; }
   .ring { position: relative; width: min(260px, 100%); aspect-ratio: 1; margin: 0 auto; }
   .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
   .ring circle { fill: none; stroke-width: 14; }
   .ring .track { stroke: var(--track); }
-  .ring .prog { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset .3s, stroke .3s; }
+  .ring .prog { stroke: var(--kid); stroke-linecap: round; transition: stroke-dashoffset .3s; }
   .ring.done .prog { stroke: var(--good); }
-  .center { position: absolute; inset: 0; display: flex; flex-direction: column;
-            align-items: center; justify-content: center; }
+  .center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
   #time { font-size: clamp(40px, 14vw, 56px); font-weight: 700; font-variant-numeric: tabular-nums; }
-  #status { font-size: 16px; color: var(--muted); margin-top: 4px; }
-  #status.playing { color: var(--good); font-weight: 600; }
+  #ofGoal { font-size: 14px; color: var(--muted); }
+  #status { font-size: 16px; color: var(--muted); margin-top: 16px; text-align: center; min-height: 1.3em; }
+  .playing { color: var(--good) !important; font-weight: 600; }
+  .talking { color: var(--accent) !important; font-weight: 600; }
+  #session { text-align: center; font-size: 14px; color: var(--muted); margin-top: 4px; }
+  .meter { height: 10px; background: var(--track); border-radius: 5px; position: relative; overflow: hidden; margin-top: 14px; }
+  .meter .level { height: 100%; width: 0; background: var(--muted); transition: width .08s; }
+  .meter .level.on { background: var(--good); }
+  .meter .mark { position: absolute; top: 0; bottom: 0; width: 3px; background: var(--accent); }
+  .goalRow { display: flex; align-items: center; justify-content: space-between; }
+  .stepper { display: flex; align-items: center; gap: 8px; }
+  .stepper button { width: 44px; height: 44px; padding: 0; font-size: 22px; }
+  .stepper span { min-width: 64px; text-align: center; font-weight: 700; font-size: 18px; }
 
-  .meter { height: 12px; background: var(--track); border-radius: 6px; position: relative; overflow: hidden; margin-top: 16px; }
-  #level { height: 100%; width: 0; background: var(--muted); transition: width .08s; }
-  #level.on { background: var(--good); }
-  #thresholdMark { position: absolute; top: 0; bottom: 0; width: 3px; background: var(--accent); }
-  .hint { font-size: 13px; color: var(--muted); margin-top: 6px; text-align: center; }
+  /* History */
+  .histHead { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .histHead .avatar { width: 32px; height: 32px; font-size: 15px; }
+  .histHead b { font-size: 18px; }
+  .stats { display: flex; gap: 8px; margin: 10px 0 14px; }
+  .stats div { flex: 1; min-width: 0; background: var(--bg); border-radius: 12px; padding: 8px 4px; text-align: center; }
+  .stats b { display: block; font-size: 16px; white-space: nowrap; }
+  .stats span { font-size: 12px; color: var(--muted); }
+  .chart { position: relative; display: flex; align-items: flex-end; gap: 4px; height: 110px; }
+  .chart .col { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
+  .chart .b { width: 100%; background: var(--kid); opacity: .45; border-radius: 4px 4px 0 0; min-height: 2px; }
+  .chart .b.met { opacity: 1; }
+  .chart .goalLine { position: absolute; left: 0; right: 0; border-top: 2px dashed var(--muted); opacity: .6; }
+  .days { display: flex; gap: 4px; margin-top: 4px; }
+  .days span { flex: 1; text-align: center; font-size: 11px; color: var(--muted); }
 
-  .buttons { display: flex; gap: 10px; }
-  button { flex: 1; font: inherit; font-size: 18px; font-weight: 600; padding: 14px;
-           border: 0; border-radius: 14px; cursor: pointer; background: var(--track); color: var(--ink); }
-  button.primary { background: var(--accent); color: #fff; }
-
-  label { display: flex; justify-content: space-between; font-size: 15px; margin-bottom: 6px; }
-  input[type=range] { width: 100%; accent-color: var(--accent); }
+  /* Parent */
   .row + .row { margin-top: 16px; }
-  #today { text-align: center; color: var(--muted); font-size: 15px; }
-  #status.talking { color: var(--accent); font-weight: 600; }
-  #hears { font-size: 13px; color: var(--muted); text-align: center; margin-top: 10px; min-height: 1.2em; }
-  .check { display: flex; align-items: center; gap: 10px; justify-content: flex-start; margin: 0; cursor: pointer; }
+  label.lbl { display: flex; justify-content: space-between; font-size: 15px; margin-bottom: 6px; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  input[type=text], input[type=password] { font: inherit; font-size: 17px; padding: 10px 12px; border-radius: 12px;
+      border: 2px solid var(--track); background: var(--bg); color: var(--ink); width: 100%; }
+  .check { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 15px; }
   .check input { width: 20px; height: 20px; accent-color: var(--accent); margin: 0; }
-  .sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .player { display: flex; align-items: center; gap: 10px; }
+  .player + .player { margin-top: 10px; }
+  .player .avatar { width: 36px; height: 36px; font-size: 16px; }
+  .addRow { display: flex; gap: 8px; margin-top: 14px; }
+  .addRow button { flex: none; }
+  .pinBox { max-width: 280px; margin: 40px auto 0; text-align: center; display: flex; flex-direction: column; gap: 12px; }
+  .pinBox input { text-align: center; font-size: 28px; letter-spacing: 8px; }
+  #pinError { color: #c0392b; min-height: 1.2em; font-size: 14px; }
 </style>
 </head>
 <body>
 <main>
-  <h1>🎵 Practice Timer</h1>
 
-  <div class="card">
-    <div class="ring" id="ring">
-      <svg viewBox="0 0 120 120">
-        <circle class="track" cx="60" cy="60" r="52"/>
-        <circle class="prog" id="prog" cx="60" cy="60" r="52"/>
-      </svg>
-      <div class="center">
-        <div id="time">0:00</div>
-        <div id="status">Press Start</div>
+  <!-- HOME: who's practicing? -->
+  <section class="screen" id="home">
+    <header>
+      <h1>🎵 Who’s practicing?</h1>
+      <button class="link" id="parentBtn">🔒 Parents</button>
+    </header>
+    <div class="kids" id="kidList"></div>
+    <div class="card empty" id="noKids" hidden>
+      <p>No players yet.</p>
+      <button id="setupBtn">Grown-ups: add players</button>
+    </div>
+    <button class="link" id="historyBtn">📅 See practice history</button>
+  </section>
+
+  <!-- PRACTICE -->
+  <section class="screen" id="practice" hidden>
+    <header>
+      <div class="who"><div class="avatar" id="pAvatar"></div><span id="pName"></span></div>
+      <button class="link" id="doneBtn">Done ✓</button>
+    </header>
+    <div class="card">
+      <div class="ring" id="ring">
+        <svg viewBox="0 0 120 120">
+          <circle class="track" cx="60" cy="60" r="52"/>
+          <circle class="prog" id="prog" cx="60" cy="60" r="52"/>
+        </svg>
+        <div class="center">
+          <div id="time">0:00</div>
+          <div id="ofGoal"></div>
+        </div>
+      </div>
+      <div id="status"></div>
+      <div id="session"></div>
+      <div class="meter"><div class="level"></div><div class="mark"></div></div>
+    </div>
+    <button class="primary" id="startBtn">Start</button>
+    <div class="card goalRow">
+      <span style="white-space:nowrap">Daily goal</span>
+      <div class="stepper"><button id="goalDown">−</button><span id="goalVal"></span><button id="goalUp">+</button></div>
+    </div>
+  </section>
+
+  <!-- HISTORY -->
+  <section class="screen" id="history" hidden>
+    <header>
+      <h1>📅 Practice history</h1>
+      <button class="link" data-home>← Back</button>
+    </header>
+    <div id="histList"></div>
+  </section>
+
+  <!-- PIN -->
+  <section class="screen" id="pin" hidden>
+    <div class="pinBox">
+      <h2 id="pinTitle"></h2>
+      <input type="password" id="pinInput" inputmode="numeric" maxlength="8" autocomplete="off">
+      <input type="password" id="pinConfirm" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="Repeat PIN">
+      <div id="pinError"></div>
+      <button class="primary" id="pinOk">OK</button>
+      <button class="link" data-home>Cancel</button>
+      <p class="muted small" id="pinForgot">Forgot the PIN? Clearing this website’s data in your browser settings resets it, but also erases the practice history.</p>
+    </div>
+  </section>
+
+  <!-- PARENT SETTINGS -->
+  <section class="screen" id="parent" hidden>
+    <header>
+      <h1>⚙️ Parent settings</h1>
+      <button class="link" data-home>Done ✓</button>
+    </header>
+
+    <div class="card">
+      <h2>Players</h2>
+      <div id="players"></div>
+      <div class="addRow">
+        <input type="text" id="newName" placeholder="Name" maxlength="20">
+        <button id="addBtn">Add</button>
       </div>
     </div>
-    <div class="meter"><div id="level"></div><div id="thresholdMark"></div></div>
-    <div class="hint">The bar should cross the orange line when playing, and stay below it when quiet.</div>
-    <div id="hears"></div>
-  </div>
 
-  <div class="buttons">
-    <button class="primary" id="startBtn">Start</button>
-    <button id="resetBtn">Reset</button>
-  </div>
+    <div class="card">
+      <h2>Microphone</h2>
+      <div class="row">
+        <label class="check"><input type="checkbox" id="musicOnly"> Only count music, not talking</label>
+        <div class="muted small" id="detectorNote" style="margin-top:4px"></div>
+      </div>
+      <div class="row">
+        <label class="lbl">Sensitivity <span id="sensVal"></span></label>
+        <input type="range" id="sens" min="1" max="100">
+      </div>
+      <div class="row">
+        <label class="lbl">Keep running during pauses <span id="graceVal"></span></label>
+        <input type="range" id="grace" min="0" max="10" step="0.5">
+      </div>
+      <div class="row">
+        <button id="testBtn">🎤 Test microphone</button>
+        <div id="testArea" hidden>
+          <div class="meter"><div class="level"></div><div class="mark"></div></div>
+          <div class="muted small" style="margin-top:6px">Play something: the bar should cross the orange line. When the room is quiet, it should stay below it.</div>
+          <div id="testStatus" style="margin-top:8px"></div>
+          <div class="muted small" id="hears"></div>
+        </div>
+      </div>
+    </div>
 
-  <div class="card">
-    <div class="row">
-      <label class="check"><input type="checkbox" id="musicOnly" checked> Only count music, not talking</label>
-      <div class="sub" id="detectorNote"></div>
+    <div class="card">
+      <h2>Parent PIN</h2>
+      <button id="changePinBtn">Change PIN</button>
     </div>
-    <div class="row">
-      <label>Sensitivity <span id="sensVal"></span></label>
-      <input type="range" id="sens" min="1" max="100" value="60">
-    </div>
-    <div class="row">
-      <label>Goal <span id="goalVal"></span></label>
-      <input type="range" id="goal" min="5" max="90" step="5" value="20">
-    </div>
-    <div class="row">
-      <label>Keep running during pauses <span id="graceVal"></span></label>
-      <input type="range" id="grace" min="0" max="10" step="0.5" value="3">
-    </div>
-  </div>
+  </section>
 
-  <div id="today"></div>
 </main>
 
 <script>
 const $ = id => document.getElementById(id);
 const CIRC = 2 * Math.PI * 52;
 $('prog').style.strokeDasharray = CIRC;
+const COLORS = ['#e0653a', '#2a9d8f', '#7b5cd6', '#2f7ed8', '#d4a017', '#d6457a'];
 
+// ---------- Storage ----------
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
 };
+let kids = store.get('pt-kids', []);            // [{id, name, color, goal (minutes)}]
+let log = store.get('pt-log', {});              // {kidId: {'YYYY-MM-DD': ms}}
+let settings = Object.assign(
+  { sens: +store.get('sens', 60), grace: +store.get('grace', 3), musicOnly: store.get('musicOnly', true), pin: null },
+  store.get('pt-settings', {}));
+const saveKids = () => store.set('pt-kids', kids);
+const saveLog = () => store.set('pt-log', log);
+const saveSettings = () => store.set('pt-settings', settings);
 
-// Settings (remembered between visits)
-for (const id of ['sens', 'goal', 'grace']) {
-  $(id).value = store.get(id, $(id).value);
-  $(id).addEventListener('input', () => { store.set(id, $(id).value); renderSettings(); });
+// ---------- Dates & formatting ----------
+const pad = n => String(n).padStart(2, '0');
+const dayKey = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+function lastDays(n) {            // oldest → today
+  const t = new Date(), out = [];
+  for (let i = n - 1; i >= 0; i--) out.push(new Date(t.getFullYear(), t.getMonth(), t.getDate() - i));
+  return out;
+}
+const msOn = (kid, d = new Date()) => (log[kid.id] || {})[dayKey(d)] || 0;
+function clock(ms) {
+  const s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, ss = s % 60;
+  return h ? `${h}:${pad(m)}:${pad(ss)}` : `${m}:${pad(ss)}`;
+}
+function mins(ms) {
+  const m = Math.floor(ms / 60000);
+  return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m} min`;
+}
+function streak(kid) {            // days in a row with at least 1 minute (today may still be in progress)
+  const days = lastDays(366).reverse();
+  let n = 0;
+  for (let i = 0; i < days.length; i++) {
+    if (msOn(kid, days[i]) >= 60000) n++;
+    else if (i > 0) break;
+  }
+  return n;
+}
+const esc = s => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const initial = k => esc([...k.name.trim()][0]?.toUpperCase() || '?');
+
+// ---------- Navigation ----------
+let screen = 'home';
+function show(name) {
+  if (listening) stopAudio();
+  screen = name;
+  for (const s of document.querySelectorAll('.screen')) s.hidden = s.id !== name;
+  ({ home: renderHome, history: renderHistory, parent: renderParent, practice: renderPractice }[name] || (() => {}))();
+  window.scrollTo(0, 0);
+}
+document.querySelectorAll('[data-home]').forEach(b => b.onclick = () => show('home'));
+
+// ---------- Home ----------
+function renderHome() {
+  $('noKids').hidden = kids.length > 0;
+  $('historyBtn').hidden = kids.length === 0;
+  $('kidList').innerHTML = kids.map(k => {
+    const today = msOn(k), frac = Math.min(today / (k.goal * 60000), 1), st = streak(k);
+    return `<button class="tile" data-kid="${k.id}" style="--kid:${k.color}">
+      <div class="avatar">${initial(k)}</div>
+      <div class="info">
+        <div class="name">${esc(k.name)}</div>
+        <div class="sub">${frac >= 1 ? '✅ ' : ''}${mins(today)} of ${k.goal} min today${st > 1 ? ` · 🔥 ${st} days` : ''}</div>
+        <div class="bar"><div style="width:${frac * 100}%"></div></div>
+      </div></button>`;
+  }).join('');
+  document.querySelectorAll('[data-kid]').forEach(b => b.onclick = () => { kid = kids.find(k => k.id === b.dataset.kid); sessionMs = 0; show('practice'); });
+}
+$('parentBtn').onclick = $('setupBtn').onclick = () => askPin();
+$('historyBtn').onclick = () => show('history');
+
+// ---------- Practice ----------
+let kid = null, sessionMs = 0, celebrated = false;
+
+function renderPractice(playing, talking) {
+  if (!kid) return;
+  document.body.style.setProperty('--kid', kid.color);
+  $('pAvatar').innerHTML = initial(kid);
+  $('pName').textContent = kid.name;
+  const today = msOn(kid), goal = kid.goal * 60000, frac = Math.min(today / goal, 1);
+  $('time').textContent = clock(today);
+  $('ofGoal').textContent = `of ${kid.goal} min today`;
+  $('prog').style.strokeDashoffset = CIRC * (1 - frac);
+  $('ring').classList.toggle('done', frac >= 1);
+  $('goalVal').textContent = kid.goal + ' min';
+  $('session').textContent = sessionMs ? `This session: ${clock(sessionMs)}` : '';
+  const st = $('status');
+  st.className = '';
+  if (!listening) st.textContent = frac >= 1 ? '🎉 Goal reached today!' : 'Press Start, then play!';
+  else if (playing) { st.textContent = frac >= 1 ? '🎉 Goal reached! Keep going!' : '▶ Playing – the clock is running'; st.className = 'playing'; }
+  else if (talking) { st.textContent = '🗣 Talking – not counted'; st.className = 'talking'; }
+  else if (musicOnly() && classifierState === 'loading') st.textContent = 'Getting ready…';
+  else st.textContent = 'Waiting for music…';
+  $('startBtn').textContent = listening ? 'Pause' : 'Start';
+}
+$('startBtn').onclick = () => listening ? (stopAudio(), renderPractice()) : startAudio('practice');
+$('doneBtn').onclick = () => show('home');
+function changeGoal(d) { kid.goal = Math.max(5, Math.min(120, kid.goal + d)); saveKids(); renderPractice(); }
+$('goalUp').onclick = () => changeGoal(5);
+$('goalDown').onclick = () => changeGoal(-5);
+
+function addPractice(ms) {
+  const k = dayKey();
+  const before = msOn(kid);
+  log[kid.id] = log[kid.id] || {};
+  log[kid.id][k] = before + ms;
+  sessionMs += ms;
+  saveLog();
+  const goal = kid.goal * 60000;
+  if (before < goal && before + ms >= goal) celebrate();
 }
 
-$('musicOnly').checked = store.get('musicOnly', true);
-$('musicOnly').addEventListener('change', () => {
-  store.set('musicOnly', $('musicOnly').checked);
-  if ($('musicOnly').checked) loadClassifier();
+// ---------- History ----------
+const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+function renderHistory() {
+  const days = lastDays(14);
+  $('histList').innerHTML = kids.map(k => {
+    const vals = days.map(d => msOn(k, d));
+    const goal = k.goal * 60000;
+    const top = Math.max(goal, ...vals) * 1.1;
+    const week = lastDays(7).reduce((a, d) => a + msOn(k, d), 0);
+    const month = lastDays(30).reduce((a, d) => a + msOn(k, d), 0);
+    const daysPracticed = lastDays(30).filter(d => msOn(k, d) >= 60000).length;
+    return `<div class="card" style="--kid:${k.color};margin-bottom:14px">
+      <div class="histHead"><div class="avatar">${initial(k)}</div><b>${esc(k.name)}</b></div>
+      <div class="stats">
+        <div><b>${mins(week)}</b><span>last 7 days</span></div>
+        <div><b>${mins(month)}</b><span>last 30 days</span></div>
+        <div><b>${daysPracticed}</b><span>days in last 30</span></div>
+      </div>
+      <div class="chart">
+        <div class="goalLine" style="bottom:${goal / top * 100}%"></div>
+        ${vals.map((v, i) => `<div class="col" title="${days[i].toDateString()}: ${mins(v)}"><div class="b ${v >= goal ? 'met' : ''}" style="height:${v / top * 100}%"></div></div>`).join('')}
+      </div>
+      <div class="days">${days.map((d, i) => `<span>${i === days.length - 1 ? 'Today' : DOW[d.getDay()]}</span>`).join('')}</div>
+      <div class="muted small" style="margin-top:8px">Last 2 weeks · dashed line = ${k.goal} min goal · solid bars = goal met</div>
+    </div>`;
+  }).join('') || '<div class="card empty muted">No players yet.</div>';
+}
+
+// ---------- Parent PIN ----------
+let pinMode = 'enter';   // enter | create
+function askPin(forceCreate) {
+  pinMode = forceCreate || !settings.pin ? 'create' : 'enter';
+  $('pinTitle').textContent = pinMode === 'create' ? 'Create a parent PIN' : 'Parent PIN';
+  $('pinConfirm').hidden = pinMode !== 'create';
+  $('pinForgot').hidden = pinMode === 'create';
+  $('pinInput').value = $('pinConfirm').value = '';
+  $('pinError').textContent = '';
+  show('pin');
+  $('pinInput').focus();
+}
+$('pinOk').onclick = () => {
+  const p = $('pinInput').value.trim();
+  if (pinMode === 'create') {
+    if (!/^\d{4,8}$/.test(p)) return $('pinError').textContent = 'Use 4 to 8 digits.';
+    if (p !== $('pinConfirm').value.trim()) return $('pinError').textContent = 'The PINs don’t match.';
+    settings.pin = p; saveSettings(); show('parent');
+  } else if (p === settings.pin) show('parent');
+  else { $('pinError').textContent = 'Wrong PIN.'; $('pinInput').value = ''; }
+};
+[$('pinInput'), $('pinConfirm')].forEach(i => i.onkeydown = e => { if (e.key === 'Enter') $('pinOk').click(); });
+$('changePinBtn').onclick = () => askPin(true);
+
+// ---------- Parent settings ----------
+function renderParent() {
+  document.body.style.setProperty('--kid', 'var(--accent)');
+  $('players').innerHTML = kids.map(k => `
+    <div class="player" style="--kid:${k.color}">
+      <div class="avatar">${initial(k)}</div>
+      <input type="text" value="${esc(k.name)}" data-rename="${k.id}" maxlength="20">
+      <button class="danger" data-remove="${k.id}">Remove</button>
+    </div>`).join('') || '<div class="muted">Add each child who practices.</div>';
+  document.querySelectorAll('[data-rename]').forEach(i => i.onchange = () => {
+    const k = kids.find(k => k.id === i.dataset.rename);
+    if (i.value.trim()) { k.name = i.value.trim(); saveKids(); }
+    renderParent();
+  });
+  document.querySelectorAll('[data-remove]').forEach(b => b.onclick = () => {
+    const k = kids.find(k => k.id === b.dataset.remove);
+    if (!confirm(`Remove ${k.name} and all of their practice history?`)) return;
+    kids = kids.filter(x => x !== k); delete log[k.id]; saveKids(); saveLog(); renderParent();
+  });
+  $('musicOnly').checked = settings.musicOnly;
+  $('sens').value = settings.sens;
+  $('grace').value = settings.grace;
+  $('sensVal').textContent = settings.sens;
+  $('graceVal').textContent = settings.grace + ' s';
+  $('testBtn').textContent = listening ? '⏹ Stop test' : '🎤 Test microphone';
+  $('testArea').hidden = !listening;
   renderDetector();
-});
+}
+$('addBtn').onclick = () => {
+  const name = $('newName').value.trim();
+  if (!name) return;
+  const used = kids.map(k => k.color);
+  kids.push({ id: Date.now().toString(36), name, goal: 20,
+              color: COLORS.find(c => !used.includes(c)) || COLORS[kids.length % COLORS.length] });
+  saveKids(); $('newName').value = ''; renderParent();
+};
+$('newName').onkeydown = e => { if (e.key === 'Enter') $('addBtn').click(); };
+$('sens').oninput = () => { settings.sens = +$('sens').value; saveSettings(); $('sensVal').textContent = settings.sens; updateMarks(); };
+$('grace').oninput = () => { settings.grace = +$('grace').value; saveSettings(); $('graceVal').textContent = settings.grace + ' s'; };
+$('musicOnly').onchange = () => { settings.musicOnly = $('musicOnly').checked; saveSettings(); if (settings.musicOnly) loadClassifier(); renderDetector(); };
+$('testBtn').onclick = async () => { listening ? stopAudio() : await startAudio('test'); renderParent(); };
 
-let practicedMs = store.get('session', 0);   // current session total
-let listening = false, audioCtx, analyser, stream, buf, timer, wakeLock;
-let lastTick = 0, lastSoundAt = -Infinity, smoothLevel = 0, celebrated = false;
+function renderTest(playing, talking) {
+  const t = $('testStatus');
+  t.className = playing ? 'playing' : talking ? 'talking' : '';
+  t.textContent = playing ? '✓ This would count as practice' : talking ? '🗣 Talking – would not count' : 'Not counting';
+}
 
-// ---- Music vs. talking detection (Google's YAMNet sound classifier, runs on-device) ----
+// ---------- Music vs. talking detection (Google's YAMNet sound classifier, runs on-device) ----------
 const MP = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-audio@1.0.1';
 const MODEL = 'https://storage.googleapis.com/mediapipe-models/audio_classifier/yamnet/float32/1/yamnet.tflite';
 // YAMNet class indices: 0–4 are speech (Speech, Child speech, Conversation, Narration, Babbling);
@@ -145,6 +456,7 @@ const SPEECH_RATIO = 2;        // …unless speech is this many times stronger t
 let classifier = null, classifierState = 'idle';   // idle | loading | ready | failed
 let processor, ring, ringPos = 0, lastClassify = 0;
 let lastMusicAt = -Infinity, lastSpeechAt = -Infinity;
+const musicOnly = () => settings.musicOnly;
 
 async function loadClassifier() {
   if (classifierState !== 'idle' && classifierState !== 'failed') return;
@@ -162,13 +474,12 @@ async function loadClassifier() {
 }
 
 function renderDetector() {
-  const on = $('musicOnly').checked;
-  $('detectorNote').textContent = !on ? 'Any sound louder than the orange line counts.'
+  $('detectorNote').textContent = !musicOnly() ? 'Any sound louder than the orange line counts.'
     : { loading: 'Loading music detector… (first time only, about 10 MB)',
         ready: 'Talking, singing and other noises won’t count.',
         failed: 'Couldn’t load the music detector, so any loud sound counts for now. Check your internet connection and reload.',
         idle: '' }[classifierState];
-  if (!on || classifierState !== 'ready') $('hears').textContent = '';
+  if (!musicOnly() || classifierState !== 'ready') $('hears').textContent = '';
 }
 
 // Returns the most recent 1 second of audio from the ring buffer, oldest sample first.
@@ -196,38 +507,13 @@ function classify(now) {
   $('hears').textContent = top ? `Hears: ${top.categoryName} (${Math.round(top.score * 100)}%)` : '';
 }
 
-const todayKey = () => 'day-' + new Date().toISOString().slice(0, 10);
+// ---------- Microphone ----------
+let listening = false, mode = 'practice', audioCtx, analyser, stream, buf, timer, wakeLock;
+let lastTick = 0, lastSoundAt = -Infinity, smoothLevel = 0;
 
 // Sensitivity 1..100 maps to a loudness threshold (0..1 meter scale). Higher sensitivity = lower threshold.
-const threshold = () => 0.6 - ($('sens').value / 100) * 0.55;
-const goalMs = () => $('goal').value * 60000;
-
-function fmt(ms) {
-  const s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, ss = s % 60;
-  return h ? `${h}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}` : `${m}:${String(ss).padStart(2, '0')}`;
-}
-
-function renderSettings() {
-  $('sensVal').textContent = $('sens').value;
-  $('goalVal').textContent = $('goal').value + ' min';
-  $('graceVal').textContent = $('grace').value + ' s';
-  $('thresholdMark').style.left = (threshold() * 100) + '%';
-  render();
-}
-
-function render(playing, talking) {
-  $('time').textContent = fmt(practicedMs);
-  const frac = Math.min(practicedMs / goalMs(), 1);
-  $('prog').style.strokeDashoffset = CIRC * (1 - frac);
-  $('ring').classList.toggle('done', frac >= 1);
-  const st = $('status');
-  if (frac >= 1 && !celebrated && listening) { celebrated = true; celebrate(); }
-  if (!listening) { st.textContent = practicedMs ? 'Paused' : 'Press Start'; st.className = ''; }
-  else if (playing) { st.textContent = frac >= 1 ? '🎉 Goal reached!' : '▶ Playing'; st.className = 'playing'; }
-  else if (talking) { st.textContent = '🗣 Talking – not counted'; st.className = 'talking'; }
-  else { st.textContent = 'Waiting for music…'; st.className = ''; }
-  $('today').textContent = 'Today: ' + fmt(store.get(todayKey(), 0));
-}
+const threshold = () => 0.6 - (settings.sens / 100) * 0.55;
+function updateMarks() { document.querySelectorAll('.meter .mark').forEach(m => m.style.left = (threshold() * 100) + '%'); }
 
 function tick() {
   const now = performance.now();
@@ -242,33 +528,31 @@ function tick() {
   smoothLevel = smoothLevel * 0.7 + level * 0.3;
 
   const loud = smoothLevel > threshold();
-  const detecting = $('musicOnly').checked && classifierState === 'ready';
+  const detecting = musicOnly() && classifierState === 'ready';
   if (detecting && loud && now - lastClassify >= 500) { lastClassify = now; classify(now); }
   // Classifier looks at the last second, so allow a little slack after its last "music" verdict
   const musicNow = !detecting || now - lastMusicAt < 1200;
   if (loud && musicNow) lastSoundAt = now;
   const talking = detecting && loud && !musicNow && now - lastSpeechAt < 1200;
-  const playing = now - lastSoundAt < $('grace').value * 1000 + 150;
+  const playing = now - lastSoundAt < settings.grace * 1000 + 150;
 
-  if (playing && dt < 5000) {        // ignore huge gaps (e.g. laptop was asleep)
-    practicedMs += dt;
-    store.set('session', practicedMs);
-    store.set(todayKey(), store.get(todayKey(), 0) + dt);
-  }
+  document.querySelectorAll('.meter .level').forEach(l => { l.style.width = (smoothLevel * 100) + '%'; l.classList.toggle('on', loud && musicNow); });
 
-  $('level').style.width = (smoothLevel * 100) + '%';
-  $('level').classList.toggle('on', loud);
-  render(playing, talking);
+  if (mode === 'practice') {
+    if (playing && dt < 5000) addPractice(dt);   // ignore huge gaps (e.g. device was asleep)
+    renderPractice(playing, talking);
+  } else renderTest(playing, talking);
 }
 
-async function start() {
+async function startAudio(m) {
+  mode = m;
   try {
     stream = await navigator.mediaDevices.getUserMedia({
       // Turn off voice processing so it doesn't filter out the instrument
       audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
     });
   } catch (e) {
-    $('status').textContent = 'Microphone access was blocked';
+    alert('Microphone access was blocked. Allow the microphone for this site in your browser settings, then try again.');
     return;
   }
   audioCtx = new AudioContext();
@@ -287,25 +571,22 @@ async function start() {
   };
   const mute = audioCtx.createGain(); mute.gain.value = 0;   // processor must reach the output to run
   source.connect(processor); processor.connect(mute); mute.connect(audioCtx.destination);
-  lastMusicAt = lastSpeechAt = -Infinity;
+  lastMusicAt = lastSpeechAt = lastSoundAt = -Infinity;
 
   listening = true;
-  celebrated = practicedMs >= goalMs();
+  updateMarks();
   lastTick = performance.now();
   timer = setInterval(tick, 100);
-  $('startBtn').textContent = 'Pause';
-  try { wakeLock = await navigator.wakeLock?.request('screen'); } catch {}
+  if (mode === 'practice') { renderPractice(); try { wakeLock = await navigator.wakeLock?.request('screen'); } catch {} }
 }
 
-function stop() {
+function stopAudio() {
   listening = false;
   clearInterval(timer);
   stream?.getTracks().forEach(t => t.stop());
   audioCtx?.close();
   wakeLock?.release?.(); wakeLock = null;
-  $('level').style.width = '0';
-  $('startBtn').textContent = 'Start';
-  render(false);
+  document.querySelectorAll('.meter .level').forEach(l => l.style.width = '0');
 }
 
 function celebrate() {
@@ -321,20 +602,15 @@ function celebrate() {
   } catch {}
 }
 
-$('startBtn').onclick = () => listening ? stop() : start();
-$('resetBtn').onclick = () => {
-  if (practicedMs && !confirm('Reset the timer to 0:00?')) return;
-  practicedMs = 0; celebrated = false; store.set('session', 0); render(false);
-};
 document.addEventListener('visibilitychange', async () => {
-  if (listening && document.visibilityState === 'visible') {
+  if (listening && mode === 'practice' && document.visibilityState === 'visible') {
     try { wakeLock = await navigator.wakeLock?.request('screen'); } catch {}
   }
 });
 
-renderSettings();
-renderDetector();
-if ($('musicOnly').checked) loadClassifier();
+updateMarks();
+show('home');
+if (musicOnly()) loadClassifier();
 </script>
 </body>
 </html>
