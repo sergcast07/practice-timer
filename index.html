@@ -136,6 +136,11 @@
   .metro { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
   #metroBtn { flex: 1 1 150px; }
   .metro .stepper { flex: 1 1 170px; justify-content: center; }
+  .metro .stepper input { width: 64px; text-align: center; font: inherit; font-weight: 700; font-size: 18px; padding: 8px 4px;
+                          border-radius: 12px; border: 2px solid var(--track); background: var(--bg); color: var(--ink); }
+  .metroOpts { display: flex; gap: 8px; flex: 1 1 100%; }
+  .metroOpts label { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+  .metroOpts select { width: 100%; min-width: 0; }
   #metroBtn.on { background: var(--kid); color: #fff; }
   #beatDot { width: 16px; height: 16px; border-radius: 50%; background: var(--track); flex: none; }
   #beatDot.on { background: var(--kid); }
@@ -201,7 +206,13 @@
     <button class="primary" id="startBtn">Start</button>
     <div class="card metro">
       <div style="display:flex;align-items:center;gap:10px;flex:1 1 150px"><button id="metroBtn">🥁 Metronome</button><div id="beatDot"></div></div>
-      <div class="stepper"><button id="bpmDown">−</button><span id="bpmVal"></span><button id="bpmUp">+</button></div>
+      <div class="stepper"><button id="bpmDown">−</button><input type="number" id="bpmVal" min="30" max="250" inputmode="numeric" aria-label="Beats per minute"><span style="min-width:0;font-size:14px" class="muted">bpm</span><button id="bpmUp">+</button></div>
+      <div class="metroOpts">
+        <label>Sound <select id="metroSound"></select></label>
+        <label>Accent beat 1 <select id="metroAccent">
+          <option value="0">None</option><option value="2">Every 2</option><option value="3">Every 3</option>
+          <option value="4">Every 4</option><option value="6">Every 6</option></select></label>
+      </div>
     </div>
     <div class="card goalRow">
       <span style="white-space:nowrap">Daily goal</span>
@@ -319,7 +330,8 @@ $('prog').style.strokeDasharray = CIRC;
 const INSTRUMENTS = { '': 'Choose instrument…', piano: '🎹 Piano', violin: '🎻 Violin', viola: '🎻 Viola', cello: '🎻 Cello', other: '🎵 Other (flute, voice, …)' };
 // Lowest note we listen for, per instrument (Hz). Piano isn't checked for tuning – its notes are fixed.
 const LOWEST = { violin: 180, viola: 120, cello: 60, other: 60 };
-const tracksPitch = k => !!LOWEST[k?.instrument];
+const hasPitch = k => !!LOWEST[k?.instrument];                  // instrument we can hear pitch on
+const tracksPitch = k => hasPitch(k) && k.tuning !== false;      // …and the parent wants tuning shown for this kid
 const COLORS = ['#e0653a', '#2a9d8f', '#7b5cd6', '#2f7ed8', '#d4a017', '#d6457a'];
 
 // ---------- Storage ----------
@@ -586,7 +598,11 @@ function renderPractice(playing, talking) {
   $('tuner').hidden = !(listening && tracksPitch(kid));
   $('metroBtn').classList.toggle('on', metroOn);
   $('metroBtn').textContent = metroOn ? '🥁 Metronome on' : '🥁 Metronome';
-  $('bpmVal').textContent = (kid.bpm || 80) + ' bpm';
+  if (document.activeElement !== $('bpmVal')) $('bpmVal').value = kid.bpm || 80;
+  if (!$('metroSound').options.length)
+    $('metroSound').innerHTML = Object.entries(METRO_SOUNDS).map(([v, m]) => `<option value="${v}">${m.label}</option>`).join('');
+  $('metroSound').value = kid.metroSound || 'click';
+  $('metroAccent').value = kid.accent || 0;
 }
 $('startBtn').onclick = () => listening ? (stopAudio(), renderPractice()) : startAudio('practice');
 $('doneBtn').onclick = () => {
@@ -599,8 +615,17 @@ $('metroBtn').onclick = () => {
   metroOn ? metroStart() : metroStop();
   renderPractice();
 };
+function setBpm(v) {
+  if (Number.isFinite(v) && v > 0) { kid.bpm = Math.round(Math.max(30, Math.min(250, v))); saveKids(); }   // ignore non-numbers
+  if (metro.timer) { metroStop(); metroStart(); }
+  renderPractice();
+}
+$('bpmVal').onchange = () => { setBpm(+$('bpmVal').value); $('bpmVal').blur(); };
+$('bpmVal').onkeydown = e => { if (e.key === 'Enter') $('bpmVal').onchange(); };
+$('metroSound').onchange = () => { kid.metroSound = $('metroSound').value; saveKids(); previewSound(); };
+$('metroAccent').onchange = () => { kid.accent = +$('metroAccent').value; saveKids(); };
 function changeBpm(d) {
-  kid.bpm = Math.max(30, Math.min(220, (kid.bpm || 80) + d)); saveKids();
+  kid.bpm = Math.max(30, Math.min(250, (kid.bpm || 80) + d)); saveKids();
   if (metro.timer) { metroStop(); metroStart(); }
   renderPractice();
 }
@@ -727,6 +752,7 @@ function renderParent() {
       <button class="danger" data-remove="${k.id}">Remove</button>
       <select data-instr="${k.id}">${Object.entries(INSTRUMENTS).map(([v, l]) =>
         `<option value="${v}" ${(k.instrument || '') === v ? 'selected' : ''} ${v === '' ? 'disabled' : ''}>${l}</option>`).join('')}</select>
+      ${hasPitch(k) ? `<label class="check"><input type="checkbox" data-tuning="${k.id}" ${k.tuning !== false ? 'checked' : ''}> 🎯 Show tuner and in-tune score</label>` : ''}
       <label class="check"><input type="checkbox" data-chime="${k.id}" ${k.chime !== false ? 'checked' : ''}> 🔔 Play a sound when goal is reached</label>
     </div>`).join('') || '<div class="muted">Add each child who practices.</div>';
   document.querySelectorAll('[data-rename]').forEach(i => i.onchange = () => {
@@ -734,11 +760,14 @@ function renderParent() {
     if (i.value.trim()) { k.name = i.value.trim(); saveKids(); }
     renderParent();
   });
+  document.querySelectorAll('[data-tuning]').forEach(c => c.onchange = () => {
+    kids.find(k => k.id === c.dataset.tuning).tuning = c.checked; saveKids();
+  });
   document.querySelectorAll('[data-chime]').forEach(c => c.onchange = () => {
     kids.find(k => k.id === c.dataset.chime).chime = c.checked; saveKids();
   });
   document.querySelectorAll('[data-instr]').forEach(sel => sel.onchange = () => {
-    kids.find(k => k.id === sel.dataset.instr).instrument = sel.value; saveKids();
+    kids.find(k => k.id === sel.dataset.instr).instrument = sel.value; saveKids(); renderParent();
   });
   document.querySelectorAll('[data-remove]').forEach(b => b.onclick = () => {
     const k = kids.find(k => k.id === b.dataset.remove);
@@ -917,7 +946,7 @@ function scoreNote(c) {
 }
 function endNote(final) {
   const n = curNote; curNote = null;
-  if (n && n.cents.length * n.hop >= 0.15 && session) {   // shorter than 0.15 s: too short to judge
+  if (n && n.cents.length * n.hop >= 0.15 && session && tracksPitch(kid)) {   // shorter than 0.15 s: too short to judge
     const c = median(n.cents.slice(1));                    // skip the first reading: note starts are often unsteady
     session.devs.push(c); if (session.devs.length > 60) session.devs.shift();
     if (session.devs.length < 8) session.early.push(c);    // wait until we know the instrument's tuning
@@ -967,7 +996,10 @@ function onHop(idx, e) {
   lpHist.push(e); if (lpHist.length > 19) lpHist.shift();                    // last ~100 ms
   const prev = hopDb.length ? Math.min(...hopDb) : db;
   hopDb.push(db); if (hopDb.length > 6) hopDb.shift();
-  if (db > -55 && db - prev > ONSET_DB && idx - lastOnset > 0.09 * sr) {
+  // A note start must be a sharp jump *and* reach the loudness line (the same one that runs the timer),
+  // which keeps faint leftovers of the metronome's click from counting as notes
+  const floorDb = threshold() * 60 - 60;
+  if (db > floorDb && db - prev > ONSET_DB && idx - lastOnset > 0.09 * sr) {
     lastOnset = idx;
     if (metro.timer && musicNowFlag) addOnset(t0 + idx / sr, true);
   }
@@ -986,21 +1018,57 @@ const lowLevel = () => {
 };
 
 // Metronome, scheduled on the audio clock so clicks are exactly in time
-const metro = { timer: null, next: 0, anchor: 0, period: 0, onsets: [] };
+const metro = { timer: null, next: 0, anchor: 0, period: 0, onsets: [], count: 0 };
+// Metronome sounds. All are kept high-pitched (4 kHz and up) on purpose: the app filters out
+// sound above ~1.5 kHz when listening for notes, so the metronome never counts as practice.
+const METRO_SOUNDS = {
+  click: { label: '🔹 Click', tones: [6000], accent: [7500], decay: 0.03 },
+  beep:  { label: '🔸 Beep', tones: [4200], accent: [5200], decay: 0.09, hold: true },
+  tick:  { label: '🥢 Tick', noise: true, decay: 0.025 },
+  bell:  { label: '🔔 Bell', tones: [5000, 7300, 9100], accent: [6000, 8700, 11000], decay: 0.25 }
+};
+function playMetroSound(ctx, t, name, accent) {
+  const m = METRO_SOUNDS[name] || METRO_SOUNDS.click, g = ctx.createGain(), peak = accent ? 0.9 : 0.5;
+  g.connect(ctx.destination);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(peak, t + 0.004);      // soft-ish attack: a sharper one leaks into low pitches
+  if (m.hold) g.gain.setValueAtTime(peak, t + m.decay * 0.6);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + m.decay);
+  if (m.noise) {           // filtered noise burst, high-passed twice at 5 kHz
+    const b = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * m.decay), ctx.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource(); src.buffer = b;
+    let node = src;
+    for (let k = 0; k < 2; k++) { const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = accent ? 7000 : 5000; node.connect(f); node = f; }
+    node.connect(g); src.start(t); src.stop(t + m.decay + 0.01);
+  } else {
+    const tones = accent ? m.accent : m.tones, norm = tones.reduce((a, _, i) => a + 1 / (i + 1), 0);
+    tones.forEach((f, i) => {
+      const o = ctx.createOscillator(), og = ctx.createGain(); o.frequency.value = f; og.gain.value = 1 / (i + 1) / norm;
+      o.connect(og); og.connect(g); o.start(t); o.stop(t + m.decay + 0.01);
+    });
+  }
+}
+function previewSound() {
+  try {
+    const ctx = listening ? audioCtx : new AudioContext();
+    playMetroSound(ctx, ctx.currentTime + 0.02, kid.metroSound, false);
+    playMetroSound(ctx, ctx.currentTime + 0.4, kid.metroSound, true);
+  } catch {}
+}
 function metroStart() {
   if (!metroOn || !listening || mode !== 'practice' || metro.timer) return;
   metro.period = 60 / (kid.bpm || 80);
   metro.next = metro.anchor = audioCtx.currentTime + 0.15;
-  metro.onsets = [];
+  metro.onsets = []; metro.count = 0;
   metro.timer = setInterval(metroSchedule, 25);
   metroSchedule();
 }
 function metroSchedule() {
   while (metro.next < audioCtx.currentTime + 0.12) {
-    const t = metro.next, o = audioCtx.createOscillator(), g = audioCtx.createGain();
-    o.frequency.value = 6000; o.connect(g); g.connect(audioCtx.destination);
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.6, t + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
-    o.start(t); o.stop(t + 0.04);
+    const t = metro.next, accent = kid.accent > 0 && metro.count % kid.accent === 0;
+    playMetroSound(audioCtx, t, kid.metroSound, accent);
+    metro.count++;
     setTimeout(() => { $('beatDot').classList.add('on'); setTimeout(() => $('beatDot').classList.remove('on'), 100); },
                Math.max(0, (t - audioCtx.currentTime) * 1000));
     metro.next += metro.period;
@@ -1075,7 +1143,8 @@ function tick() {
     if (!playing && session.wasPlaying) { endStretch(); session.breaks++; addStat('breaks', 1); }
     session.wasPlaying = playing;
 
-    if (tracksPitch(kid)) {
+    // Pitch also finds smooth (legato) note starts for the rhythm score, so keep it running with the metronome
+    if (hasPitch(kid) && (tracksPitch(kid) || metro.timer)) {
       pitchStep(now);
       if (now - lastPitchAt > 400) { $('tNote').innerHTML = '&nbsp;'; $('tNeedle').style.left = '50%'; $('tNeedle').className = ''; }
     }
