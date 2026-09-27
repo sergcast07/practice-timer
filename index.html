@@ -104,6 +104,9 @@
   .addRow button { flex: none; }
   .pinBox { max-width: 280px; margin: 40px auto 0; text-align: center; display: flex; flex-direction: column; gap: 12px; }
   .pinBox input { text-align: center; font-size: 28px; letter-spacing: 8px; }
+  .code { font-family: ui-monospace, Menlo, monospace; font-size: 16px; background: var(--bg); border-radius: 10px;
+          padding: 10px; margin: 4px 0 12px; user-select: all; word-break: break-all; }
+  #syncStatus { text-align: center; }
   #pinError { color: #c0392b; min-height: 1.2em; font-size: 14px; }
 </style>
 </head>
@@ -122,6 +125,7 @@
       <button id="setupBtn">Grown-ups: add players</button>
     </div>
     <button class="link" id="historyBtn">📅 See practice history</button>
+    <div id="syncStatus" class="muted small"></div>
   </section>
 
   <!-- PRACTICE -->
@@ -191,6 +195,28 @@
     </div>
 
     <div class="card">
+      <h2>Sync across devices</h2>
+      <div id="syncOff">
+        <p class="muted small" style="margin-top:0">Right now everything is saved on this device only. Turn on sync to share players and practice history between all your phones and tablets.</p>
+        <button id="createFamilyBtn">☁️ Turn on sync</button>
+        <div class="muted small" style="margin:16px 0 6px">Already turned on sync on another device? Enter its family code:</div>
+        <div class="addRow" style="margin-top:0">
+          <input type="text" id="joinCode" placeholder="family code" autocapitalize="off" autocorrect="off" spellcheck="false">
+          <button id="joinBtn">Join</button>
+        </div>
+        <div id="joinError" class="small" style="color:#c0392b;margin-top:6px"></div>
+      </div>
+      <div id="syncOn">
+        <div id="syncState"></div>
+        <div class="muted small" style="margin-top:12px">Family code</div>
+        <div id="familyCode" class="code"></div>
+        <button id="shareBtn">📲 Send link to another device</button>
+        <div class="muted small" style="margin-top:8px">Open the link on another phone or tablet to connect it. Anyone with this code can see and change your practice data, so only share it with family.</div>
+        <button class="danger" id="leaveBtn" style="margin-top:12px">Stop syncing on this device</button>
+      </div>
+    </div>
+
+    <div class="card">
       <h2>Microphone</h2>
       <div class="row">
         <label class="check"><input type="checkbox" id="musicOnly"> Only count music, not talking</label>
@@ -239,9 +265,133 @@ let log = store.get('pt-log', {});              // {kidId: {'YYYY-MM-DD': ms}}
 let settings = Object.assign(
   { sens: +store.get('sens', 60), grace: +store.get('grace', 3), musicOnly: store.get('musicOnly', true), pin: null },
   store.get('pt-settings', {}));
-const saveKids = () => store.set('pt-kids', kids);
-const saveLog = () => store.set('pt-log', log);
-const saveSettings = () => store.set('pt-settings', settings);
+function saveKids() { store.set('pt-kids', kids); pushRemote({ kids }); }
+function saveLog() { store.set('pt-log', log); }
+function saveSettings() { store.set('pt-settings', settings); pushRemote({ settings }); }
+
+// ---------- Cloud sync (Firebase Firestore) ----------
+// Each family is one document, families/{family code}. The long random code is the key:
+// the database rules refuse to list families or accept short codes, so only devices that know it can get in.
+const FIREBASE = {
+  apiKey: 'AIzaSyAUn6GqVxRR-m9i5kjTH9dY7-nGWCo1374',
+  authDomain: 'music-practice-tracker-d77f7.firebaseapp.com',
+  projectId: 'music-practice-tracker-d77f7',
+  storageBucket: 'music-practice-tracker-d77f7.firebasestorage.app',
+  messagingSenderId: '933602552014',
+  appId: '1:933602552014:web:1b19df5cc27f55fc58c89f'
+};
+const FB = 'https://www.gstatic.com/firebasejs/12.19.0';
+let family = store.get('pt-family', null);
+let F, db, ref, unsubscribe, syncState = 'local';
+let pend = store.get('pt-pend', {});              // practice time not yet sent: {kidId: {day: ms}}
+let pendingFields = {}, fieldTimer, lastFlush = 0;
+
+async function loadFirebase() {
+  if (F) return;
+  const [{ initializeApp }, firestore] = await Promise.all([import(FB + '/firebase-app.js'), import(FB + '/firebase-firestore.js')]);
+  const app = initializeApp(FIREBASE);
+  try {   // offline cache: practice still counts with no internet and syncs later
+    db = firestore.initializeFirestore(app, { localCache: firestore.persistentLocalCache({ tabManager: firestore.persistentMultipleTabManager() }) });
+  } catch { db = firestore.getFirestore(app); }
+  F = firestore;
+}
+
+async function connect() {
+  setSync('connecting');
+  try { await loadFirebase(); } catch (e) { console.error(e); return setSync('error'); }
+  unsubscribe?.();
+  ref = F.doc(db, 'families', family);
+  unsubscribe = F.onSnapshot(ref, { includeMetadataChanges: true }, onRemote, e => { console.error(e); setSync('error'); });
+  flushPractice(); flushFields();
+}
+
+function onRemote(snap) {
+  if (!snap.exists()) return setSync(snap.metadata.fromCache ? 'connecting' : 'missing');
+  const d = snap.data();
+  // Don't let an older server copy overwrite a change still waiting to be sent
+  if (!pendingFields.kids) kids = d.kids || [];
+  if (!pendingFields.settings) settings = Object.assign(settings, d.settings || {});
+  log = d.log || {};
+  store.set('pt-kids', kids); store.set('pt-log', log); store.set('pt-settings', settings);
+  if (kid) {
+    kid = kids.find(k => k.id === kid.id) || null;
+    if (!kid && screen === 'practice') return show('home');
+  }
+  setSync(snap.metadata.hasPendingWrites ? 'saving' : snap.metadata.fromCache ? 'offline' : 'synced');
+  if (screen === 'home') renderHome();
+  else if (screen === 'history') renderHistory();
+  else if (screen === 'practice' && !listening) renderPractice();
+  else if (screen === 'parent' && document.activeElement?.tagName !== 'INPUT') renderParent();
+}
+
+function pushRemote(fields) {
+  if (!family) return;
+  Object.assign(pendingFields, fields);
+  clearTimeout(fieldTimer);
+  fieldTimer = setTimeout(flushFields, 700);     // wait for sliders/typing to settle
+}
+function flushFields() {
+  clearTimeout(fieldTimer);
+  if (!ref || !Object.keys(pendingFields).length) return;
+  const f = pendingFields; pendingFields = {};
+  F.updateDoc(ref, f).catch(e => { console.error(e); setSync('error'); });
+}
+// Practice time is sent as increments, so two kids practicing on two devices at once both add up correctly
+function flushPractice() {
+  if (!ref) return;
+  const upd = {};
+  for (const id in pend) for (const day in pend[id]) upd[`log.${id}.${day}`] = F.increment(Math.round(pend[id][day]));
+  pend = {}; store.set('pt-pend', pend);
+  if (Object.keys(upd).length) F.updateDoc(ref, upd).catch(e => { console.error(e); setSync('error'); });
+}
+
+function familyCode() {
+  const abc = 'abcdefghjkmnpqrstuvwxyz23456789', r = crypto.getRandomValues(new Uint8Array(25));
+  return [...r].map(x => abc[x % abc.length]).join('').match(/.{5}/g).join('-');
+}
+async function createFamily() {
+  setSync('connecting');
+  try { await loadFirebase(); } catch (e) { console.error(e); return setSync('error'); }
+  family = familyCode();
+  F.setDoc(F.doc(db, 'families', family), { kids, log, settings, created: F.serverTimestamp() })
+    .catch(e => { console.error(e); setSync('error'); });
+  store.set('pt-family', family);
+  connect(); renderParent();
+}
+async function joinFamily(code) {
+  code = code.trim().toLowerCase().replace(/\s+/g, '');
+  const fail = msg => screen === 'parent' ? ($('joinError').textContent = msg) : alert(msg);
+  $('joinError').textContent = '';
+  if (code.length < 20) return fail('That code is too short. Check it and try again.');
+  try {
+    await loadFirebase();
+    const snap = await F.getDoc(F.doc(db, 'families', code));
+    if (!snap.exists()) return fail('No family found with that code.');
+  } catch (e) { console.error(e); return fail('Couldn’t reach the server. Check the internet connection.'); }
+  if (kids.length && !confirm('Replace the players and history on this device with your family’s shared ones?')) return;
+  family = code; store.set('pt-family', family);
+  pend = {}; store.set('pt-pend', pend);
+  await connect();
+  if (screen === 'parent') renderParent();
+}
+function leaveFamily() {
+  if (!confirm('Stop syncing on this device? It keeps a copy of the current players and history, but won’t see new practice from other devices.')) return;
+  flushPractice(); flushFields();
+  unsubscribe?.(); unsubscribe = ref = null;
+  family = null; store.set('pt-family', null);
+  setSync('local'); renderParent();
+}
+
+function setSync(state) {
+  syncState = state;
+  const text = {
+    local: '', connecting: '☁️ Connecting…', synced: '☁️ Synced', saving: '☁️ Saving…',
+    offline: '☁️ Offline – will sync when back online', error: '⚠️ Sync problem – practice is still saved on this device',
+    missing: '⚠️ Family not found – check the family code in Parent settings'
+  }[state];
+  $('syncStatus').textContent = text;
+  $('syncState').textContent = text;
+}
 
 // ---------- Dates & formatting ----------
 const pad = n => String(n).padStart(2, '0');
@@ -251,7 +401,7 @@ function lastDays(n) {            // oldest → today
   for (let i = n - 1; i >= 0; i--) out.push(new Date(t.getFullYear(), t.getMonth(), t.getDate() - i));
   return out;
 }
-const msOn = (kid, d = new Date()) => (log[kid.id] || {})[dayKey(d)] || 0;
+const msOn = (kid, d = new Date()) => ((log[kid.id] || {})[dayKey(d)] || 0) + ((pend[kid.id] || {})[dayKey(d)] || 0);
 function clock(ms) {
   const s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, ss = s % 60;
   return h ? `${h}:${pad(m)}:${pad(ss)}` : `${m}:${pad(ss)}`;
@@ -335,10 +485,16 @@ $('goalDown').onclick = () => changeGoal(-5);
 function addPractice(ms) {
   const k = dayKey();
   const before = msOn(kid);
-  log[kid.id] = log[kid.id] || {};
-  log[kid.id][k] = before + ms;
+  if (family) {        // queue it; flushPractice() sends it every few seconds
+    pend[kid.id] = pend[kid.id] || {};
+    pend[kid.id][k] = (pend[kid.id][k] || 0) + ms;
+    store.set('pt-pend', pend);
+  } else {
+    log[kid.id] = log[kid.id] || {};
+    log[kid.id][k] = before + ms;
+    saveLog();
+  }
   sessionMs += ms;
-  saveLog();
   const goal = kid.goal * 60000;
   if (before < goal && before + ms >= goal) celebrate();
 }
@@ -412,8 +568,13 @@ function renderParent() {
   document.querySelectorAll('[data-remove]').forEach(b => b.onclick = () => {
     const k = kids.find(k => k.id === b.dataset.remove);
     if (!confirm(`Remove ${k.name} and all of their practice history?`)) return;
-    kids = kids.filter(x => x !== k); delete log[k.id]; saveKids(); saveLog(); renderParent();
+    kids = kids.filter(x => x !== k); delete log[k.id]; delete pend[k.id]; saveKids(); saveLog();
+    if (ref) F.updateDoc(ref, { ['log.' + k.id]: F.deleteField() }).catch(console.error);
+    renderParent();
   });
+  $('syncOff').hidden = !!family;
+  $('syncOn').hidden = !family;
+  $('familyCode').textContent = family || '';
   $('musicOnly').checked = settings.musicOnly;
   $('sens').value = settings.sens;
   $('grace').value = settings.grace;
@@ -430,6 +591,18 @@ $('addBtn').onclick = () => {
   kids.push({ id: Date.now().toString(36), name, goal: 20,
               color: COLORS.find(c => !used.includes(c)) || COLORS[kids.length % COLORS.length] });
   saveKids(); $('newName').value = ''; renderParent();
+};
+$('createFamilyBtn').onclick = createFamily;
+$('joinBtn').onclick = () => joinFamily($('joinCode').value);
+$('joinCode').onkeydown = e => { if (e.key === 'Enter') $('joinBtn').click(); };
+$('leaveBtn').onclick = leaveFamily;
+$('shareBtn').onclick = async () => {
+  const url = location.origin + location.pathname + '#join=' + family;
+  try {
+    if (navigator.share) return await navigator.share({ title: 'Practice Timer', text: 'Open this to connect this device to our family practice timer:', url });
+    await navigator.clipboard.writeText(url);
+    $('shareBtn').textContent = '✓ Link copied – paste it on the other device';
+  } catch {}
 };
 $('newName').onkeydown = e => { if (e.key === 'Enter') $('addBtn').click(); };
 $('sens').oninput = () => { settings.sens = +$('sens').value; saveSettings(); $('sensVal').textContent = settings.sens; updateMarks(); };
@@ -539,7 +712,8 @@ function tick() {
   document.querySelectorAll('.meter .level').forEach(l => { l.style.width = (smoothLevel * 100) + '%'; l.classList.toggle('on', loud && musicNow); });
 
   if (mode === 'practice') {
-    if (playing && dt < 5000) addPractice(dt);   // ignore huge gaps (e.g. device was asleep)
+    if (playing && dt < 5000) addPractice(dt);
+    if (family && now - lastFlush > 10000) { lastFlush = now; flushPractice(); }   // ignore huge gaps (e.g. device was asleep)
     renderPractice(playing, talking);
   } else renderTest(playing, talking);
 }
@@ -582,6 +756,7 @@ async function startAudio(m) {
 
 function stopAudio() {
   listening = false;
+  flushPractice();
   clearInterval(timer);
   stream?.getTracks().forEach(t => t.stop());
   audioCtx?.close();
@@ -602,7 +777,10 @@ function celebrate() {
   } catch {}
 }
 
+const flushAll = () => { flushPractice(); flushFields(); };
+addEventListener('pagehide', flushAll);
 document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'hidden') flushAll();
   if (listening && mode === 'practice' && document.visibilityState === 'visible') {
     try { wakeLock = await navigator.wakeLock?.request('screen'); } catch {}
   }
@@ -611,6 +789,13 @@ document.addEventListener('visibilitychange', async () => {
 updateMarks();
 show('home');
 if (musicOnly()) loadClassifier();
+if (family) connect();
+// A "Send link to another device" link: #join=<family code>
+const joinLink = location.hash.match(/join=([a-z0-9-]{20,})/);
+if (joinLink) {
+  history.replaceState(null, '', location.pathname);
+  if (joinLink[1] !== family) joinFamily(joinLink[1]).then(() => { if (family === joinLink[1]) show('home'); });
+}
 </script>
 </body>
 </html>
