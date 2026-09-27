@@ -68,7 +68,7 @@
   .meter .level { height: 100%; width: 0; background: var(--muted); transition: width .08s; }
   .meter .level.on { background: var(--good); }
   .meter .mark { position: absolute; top: 0; bottom: 0; width: 3px; background: var(--accent); }
-  .goalRow { display: flex; align-items: center; justify-content: space-between; }
+  .goalRow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
   .stepper { display: flex; align-items: center; gap: 8px; }
   .stepper button { width: 44px; height: 44px; padding: 0; font-size: 22px; }
   .stepper span { min-width: 64px; text-align: center; font-weight: 700; font-size: 18px; }
@@ -107,6 +107,42 @@
   .code { font-family: ui-monospace, Menlo, monospace; font-size: 16px; background: var(--bg); border-radius: 10px;
           padding: 10px; margin: 4px 0 12px; user-select: all; word-break: break-all; }
   #syncStatus { text-align: center; }
+  select { font: inherit; font-size: 16px; padding: 8px 10px; border-radius: 12px; border: 2px solid var(--track);
+           background: var(--bg); color: var(--ink); }
+  .player { display: grid; grid-template-columns: 36px 1fr auto; gap: 8px; align-items: center; }
+  .player select { grid-column: 2 / -1; }
+  .player + .player { margin-top: 16px; }
+
+  /* Tuner */
+  #tuner { margin-top: 12px; text-align: center; }
+  #tNote { font-size: 22px; font-weight: 700; min-height: 1.3em; }
+  .needle { position: relative; height: 14px; background: var(--track); border-radius: 7px; margin: 6px auto 0; max-width: 260px; }
+  .needle::before { content: ''; position: absolute; left: 30%; width: 40%; top: 0; bottom: 0; background: var(--good); opacity: .25; border-radius: 7px; }
+  .needle::after { content: ''; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 2px; background: var(--muted); }
+  #tNeedle { position: absolute; top: -2px; width: 10px; height: 18px; margin-left: -5px; border-radius: 5px; background: var(--muted); transition: left .1s; }
+  #tNeedle.ok { background: var(--good); }
+  #tNeedle.off { background: var(--accent); }
+  .needleLbl { display: flex; justify-content: space-between; max-width: 260px; margin: 2px auto 0; font-size: 11px; color: var(--muted); }
+
+  /* Metronome */
+  .metro { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+  #metroBtn { flex: 1 1 150px; }
+  .metro .stepper { flex: 1 1 170px; justify-content: center; }
+  #metroBtn.on { background: var(--kid); color: #fff; }
+  #beatDot { width: 16px; height: 16px; border-radius: 50%; background: var(--track); flex: none; }
+  #beatDot.on { background: var(--kid); }
+
+  /* Session summary */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
+  .overlay .card { width: 100%; max-width: 400px; }
+  .sumRow { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--track); }
+  .sumRow:first-child { border-top: 0; }
+  .sumRow .ic { font-size: 24px; width: 32px; text-align: center; }
+  .sumRow b { font-size: 18px; }
+  .sumRow div div { font-size: 13px; color: var(--muted); }
+  .trend { font-size: 11px; font-weight: 600; }
+  .trend.up { color: var(--good); } .trend.down { color: var(--accent); }
+
   #pinError { color: #c0392b; min-height: 1.2em; font-size: 14px; }
 </style>
 </head>
@@ -147,9 +183,18 @@
       </div>
       <div id="status"></div>
       <div id="session"></div>
+      <div id="tuner" hidden>
+        <div id="tNote">&nbsp;</div>
+        <div class="needle"><div id="tNeedle" style="left:50%"></div></div>
+        <div class="needleLbl"><span>flat</span><span>in tune</span><span>sharp</span></div>
+      </div>
       <div class="meter"><div class="level"></div><div class="mark"></div></div>
     </div>
     <button class="primary" id="startBtn">Start</button>
+    <div class="card metro">
+      <div style="display:flex;align-items:center;gap:10px;flex:1 1 150px"><button id="metroBtn">🥁 Metronome</button><div id="beatDot"></div></div>
+      <div class="stepper"><button id="bpmDown">−</button><span id="bpmVal"></span><button id="bpmUp">+</button></div>
+    </div>
     <div class="card goalRow">
       <span style="white-space:nowrap">Daily goal</span>
       <div class="stepper"><button id="goalDown">−</button><span id="goalVal"></span><button id="goalUp">+</button></div>
@@ -249,10 +294,22 @@
 
 </main>
 
+<div class="overlay" id="summary" hidden>
+  <div class="card" style="--kid:var(--accent)">
+    <h2 id="sumTitle"></h2>
+    <div id="sumRows"></div>
+    <button class="primary" id="sumOk" style="width:100%;margin-top:12px">OK</button>
+  </div>
+</div>
+
 <script>
 const $ = id => document.getElementById(id);
 const CIRC = 2 * Math.PI * 52;
 $('prog').style.strokeDasharray = CIRC;
+const INSTRUMENTS = { '': 'Choose instrument…', piano: '🎹 Piano', violin: '🎻 Violin', viola: '🎻 Viola', cello: '🎻 Cello', other: '🎵 Other (flute, voice, …)' };
+// Lowest note we listen for, per instrument (Hz). Piano isn't checked for tuning – its notes are fixed.
+const LOWEST = { violin: 180, viola: 120, cello: 60, other: 60 };
+const tracksPitch = k => !!LOWEST[k?.instrument];
 const COLORS = ['#e0653a', '#2a9d8f', '#7b5cd6', '#2f7ed8', '#d4a017', '#d6457a'];
 
 // ---------- Storage ----------
@@ -262,6 +319,7 @@ const store = {
 };
 let kids = store.get('pt-kids', []);            // [{id, name, color, goal (minutes)}]
 let log = store.get('pt-log', {});              // {kidId: {'YYYY-MM-DD': ms}}
+let stats = store.get('pt-stats', {});          // {kidId: {'YYYY-MM-DD': {active, breaks, longest, notes, inTune, beats, steady}}}
 let settings = Object.assign(
   { sens: +store.get('sens', 60), grace: +store.get('grace', 3), musicOnly: store.get('musicOnly', true), pin: null },
   store.get('pt-settings', {}));
@@ -284,6 +342,7 @@ const FB = 'https://www.gstatic.com/firebasejs/12.19.0';
 let family = store.get('pt-family', null);
 let F, db, ref, unsubscribe, syncState = 'local';
 let pend = store.get('pt-pend', {});              // practice time not yet sent: {kidId: {day: ms}}
+let pendStats = store.get('pt-pendstats', {});    // quality stats not yet sent, same shape as `stats`
 let pendingFields = {}, fieldTimer, lastFlush = 0;
 
 async function loadFirebase() {
@@ -312,7 +371,8 @@ function onRemote(snap) {
   if (!pendingFields.kids) kids = d.kids || [];
   if (!pendingFields.settings) settings = Object.assign(settings, d.settings || {});
   log = d.log || {};
-  store.set('pt-kids', kids); store.set('pt-log', log); store.set('pt-settings', settings);
+  stats = d.stats || {};
+  store.set('pt-kids', kids); store.set('pt-log', log); store.set('pt-settings', settings); store.set('pt-stats', stats);
   if (kid) {
     kid = kids.find(k => k.id === kid.id) || null;
     if (!kid && screen === 'practice') return show('home');
@@ -341,7 +401,12 @@ function flushPractice() {
   if (!ref) return;
   const upd = {};
   for (const id in pend) for (const day in pend[id]) upd[`log.${id}.${day}`] = F.increment(Math.round(pend[id][day]));
+  for (const id in pendStats) for (const day in pendStats[id]) for (const f in pendStats[id][day]) {
+    const v = pendStats[id][day][f];
+    upd[`stats.${id}.${day}.${f}`] = f === 'longest' ? Math.round(Math.max(v, stats[id]?.[day]?.longest || 0)) : F.increment(Math.round(v));
+  }
   pend = {}; store.set('pt-pend', pend);
+  pendStats = {}; store.set('pt-pendstats', pendStats);
   if (Object.keys(upd).length) F.updateDoc(ref, upd).catch(e => { console.error(e); setSync('error'); });
 }
 
@@ -353,7 +418,7 @@ async function createFamily() {
   setSync('connecting');
   try { await loadFirebase(); } catch (e) { console.error(e); return setSync('error'); }
   family = familyCode();
-  F.setDoc(F.doc(db, 'families', family), { kids, log, settings, created: F.serverTimestamp() })
+  F.setDoc(F.doc(db, 'families', family), { kids, log, stats, settings, created: F.serverTimestamp() })
     .catch(e => { console.error(e); setSync('error'); });
   store.set('pt-family', family);
   connect(); renderParent();
@@ -371,6 +436,7 @@ async function joinFamily(code) {
   if (kids.length && !confirm('Replace the players and history on this device with your family’s shared ones?')) return;
   family = code; store.set('pt-family', family);
   pend = {}; store.set('pt-pend', pend);
+  pendStats = {}; store.set('pt-pendstats', pendStats);
   await connect();
   if (screen === 'parent') renderParent();
 }
@@ -402,6 +468,36 @@ function lastDays(n) {            // oldest → today
   return out;
 }
 const msOn = (kid, d = new Date()) => ((log[kid.id] || {})[dayKey(d)] || 0) + ((pend[kid.id] || {})[dayKey(d)] || 0);
+// Quality stats for one day, including anything not yet synced
+function statsOn(kid, d = new Date()) {
+  const k = dayKey(d), r = stats[kid.id]?.[k] || {}, p = pendStats[kid.id]?.[k] || {}, out = { ...r };
+  for (const f in p) out[f] = f === 'longest' ? Math.max(r[f] || 0, p[f]) : (r[f] || 0) + p[f];
+  return out;
+}
+// Totals over several days. Focus only counts days that have "active" time (i.e. since this feature existed).
+function statsOver(kid, days) {
+  const t = { active: 0, played: 0, notes: 0, inTune: 0, beats: 0, steady: 0 };
+  for (const d of days) {
+    const s = statsOn(kid, d);
+    if (s.active) { t.active += s.active; t.played += Math.min(msOn(kid, d), s.active); }
+    t.notes += s.notes || 0; t.inTune += s.inTune || 0; t.beats += s.beats || 0; t.steady += s.steady || 0;
+  }
+  return {
+    focus: t.active >= 60000 ? t.played / t.active : null,
+    tune: t.notes >= 10 ? t.inTune / t.notes : null,
+    rhythm: t.beats >= 8 ? t.steady / t.beats : null,
+    notes: t.notes, beats: t.beats
+  };
+}
+function addStat(field, n) {
+  if (!kid) return;
+  const day = dayKey(), target = family ? pendStats : stats;
+  const d = ((target[kid.id] ??= {})[day] ??= {});
+  d[field] = field === 'longest' ? Math.max(d[field] || 0, n) : (d[field] || 0) + n;
+  store.set(family ? 'pt-pendstats' : 'pt-stats', target);
+}
+const pct = x => x === null ? '–' : Math.round(x * 100) + '%';
+
 function clock(ms) {
   const s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, ss = s % 60;
   return h ? `${h}:${pad(m)}:${pad(ss)}` : `${m}:${pad(ss)}`;
@@ -447,13 +543,15 @@ function renderHome() {
         <div class="bar"><div style="width:${frac * 100}%"></div></div>
       </div></button>`;
   }).join('');
-  document.querySelectorAll('[data-kid]').forEach(b => b.onclick = () => { kid = kids.find(k => k.id === b.dataset.kid); sessionMs = 0; show('practice'); });
+  document.querySelectorAll('[data-kid]').forEach(b => b.onclick = () => { kid = kids.find(k => k.id === b.dataset.kid); sessionMs = 0; session = newSession(); show('practice'); });
 }
 $('parentBtn').onclick = $('setupBtn').onclick = () => askPin();
 $('historyBtn').onclick = () => show('history');
 
 // ---------- Practice ----------
-let kid = null, sessionMs = 0, celebrated = false;
+let kid = null, sessionMs = 0, celebrated = false, session = null;
+let metroOn = store.get('pt-metro', false);
+const newSession = () => ({ active: 0, breaks: 0, longest: 0, stretch: 0, wasPlaying: false, notes: 0, inTune: 0, beats: 0, steady: 0, devs: [], early: [] });
 
 function renderPractice(playing, talking) {
   if (!kid) return;
@@ -475,9 +573,29 @@ function renderPractice(playing, talking) {
   else if (musicOnly() && classifierState === 'loading') st.textContent = 'Getting ready…';
   else st.textContent = 'Waiting for music…';
   $('startBtn').textContent = listening ? 'Pause' : 'Start';
+  $('tuner').hidden = !(listening && tracksPitch(kid));
+  $('metroBtn').classList.toggle('on', metroOn);
+  $('metroBtn').textContent = metroOn ? '🥁 Metronome on' : '🥁 Metronome';
+  $('bpmVal').textContent = (kid.bpm || 80) + ' bpm';
 }
 $('startBtn').onclick = () => listening ? (stopAudio(), renderPractice()) : startAudio('practice');
-$('doneBtn').onclick = () => show('home');
+$('doneBtn').onclick = () => {
+  const k = kid, s = session, played = sessionMs;
+  show('home');                      // stops the mic and finishes this session's stats
+  if (s && played >= 30000) showSummary(k, s, played);
+};
+$('metroBtn').onclick = () => {
+  metroOn = !metroOn; store.set('pt-metro', metroOn);
+  metroOn ? metroStart() : metroStop();
+  renderPractice();
+};
+function changeBpm(d) {
+  kid.bpm = Math.max(30, Math.min(220, (kid.bpm || 80) + d)); saveKids();
+  if (metro.timer) { metroStop(); metroStart(); }
+  renderPractice();
+}
+$('bpmUp').onclick = () => changeBpm(5);
+$('bpmDown').onclick = () => changeBpm(-5);
 function changeGoal(d) { kid.goal = Math.max(5, Math.min(120, kid.goal + d)); saveKids(); renderPractice(); }
 $('goalUp').onclick = () => changeGoal(5);
 $('goalDown').onclick = () => changeGoal(-5);
@@ -499,6 +617,29 @@ function addPractice(ms) {
   if (before < goal && before + ms >= goal) celebrate();
 }
 
+// ---------- End-of-session summary ----------
+function showSummary(k, s, played) {
+  const focus = s.active ? Math.min(played / s.active, 1) : null;
+  const today = msOn(k), goal = k.goal * 60000;
+  const rows = [
+    ['⏱', clock(played) + ' played', `Mic was on for ${clock(s.active)}`],
+    ['🎯', pct(focus) + ' focus', `Longest stretch without stopping: ${clock(s.longest)} · ${s.breaks} ${s.breaks === 1 ? 'break' : 'breaks'}`]
+  ];
+  if (tracksPitch(k) && s.notes >= 10) rows.push(['🎻', pct(s.inTune / s.notes) + ' in tune', `${s.notes} notes checked`]);
+  if (s.beats >= 8) rows.push(['🥁', pct(s.steady / s.beats) + ' steady rhythm', `${s.beats} notes played with the metronome`]);
+  rows.push(today >= goal ? ['✅', 'Daily goal reached!', `${mins(today)} today`] : ['🏁', `${mins(goal - today)} to go`, `for today’s ${k.goal} min goal`]);
+  $('sumTitle').textContent = focus >= 0.8 ? `Great focus, ${k.name}! 🌟` : `Nice work, ${k.name}!`;
+  $('sumRows').innerHTML = rows.map(([ic, big, small]) => `<div class="sumRow"><div class="ic">${ic}</div><div><b>${big}</b><div>${small}</div></div></div>`).join('');
+  $('summary').hidden = false;
+}
+$('sumOk').onclick = () => { $('summary').hidden = true; };
+
+function trend(a, b) {
+  if (a === null || b === null) return '';
+  const d = Math.round((a - b) * 100);
+  return d ? ` <span class="trend ${d > 0 ? 'up' : 'down'}">${d > 0 ? '▲' : '▼'}${Math.abs(d)}</span>` : '';
+}
+
 // ---------- History ----------
 const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 function renderHistory() {
@@ -517,12 +658,22 @@ function renderHistory() {
         <div><b>${mins(month)}</b><span>last 30 days</span></div>
         <div><b>${daysPracticed}</b><span>days in last 30</span></div>
       </div>
+      ${(() => {
+        const cur = statsOver(k, lastDays(7)), prev = statsOver(k, lastDays(14).slice(0, 7));
+        return `<div class="stats">
+          <div><b>${pct(cur.focus)}${trend(cur.focus, prev.focus)}</b><span>focus</span></div>
+          ${tracksPitch(k) ? `<div><b>${pct(cur.tune)}${trend(cur.tune, prev.tune)}</b><span>in tune</span></div>` : ''}
+          <div><b>${pct(cur.rhythm)}${trend(cur.rhythm, prev.rhythm)}</b><span>steady rhythm</span></div>
+        </div>`;
+      })()}
       <div class="chart">
         <div class="goalLine" style="bottom:${goal / top * 100}%"></div>
         ${vals.map((v, i) => `<div class="col" title="${days[i].toDateString()}: ${mins(v)}"><div class="b ${v >= goal ? 'met' : ''}" style="height:${v / top * 100}%"></div></div>`).join('')}
       </div>
       <div class="days">${days.map((d, i) => `<span>${i === days.length - 1 ? 'Today' : DOW[d.getDay()]}</span>`).join('')}</div>
-      <div class="muted small" style="margin-top:8px">Last 2 weeks · dashed line = ${k.goal} min goal · solid bars = goal met</div>
+      <div class="muted small" style="margin-top:8px">Chart: last 2 weeks · dashed line = ${k.goal} min goal · solid bars = goal met.<br>
+        Focus, in tune and rhythm are for the last 7 days; ▲▼ compare with the week before.
+        In tune = within ${IN_TUNE_CENTS} cents, measured against the instrument’s own tuning.</div>
     </div>`;
   }).join('') || '<div class="card empty muted">No players yet.</div>';
 }
@@ -559,17 +710,23 @@ function renderParent() {
       <div class="avatar">${initial(k)}</div>
       <input type="text" value="${esc(k.name)}" data-rename="${k.id}" maxlength="20">
       <button class="danger" data-remove="${k.id}">Remove</button>
+      <select data-instr="${k.id}">${Object.entries(INSTRUMENTS).map(([v, l]) =>
+        `<option value="${v}" ${(k.instrument || '') === v ? 'selected' : ''} ${v === '' ? 'disabled' : ''}>${l}</option>`).join('')}</select>
     </div>`).join('') || '<div class="muted">Add each child who practices.</div>';
   document.querySelectorAll('[data-rename]').forEach(i => i.onchange = () => {
     const k = kids.find(k => k.id === i.dataset.rename);
     if (i.value.trim()) { k.name = i.value.trim(); saveKids(); }
     renderParent();
   });
+  document.querySelectorAll('[data-instr]').forEach(sel => sel.onchange = () => {
+    kids.find(k => k.id === sel.dataset.instr).instrument = sel.value; saveKids();
+  });
   document.querySelectorAll('[data-remove]').forEach(b => b.onclick = () => {
     const k = kids.find(k => k.id === b.dataset.remove);
     if (!confirm(`Remove ${k.name} and all of their practice history?`)) return;
-    kids = kids.filter(x => x !== k); delete log[k.id]; delete pend[k.id]; saveKids(); saveLog();
-    if (ref) F.updateDoc(ref, { ['log.' + k.id]: F.deleteField() }).catch(console.error);
+    kids = kids.filter(x => x !== k); delete log[k.id]; delete pend[k.id]; delete stats[k.id]; delete pendStats[k.id];
+    saveKids(); saveLog(); store.set('pt-stats', stats);
+    if (ref) F.updateDoc(ref, { ['log.' + k.id]: F.deleteField(), ['stats.' + k.id]: F.deleteField() }).catch(console.error);
     renderParent();
   });
   $('syncOff').hidden = !!family;
@@ -588,7 +745,7 @@ $('addBtn').onclick = () => {
   const name = $('newName').value.trim();
   if (!name) return;
   const used = kids.map(k => k.color);
-  kids.push({ id: Date.now().toString(36), name, goal: 20,
+  kids.push({ id: Date.now().toString(36), name, goal: 20, bpm: 80, instrument: '',
               color: COLORS.find(c => !used.includes(c)) || COLORS[kids.length % COLORS.length] });
   saveKids(); $('newName').value = ''; renderParent();
 };
@@ -680,6 +837,182 @@ function classify(now) {
   $('hears').textContent = top ? `Hears: ${top.categoryName} (${Math.round(top.score * 100)}%)` : '';
 }
 
+// ---------- Practice analysis: tuning, rhythm, focus (all on-device, free) ----------
+const IN_TUNE_CENTS = 20;     // a note counts as in tune within ±20 cents (1/5 of a semitone)
+const NOTE_NAMES = ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'];
+const median = a => { const b = [...a].sort((x, y) => x - y), m = b.length >> 1; return b.length % 2 ? b[m] : (b[m - 1] + b[m]) / 2; };
+
+// Pitch of a single note using the YIN algorithm. Returns Hz, or null when there's no clear pitch.
+function yin(x, sr, minF) {
+  const maxTau = Math.floor(sr / minF), minTau = Math.floor(sr / 2700), W = x.length - maxTau;
+  const d = new Float32Array(maxTau + 2);
+  for (let tau = 1; tau <= maxTau + 1; tau++) {
+    let sum = 0;
+    for (let i = 0; i < W; i++) { const v = x[i] - x[i + tau]; sum += v * v; }
+    d[tau] = sum;
+  }
+  let running = 0;
+  for (let tau = 1; tau <= maxTau + 1; tau++) { running += d[tau]; d[tau] = running ? d[tau] * tau / running : 1; }
+  let tau = minTau;
+  while (tau <= maxTau && d[tau] >= 0.15) tau++;
+  if (tau > maxTau) return null;
+  while (tau < maxTau && d[tau + 1] < d[tau]) tau++;
+  const a = d[tau - 1], b = d[tau], c = d[tau + 1], den = a - 2 * b + c;
+  return sr / (tau + (den ? (a - c) / (2 * den) : 0));
+}
+
+// Last n samples of the rolling buffer, ending `back` samples ago
+function recent(n, back = 0) {
+  const out = new Float32Array(n), L = ring.length;
+  const start = ((ringPos - back - n) % L + L) % L;
+  for (let i = 0; i < n; i++) out[i] = ring[(start + i) % L];
+  return out;
+}
+
+// Group pitch readings (20 per second) into notes, and score each note's tuning
+let curNote = null, lastPitchAt = 0;
+// f: pitch in Hz or null · now: page clock · t: audio-clock time of this reading · hop: seconds between readings
+function pitchFrame(f, now, t, hop = 0.05) {
+  if (!f) return endNote();
+  const m = 69 + 12 * Math.log2(f / 440), midi = Math.round(m), cents = (m - midi) * 100;
+  lastPitchAt = now;
+  $('tNote').textContent = NOTE_NAMES[midi % 12] + (Math.floor(midi / 12) - 1);
+  const rel = cents - tuningRef();
+  $('tNeedle').style.left = (50 + Math.max(-50, Math.min(50, rel))) + '%';
+  $('tNeedle').className = Math.abs(rel) <= IN_TUNE_CENTS ? 'ok' : 'off';
+  if (curNote && curNote.midi === midi) {
+    curNote.cents.push(cents);
+    // A new pitch that holds for 2 readings is a note start – this catches smooth (legato) bow changes
+    if (curNote.cents.length === 2 && metro.timer && musicNowFlag) addOnset(curNote.t, false);
+  } else { endNote(); curNote = { midi, cents: [cents], t, hop }; }
+}
+// Tuning is judged against the instrument's own tuning (the typical offset of recent notes),
+// so a violin whose strings are a little sharp doesn't make every note look out of tune.
+function tuningRef() {
+  const d = session?.devs || [];
+  return d.length >= 8 ? Math.max(-40, Math.min(40, median(d))) : 0;
+}
+function scoreNote(c) {
+  session.notes++; addStat('notes', 1);
+  if (Math.abs(c - tuningRef()) <= IN_TUNE_CENTS) { session.inTune++; addStat('inTune', 1); }
+}
+function endNote(final) {
+  const n = curNote; curNote = null;
+  if (n && n.cents.length * n.hop >= 0.15 && session) {   // shorter than 0.15 s: too short to judge
+    const c = median(n.cents.slice(1));                    // skip the first reading: note starts are often unsteady
+    session.devs.push(c); if (session.devs.length > 60) session.devs.shift();
+    if (session.devs.length < 8) session.early.push(c);    // wait until we know the instrument's tuning
+    else { for (const e of session.early.splice(0)) scoreNote(e); scoreNote(c); }
+  }
+  if (final && session?.early.length) {                    // short session: score with what we have
+    const ref = median(session.devs);
+    for (const e of session.early.splice(0)) { session.notes++; addStat('notes', 1); if (Math.abs(e - ref) <= IN_TUNE_CENTS) { session.inTune++; addStat('inTune', 1); } }
+  }
+}
+
+// Read pitch on a steady grid of audio positions (every 50 ms, or 25 ms with the metronome on for
+// sharper note-start timing), covering all audio received since the last call exactly once.
+let nextPitchAt = 0;
+function pitchStep(now) {
+  const sr = audioCtx.sampleRate, minF = LOWEST[kid.instrument], n = Math.round(sr * 0.025) + Math.floor(sr / minF) + 2;
+  const hop = metro.timer ? 0.025 : 0.05, step = Math.round(sr * hop);
+  const oldest = Math.max(n, sampleCount - Math.floor(sr / 2));
+  if (nextPitchAt < oldest) nextPitchAt = oldest;          // fell behind (e.g. tab was hidden): skip ahead
+  for (; nextPitchAt <= sampleCount; nextPitchAt += step) {
+    const t = t0 + (nextPitchAt - n / 2) / sr;             // audio-clock time at the middle of the window
+    pitchFrame(musicNowFlag ? yin(recent(n, sampleCount - nextPitchAt), sr, minF) : null, now, t, hop);
+  }
+}
+
+// Note starts (onsets), for rhythm. Uses a low-pass copy of the sound so the metronome's
+// high-pitched click (6 kHz) is mostly filtered out and isn't mistaken for a note.
+const HOP = 256, ONSET_DB = 9;
+let lp, lpA, hopE, hopN, hopDb, lpHist, lastOnset, sampleCount, t0, musicNowFlag = false;
+function resetAnalysis(sr) {
+  lp = [0, 0, 0, 0]; lpA = Math.exp(-2 * Math.PI * 1500 / sr);
+  hopE = hopN = sampleCount = 0; hopDb = []; lpHist = []; lastOnset = -1e9; t0 = null;
+  curNote = null; lastPitchAt = 0; nextPitchAt = 0;
+}
+function analyseSamples(data) {
+  if (t0 === null) t0 = audioCtx.currentTime - data.length / audioCtx.sampleRate;
+  for (let i = 0; i < data.length; i++) {
+    let y = data[i];
+    for (let k = 0; k < 4; k++) y = lp[k] = lp[k] + (1 - lpA) * (y - lp[k]);
+    hopE += y * y;
+    if (++hopN === HOP) { onHop(sampleCount + i, hopE / HOP); hopE = hopN = 0; }
+  }
+  sampleCount += data.length;
+}
+function onHop(idx, e) {
+  const db = 10 * Math.log10(e + 1e-12), sr = audioCtx.sampleRate;
+  lpHist.push(e); if (lpHist.length > 19) lpHist.shift();                    // last ~100 ms
+  const prev = hopDb.length ? Math.min(...hopDb) : db;
+  hopDb.push(db); if (hopDb.length > 6) hopDb.shift();
+  if (db > -55 && db - prev > ONSET_DB && idx - lastOnset > 0.09 * sr) {
+    lastOnset = idx;
+    if (metro.timer && musicNowFlag) addOnset(t0 + idx / sr, true);
+  }
+}
+// Note starts come from two detectors (loudness jumps, and pitch changes on string instruments).
+// Merge them: one note start per 70 ms, preferring the loudness one because its timing is sharper.
+function addOnset(t, precise) {
+  const near = metro.onsets.findIndex(x => Math.abs(x.t - t) < 0.07);
+  if (near < 0) metro.onsets.push({ t, precise });
+  else if (precise && !metro.onsets[near].precise) metro.onsets[near] = { t, precise };
+}
+// Loudness of the low-pass copy, on the same 0..1 scale as the meter (used while the metronome is clicking)
+const lowLevel = () => {
+  const e = lpHist.length ? lpHist.reduce((a, b) => a + b, 0) / lpHist.length : 0;
+  return Math.max(0, Math.min(1, (10 * Math.log10(e + 1e-16) + 60) / 60));
+};
+
+// Metronome, scheduled on the audio clock so clicks are exactly in time
+const metro = { timer: null, next: 0, anchor: 0, period: 0, onsets: [] };
+function metroStart() {
+  if (!metroOn || !listening || mode !== 'practice' || metro.timer) return;
+  metro.period = 60 / (kid.bpm || 80);
+  metro.next = metro.anchor = audioCtx.currentTime + 0.15;
+  metro.onsets = [];
+  metro.timer = setInterval(metroSchedule, 25);
+  metroSchedule();
+}
+function metroSchedule() {
+  while (metro.next < audioCtx.currentTime + 0.12) {
+    const t = metro.next, o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.frequency.value = 6000; o.connect(g); g.connect(audioCtx.destination);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.6, t + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
+    o.start(t); o.stop(t + 0.04);
+    setTimeout(() => { $('beatDot').classList.add('on'); setTimeout(() => $('beatDot').classList.remove('on'), 100); },
+               Math.max(0, (t - audioCtx.currentTime) * 1000));
+    metro.next += metro.period;
+  }
+}
+function metroStop() {
+  if (!metro.timer) return;
+  clearInterval(metro.timer); metro.timer = null;
+  scoreRhythm();
+}
+// How evenly notes land on the metronome's grid (8th notes, so quarter and eighth notes both fit).
+// Any constant delay (mic/speaker latency, or always playing slightly early) is removed by
+// lining up with the average position, so this measures steadiness.
+function scoreRhythm() {
+  const on = metro.onsets; metro.onsets = [];
+  if (on.length < 8 || !session) return;
+  const P = metro.period / 2, tol = Math.min(0.05, P * 0.2);
+  const ph = on.map(o => (o.t - metro.anchor) / P * 2 * Math.PI);
+  const mean = Math.atan2(ph.reduce((a, x) => a + Math.sin(x), 0), ph.reduce((a, x) => a + Math.cos(x), 0));
+  const steady = ph.filter(x => Math.abs(Math.atan2(Math.sin(x - mean), Math.cos(x - mean))) / (2 * Math.PI) * P <= tol).length;
+  session.beats += on.length; session.steady += steady;
+  addStat('beats', on.length); addStat('steady', steady);
+}
+
+function endStretch() {
+  if (!session || !session.stretch) return;
+  session.longest = Math.max(session.longest, session.stretch);
+  addStat('longest', session.stretch);
+  session.stretch = 0;
+}
+
 // ---------- Microphone ----------
 let listening = false, mode = 'practice', audioCtx, analyser, stream, buf, timer, wakeLock;
 let lastTick = 0, lastSoundAt = -Infinity, smoothLevel = 0;
@@ -697,7 +1030,8 @@ function tick() {
   for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
   const rms = Math.sqrt(sum / buf.length);
   // Convert to a 0..1 scale on a log (dB) curve: -60 dB → 0, 0 dB → 1
-  const level = Math.max(0, Math.min(1, (20 * Math.log10(rms + 1e-8) + 60) / 60));
+  let level = Math.max(0, Math.min(1, (20 * Math.log10(rms + 1e-8) + 60) / 60));
+  if (metro.timer) level = lowLevel();          // ignore the metronome's own clicks
   smoothLevel = smoothLevel * 0.7 + level * 0.3;
 
   const loud = smoothLevel > threshold();
@@ -711,9 +1045,22 @@ function tick() {
 
   document.querySelectorAll('.meter .level').forEach(l => { l.style.width = (smoothLevel * 100) + '%'; l.classList.toggle('on', loud && musicNow); });
 
+  musicNowFlag = loud && musicNow;
+
   if (mode === 'practice') {
-    if (playing && dt < 5000) addPractice(dt);
-    if (family && now - lastFlush > 10000) { lastFlush = now; flushPractice(); }   // ignore huge gaps (e.g. device was asleep)
+    if (dt < 5000) {                              // ignore huge gaps (e.g. device was asleep)
+      if (playing) addPractice(dt);
+      session.active += dt; addStat('active', dt);
+      if (playing) session.stretch += dt;
+    }
+    if (!playing && session.wasPlaying) { endStretch(); session.breaks++; addStat('breaks', 1); }
+    session.wasPlaying = playing;
+
+    if (tracksPitch(kid)) {
+      pitchStep(now);
+      if (now - lastPitchAt > 400) { $('tNote').innerHTML = '&nbsp;'; $('tNeedle').style.left = '50%'; $('tNeedle').className = ''; }
+    }
+    if (family && now - lastFlush > 10000) { lastFlush = now; flushPractice(); }
     renderPractice(playing, talking);
   } else renderTest(playing, talking);
 }
@@ -742,12 +1089,15 @@ async function startAudio(m) {
   processor.onaudioprocess = e => {
     const data = e.inputBuffer.getChannelData(0);
     for (let i = 0; i < data.length; i++) { ring[ringPos] = data[i]; ringPos = (ringPos + 1) % ring.length; }
+    analyseSamples(data);
   };
   const mute = audioCtx.createGain(); mute.gain.value = 0;   // processor must reach the output to run
   source.connect(processor); processor.connect(mute); mute.connect(audioCtx.destination);
   lastMusicAt = lastSpeechAt = lastSoundAt = -Infinity;
+  resetAnalysis(audioCtx.sampleRate);
 
   listening = true;
+  if (mode === 'practice') metroStart();
   updateMarks();
   lastTick = performance.now();
   timer = setInterval(tick, 100);
@@ -756,6 +1106,7 @@ async function startAudio(m) {
 
 function stopAudio() {
   listening = false;
+  if (mode === 'practice' && session) { metroStop(); endNote(true); endStretch(); session.wasPlaying = false; }
   flushPractice();
   clearInterval(timer);
   stream?.getTracks().forEach(t => t.stop());
