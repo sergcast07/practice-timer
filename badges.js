@@ -1,4 +1,4 @@
-// Practice Timer – badges (shared by the family app and the teacher studio)
+// Allegrow – badges (shared by the family app and the teacher studio)
 //
 // Badges are earned automatically from practice data. Each badge measures one thing (its metric) and has
 // levels (tiers); the child always sees the next level, so there's always something within reach.

@@ -12,7 +12,7 @@ API_KEY = "AIzaSyAUn6GqVxRR-m9i5kjTH9dY7-nGWCo1374"   # public web key (same as 
 APP_URL = "https://sergcast07.github.io/practice-timer/"
 # Resend's shared test sender can only email the address you signed up to Resend with.
 # Once you have your own domain, verify it in Resend and change this.
-FROM_EMAIL = "Practice Timer <onboarding@resend.dev>"
+FROM_EMAIL = "Allegrow <onboarding@resend.dev>"
 
 # KV stores which studios to email and which emails were already sent. Filled in by `wrangler kv namespace create`.
 [[kv_namespaces]]

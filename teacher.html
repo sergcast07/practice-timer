@@ -5,8 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#f6f3ee" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#14171f" media="(prefers-color-scheme: dark)">
-<title>Practice Timer for Teachers</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231e2a44'/%3E%3Cpath d='M13 22V10l9-2v12' stroke='%23f6f3ee' stroke-width='2.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='10.5' cy='22' r='2.7' fill='%23f6f3ee'/%3E%3Ccircle cx='19.5' cy='20' r='2.7' fill='%23f6f3ee'/%3E%3C/svg%3E">
+<title>Allegrow Studio</title>
+<meta name="description" content="Allegrow for music teachers: see students' practice, plan lessons, set assignments, award badges and print reports.">
+<link rel="icon" href="brand/allegrow-icon.svg" type="image/svg+xml">
+<link rel="icon" href="brand/png/allegrow-icon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="brand/png/apple-touch-icon.png">
+<link rel="manifest" href="manifest-studio.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Allegrow Studio">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
@@ -14,7 +21,7 @@
   :root {
     --bg: #f6f3ee; --card: #ffffff; --ink: #1e2a44; --ink-2: #3d4760; --muted: #6e7385;
     --line: #e9e3da; --track: #efeae2; --soft: #f8f5f0;
-    --brand: #1e2a44; --accent: #3b5bab; --good: #23865f; --warn: #c0612b; --danger: #b8402f; --gold: #b3821c;
+    --brand: #1e2a44; --leaf: #23865f; --accent: #3b5bab; --good: #23865f; --warn: #c0612b; --danger: #b8402f; --gold: #b3821c;
     --kid: var(--accent);
     --shadow: 0 1px 2px rgba(30, 42, 68, .05), 0 6px 20px rgba(30, 42, 68, .06);
     --radius: 18px;
@@ -24,7 +31,7 @@
   @media (prefers-color-scheme: dark) {
     :root { --bg: #14171f; --card: #1d212b; --ink: #eef0f5; --ink-2: #c9cdd8; --muted: #9aa0ae;
             --line: #2b303c; --track: #292e3a; --soft: #222733;
-            --brand: #eef0f5; --accent: #8aa4f0; --good: #4cc08d; --warn: #f08a55; --danger: #f07a66; --gold: #e2b54a;
+            --brand: #eef0f5; --leaf: #4cc08d; --accent: #8aa4f0; --good: #4cc08d; --warn: #f08a55; --danger: #f07a66; --gold: #e2b54a;
             --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25); }
   }
   * { box-sizing: border-box; }
@@ -90,6 +97,10 @@
           display: flex; flex-direction: column; gap: 4px; }
   .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; padding: 4px 8px 18px; }
   .logo { width: 32px; height: 32px; border-radius: 9px; background: var(--brand); color: var(--bg); display: grid; place-items: center; flex: none; }
+  img.logo { background: none; display: block; }
+  .wm { font-family: var(--serif); font-weight: 600; letter-spacing: -0.01em; }
+  .wm b { color: var(--leaf); font-weight: inherit; }
+  .brand small.wm { font-family: var(--serif); font-size: 13px; color: var(--muted); }
   .logo .ic { width: 18px; height: 18px; stroke-width: 2.2; }
   .brand small { display: block; font-weight: 500; color: var(--muted); font-size: 12.5px; }
   nav { display: flex; flex-direction: column; gap: 2px; }
@@ -357,9 +368,9 @@
 <!-- Signed out -->
 <div class="gate" id="signin" hidden>
   <div class="card">
-    <div class="logo"><svg class="ic"><use href="#i-note"/></svg></div>
-    <div><h1>Practice Timer for Teachers</h1>
-      <p class="muted" style="margin-top:8px">Your studio in one place, free.</p></div>
+    <img class="logo" src="brand/allegrow-icon.svg" alt="">
+    <div><h1><span class="wm">Alle<b>grow</b></span> Studio</h1>
+      <p class="muted" style="margin-top:8px">Everything for your music students, in one place.</p></div>
     <div class="features">
       <div><svg class="ic"><use href="#i-users"/></svg>See every student’s practice time, focus, tuning and rhythm</div>
       <div><svg class="ic"><use href="#i-calendar"/></svg>Plan your weekly lessons and keep lesson notes</div>
@@ -377,7 +388,7 @@
 <!-- First-time setup -->
 <div class="gate" id="setup" hidden>
   <div class="card text-left">
-    <div class="logo"><svg class="ic"><use href="#i-note"/></svg></div>
+    <img class="logo" src="brand/allegrow-icon.svg" alt="">
     <div style="text-align:center"><h1>Set up your studio</h1><p class="muted" style="margin-top:8px">Families see these names in their app.</p></div>
     <label class="field">Studio name <input type="text" id="setupStudio" placeholder="e.g. Riverside Strings" maxlength="60"></label>
     <label class="field">Your name, as students know you <input type="text" id="setupTeacher" placeholder="e.g. Ms. Alvarez" maxlength="60"></label>
@@ -390,7 +401,7 @@
 <!-- App -->
 <div id="shell" hidden>
   <aside>
-    <div class="brand"><div class="logo"><svg class="ic"><use href="#i-note"/></svg></div><div><span id="studioName"></span><small>Practice Timer</small></div></div>
+    <div class="brand"><img class="logo" src="brand/allegrow-icon.svg" alt=""><div><span id="studioName"></span><small class="wm small">Alle<b>grow</b> Studio</small></div></div>
     <nav id="nav">
       <button data-go="overview"><svg class="ic"><use href="#i-home"/></svg>Overview</button>
       <button data-go="students"><svg class="ic"><use href="#i-users"/></svg>Students</button>
@@ -400,6 +411,7 @@
     </nav>
     <div class="account">
       <div class="who"><b id="meName"></b><span id="meEmail"></span></div>
+      <button class="ghost icon" id="installBtn" title="Install Allegrow Studio" aria-label="Install Allegrow Studio" hidden><svg class="ic"><use href="#i-share"/></svg></button>
       <button class="ghost icon" id="studioBtn" title="Studio settings" aria-label="Studio settings"><svg class="ic"><use href="#i-settings"/></svg></button>
       <button class="ghost icon" id="signOutBtn" title="Sign out" aria-label="Sign out"><svg class="ic"><use href="#i-logout"/></svg></button>
     </div>
@@ -413,7 +425,7 @@
 <script src="badges.js?v=4"></script>
 <script>
 // ============================================================================================
-// Practice Timer for Teachers
+// Allegrow Studio (teacher side of Allegrow)
 // Data lives in Firebase (same project as the family app):
 //   studios/{uid}                    studio name + teacher name (only this teacher)
 //   studios/{uid}/lessons/{sid_date} lesson status, notes, ratings (private)
@@ -805,7 +817,7 @@ function tProgress(s) {
       </div>
       <div class="axis"><span>${fmtDate(days[0], { day: 'numeric', month: 'short' })}</span><span>Last 4 weeks · dashes = each day’s goal (${planText(planOfStudent(s))}) · striped = logged by hand</span><span>Today</span></div>
     </div>
-    <p class="small muted">Last practiced: ${lastPracticedText(lastPracticed(s))}. Practice data comes from ${esc(s.kidName || firstName(s.name))}’s Practice Timer app.</p>
+    <p class="small muted">Last practiced: ${lastPracticedText(lastPracticed(s))}. Practice data comes from ${esc(s.kidName || firstName(s.name))}’s Allegrow app.</p>
   </div>`;
 }
 
@@ -952,7 +964,7 @@ function vReports() {
       <div class="chart" style="height:110px">${wVals.map((v, i) => `<div class="col" title="Week of ${fmtDate(weeks[i][0])}: ${mins(v)}"><div class="b met" style="height:${v / wTop * 100}%"></div></div>`).join('')}
         <div class="goal" style="bottom:${weekTarget / wTop * 100}%"></div></div>
       <div class="axis"><span>Minutes per week</span><span>dashed line = weekly plan (${planText(planOfStudent(s))})</span></div>`
-      : '<p class="muted">Not connected to the Practice Timer app, so no practice data.</p>'}
+      : '<p class="muted">Not connected to the Allegrow app, so no practice data.</p>'}
     </section>
     <section><h3>Lessons</h3>
       <div class="stats"><div class="stat"><b>${doneL.length}</b><span>attended</span></div><div class="stat"><b>${cancelled.length}</b><span>canceled</span></div><div class="stat"><b>${noshow.length}</b><span>missed</span></div></div>
@@ -1112,7 +1124,7 @@ function inviteLink(sid) { return location.origin + location.pathname.replace(/t
 function inviteModal(sid) {
   const s = students[sid], link = inviteLink(sid);
   openModal(`${mhead('Invite ' + esc(firstName(s.name)) + '’s family')}
-    <p>Send this link to the family. They open it on the phone or tablet ${esc(firstName(s.name))} practices with, and the Practice Timer app connects to your studio.</p>
+    <p>Send this link to the family. They open it on the phone or tablet ${esc(firstName(s.name))} practices with, and the Allegrow app connects to your studio.</p>
     <div class="codeBox">${esc(link)}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       ${navigator.share ? `<button class="accent" id="iShare">${icon('share', 'sm')}Share link</button>` : ''}
@@ -1123,11 +1135,11 @@ function inviteModal(sid) {
       Anyone with the link can see ${esc(firstName(s.name))}’s assignments and lesson times, so send it only to the family.</p>
     ${s.linkedAt ? `<div class="banner" style="margin:0">${icon('check')}<div class="grow">Connected${s.kidName && s.kidName !== s.name ? ` as “${esc(s.kidName)}”` : ''}.</div></div>` : ''}
     <footer><div class="right"><button class="primary" data-close>Done</button></div></footer>`, m => {
-    const msg = `Hi! ${studio.teacherName} here. Please open this link on the device ${firstName(s.name)} practices with to connect the Practice Timer app to my studio: ${link}`;
+    const msg = `Hi! ${studio.teacherName} here. Please open this link on the device ${firstName(s.name)} practices with to connect the Allegrow app to my studio: ${link}`;
     const copy = async (t, what) => { try { await navigator.clipboard.writeText(t); toast(what + ' copied'); } catch { prompt('Copy this:', t); } };
     m.querySelector('#iCopy').onclick = () => copy(link, 'Link');
     m.querySelector('#iMsg').onclick = () => copy(msg, 'Message');
-    const sh = m.querySelector('#iShare'); if (sh) sh.onclick = () => navigator.share({ title: 'Practice Timer', text: msg.replace(link, '').trim(), url: link }).catch(() => {});
+    const sh = m.querySelector('#iShare'); if (sh) sh.onclick = () => navigator.share({ title: 'Allegrow', text: msg.replace(link, '').trim(), url: link }).catch(() => {});
   });
 }
 
@@ -1298,6 +1310,11 @@ function studioModal() {
   });
 }
 $('studioBtn').onclick = studioModal;
+let installEvent = null;
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvent = e; $('installBtn').hidden = false; });
+addEventListener('appinstalled', () => { installEvent = null; $('installBtn').hidden = true; });
+$('installBtn').onclick = async () => { if (!installEvent) return; installEvent.prompt(); await installEvent.userChoice; installEvent = null; $('installBtn').hidden = true; };
+if ('serviceWorker' in navigator && !EMULATOR) navigator.serviceWorker.register('sw.js').catch(e => console.error(e));
 $('signOutBtn').onclick = () => api.signOut();
 
 // ============================================================================================
@@ -1550,7 +1567,7 @@ function studioIcs() {
   for (const e of Object.values(events)) if (e.date >= from)
     ev.push([`event-${e.id}`, e.date, e.time || '12:00', 120, e.title, '', [], e.location || '',
              Object.entries(e.participants || {}).map(([sid, p]) => `${students[sid]?.name || ''}${p.piece ? ': ' + p.piece : ''}`).join('\n')]);
-  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Practice Timer//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:' + icsEsc(studio.studioName + ' – lessons')];
+  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Allegrow//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:' + icsEsc(studio.studioName + ' – lessons')];
   for (const [uid, key, time, len, title, rrule, ex, loc, desc] of ev) {
     L.push('BEGIN:VEVENT', `UID:${uid}@practice-timer`, 'DTSTAMP:' + stamp, 'DTSTART:' + icsLocal(key, time), 'DTEND:' + plusMin(key, time, len), 'SUMMARY:' + icsEsc(title));
     if (rrule) L.push('RRULE:' + rrule);
@@ -1618,7 +1635,7 @@ async function calendarEmailModal() {
       <label class="participant" style="grid-template-columns:auto 1fr;border:0;padding:0"><input type="checkbox" id="cDigest" ${feed.digest ? 'checked' : ''}>
         <span><b style="color:var(--ink)">Sunday studio digest</b><br><span class="small muted">Sunday at 6 pm: the week’s wins, who could use a nudge, and what’s coming up.</span></span></label>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="secondary" data-test="brief">Send a test brief</button><button class="secondary" data-test="digest">Send a test digest</button></div>
-      <p class="small muted" id="cMsg">Emails come from Practice Timer. While it uses the free test sender, they can only go to the email address the service was set up with.</p>
+      <p class="small muted" id="cMsg">Emails come from Allegrow. While it uses the free test sender, they can only go to the email address the service was set up with.</p>
     </section>` : ''}
     <footer><div class="right"><button class="${feed ? 'secondary' : 'primary'}" data-close>${feed ? 'Cancel' : 'Done'}</button>${feed ? '<button class="primary" id="cSave">Save</button>' : ''}</div></footer>`, m => {
     m.querySelector('#cDownload').onclick = downloadIcs;

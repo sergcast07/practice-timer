@@ -1,4 +1,4 @@
-// Practice Timer – calendar feeds and teacher emails (runs free on Cloudflare Workers)
+// Allegrow – calendar feeds and teacher emails (runs free on Cloudflare Workers)
 //
 // It reads the same Firestore documents the apps use (readable only with their long random codes):
 //   feeds/{token}      a teacher's calendar/email settings + list of student codes (written by teacher.html)
@@ -57,7 +57,7 @@ export default {
         const mail = await buildEmail(env, feed, m[2], { test: url.searchParams.has('test') });
         return new Response(`<!-- ${mail.subject} -->` + mail.html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
       }
-      if (path === '/') return new Response('Practice Timer calendar & email service', { headers: CORS });
+      if (path === '/') return new Response('Allegrow calendar & email service', { headers: CORS });
       return new Response('Not found', { status: 404 });
     } catch (e) {
       console.error(e);
@@ -136,7 +136,7 @@ const icsEnd = (key, time, minutes) => { const t = toMin(time) + minutes, k = ad
 function calendarText(name, tz, events) {
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
   const at = (prop, key, time) => tz ? `${prop};TZID=${tz}:${icsLocal(key, time)}` : `${prop}:${icsLocal(key, time)}`;
-  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Practice Timer//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Allegrow//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
              'X-WR-CALNAME:' + icsEsc(name), 'X-PUBLISHED-TTL:PT1H', 'REFRESH-INTERVAL;VALUE=DURATION:PT1H', ...(tz ? ['X-WR-TIMEZONE:' + tz] : [])];
   for (const e of events) {
     L.push('BEGIN:VEVENT', 'UID:' + e.uid, 'DTSTAMP:' + stamp, at('DTSTART', e.date, e.time),

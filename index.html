@@ -5,8 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#f6f3ee" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#14171f" media="(prefers-color-scheme: dark)">
-<title>Practice Timer</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231e2a44'/%3E%3Cpath d='M13 22V10l9-2v12' stroke='%23f6f3ee' stroke-width='2.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='10.5' cy='22' r='2.7' fill='%23f6f3ee'/%3E%3Ccircle cx='19.5' cy='20' r='2.7' fill='%23f6f3ee'/%3E%3C/svg%3E">
+<title>Allegrow</title>
+<meta name="description" content="A music practice timer that listens while you play, tracks progress, and celebrates practice.">
+<link rel="icon" href="brand/allegrow-icon.svg" type="image/svg+xml">
+<link rel="icon" href="brand/png/allegrow-icon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="brand/png/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Allegrow">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
@@ -14,7 +22,7 @@
   :root {
     --bg: #f6f3ee; --card: #ffffff; --ink: #1e2a44; --ink-2: #3d4760; --muted: #6e7385;
     --line: #e9e3da; --track: #efeae2; --soft: #f8f5f0;
-    --brand: #1e2a44; --accent: #3b5bab; --good: #23865f; --warn: #c0612b; --danger: #b8402f;
+    --brand: #1e2a44; --leaf: #23865f; --accent: #3b5bab; --good: #23865f; --warn: #c0612b; --danger: #b8402f;
     --kid: var(--accent);
     --shadow: 0 1px 2px rgba(30, 42, 68, .05), 0 6px 20px rgba(30, 42, 68, .06);
     --radius: 20px;
@@ -24,7 +32,7 @@
   @media (prefers-color-scheme: dark) {
     :root { --bg: #14171f; --card: #1d212b; --ink: #eef0f5; --ink-2: #c9cdd8; --muted: #9aa0ae;
             --line: #2b303c; --track: #292e3a; --soft: #222733;
-            --brand: #eef0f5; --accent: #8aa4f0; --good: #4cc08d; --warn: #f08a55; --danger: #f07a66;
+            --brand: #eef0f5; --leaf: #4cc08d; --accent: #8aa4f0; --good: #4cc08d; --warn: #f08a55; --danger: #f07a66;
             --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25); }
   }
   * { box-sizing: border-box; }
@@ -68,6 +76,14 @@
   header { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; }
   .brand { white-space: nowrap; display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; letter-spacing: .01em; color: var(--ink); }
   .logo { width: 32px; height: 32px; border-radius: 9px; background: var(--brand); color: var(--bg); display: grid; place-items: center; }
+  img.logo { background: none; display: block; }
+  .wm { font-family: var(--serif); font-weight: 600; font-size: 19px; letter-spacing: -0.01em; }
+  .wm b { color: var(--leaf); font-weight: inherit; }
+  .installCard { display: flex; gap: 14px; align-items: flex-start; }
+  .installCard img { width: 44px; height: 44px; flex: none; }
+  .installCard .grow { flex: 1; min-width: 0; }
+  .installCard b { display: block; }
+  .installCard span { font-size: 13.5px; color: var(--muted); }
   .logo .ic { width: 18px; height: 18px; stroke-width: 2.2; }
   .intro { padding: 10px 2px 4px; }
   .intro p { color: var(--muted); margin-top: 6px; }
@@ -388,7 +404,7 @@
   <!-- HOME -->
   <section class="screen" id="home">
     <header>
-      <div class="brand"><div class="logo"><svg class="ic"><use href="#i-note"/></svg></div>Practice Timer</div>
+      <div class="brand"><img class="logo" src="brand/allegrow-icon.svg" alt=""><span class="wm">Alle<b>grow</b></span></div>
       <button class="ghost" id="parentBtn"><svg class="ic sm"><use href="#i-lock"/></svg>Parents</button>
     </header>
     <div class="intro">
@@ -396,6 +412,7 @@
       <p>Tap your name to start.</p>
     </div>
     <div class="card recap" id="recap" hidden></div>
+    <div class="card installCard" id="installCard" hidden></div>
     <div class="kids" id="kidList"></div>
     <div class="card empty" id="noKids" hidden>
       <svg class="ic lg muted"><use href="#i-users"/></svg>
@@ -861,6 +878,7 @@ document.querySelectorAll('[data-home]').forEach(b => b.onclick = () => show('ho
 // ---------- Home ----------
 function renderHome() {
   renderRecap();
+  renderInstall();
   $('noKids').hidden = kids.length > 0;
   $('historyBtn').hidden = kids.length === 0;
   $('kidList').innerHTML = kids.map(k => {
@@ -1289,7 +1307,7 @@ $('leaveBtn').onclick = leaveFamily;
 $('shareBtn').onclick = async () => {
   const url = location.origin + location.pathname + '#join=' + family;
   try {
-    if (navigator.share) return await navigator.share({ title: 'Practice Timer', text: 'Open this to connect this device to our family practice timer:', url });
+    if (navigator.share) return await navigator.share({ title: 'Allegrow', text: 'Open this to connect this device to our family’s Allegrow:', url });
     await navigator.clipboard.writeText(url);
     $('shareBtn').innerHTML = `${icon('check')}Link copied – paste it on the other device`;
   } catch {}
@@ -1763,7 +1781,7 @@ const icsTime = d => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate(
 const icsFold = line => { const out = []; while (line.length > 74) { out.push(line.slice(0, 74)); line = ' ' + line.slice(74); } out.push(line); return out.join('\r\n'); };
 function buildIcs(calName, evs) {
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
-  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Practice Timer//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:' + icsEsc(calName)];
+  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Allegrow//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:' + icsEsc(calName)];
   for (const e of evs) {
     L.push('BEGIN:VEVENT', 'UID:' + e.uid, 'DTSTAMP:' + stamp, 'DTSTART:' + icsTime(e.start),
            'DTEND:' + icsTime(new Date(e.start.getTime() + e.minutes * 60000)), 'SUMMARY:' + icsEsc(e.title));
@@ -1987,6 +2005,27 @@ function showNextCheer() {
     setTimeout(showNextCheer, 600);
   };
 }
+
+// ---------- Install to the home screen ----------
+// Chrome/Edge/Android offer a real install prompt; iPhone/iPad need Share → Add to Home Screen.
+let installEvent = null;
+const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvent = e; renderInstall(); });
+addEventListener('appinstalled', () => { installEvent = null; renderInstall(); });
+function renderInstall() {
+  const el = $('installCard');
+  if (standalone() || store.get('pt-install-hide', false) || !(installEvent || isIOS())) { el.hidden = true; return; }
+  el.hidden = false;
+  el.innerHTML = `<img src="brand/allegrow-icon.svg" alt="">
+    <div class="grow"><b>Put Allegrow on your home screen</b>
+      <span>${installEvent ? 'Opens like an app, full screen, even without internet.' : 'Tap the Share button, then “Add to Home Screen”.'}</span>
+      ${installEvent ? '<div><button class="secondary" id="installGo" style="margin-top:10px">Install</button></div>' : ''}</div>
+    <button class="ghost icon" id="installX" aria-label="Not now" style="align-self:flex-start">${icon('x')}</button>`;
+  $('installGo')?.addEventListener('click', async () => { installEvent.prompt(); await installEvent.userChoice; installEvent = null; renderInstall(); });
+  $('installX').onclick = () => { store.set('pt-install-hide', true); el.hidden = true; };
+}
+if ('serviceWorker' in navigator && !EMULATOR) navigator.serviceWorker.register('sw.js').catch(e => console.error(e));
 
 // ---------- Microphone ----------
 let listening = false, mode = 'practice', audioCtx, analyser, stream, buf, timer, wakeLock;
