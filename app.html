@@ -368,7 +368,7 @@
   .pips { display: flex; gap: 5px; } .pips i { width: 9px; height: 9px; border-radius: 50%; background: var(--track); } .pips i.on { background: var(--kid); }
   .deck .modes { display: flex; gap: 8px; flex-wrap: wrap; } .deck .modes button { flex: 1 1 auto; padding: 10px 12px; font-size: 15px; }
   .thGoal { display: flex; gap: 12px; align-items: center; border: 1.5px solid color-mix(in srgb, var(--kid) 40%, transparent); }
-  .qProg { display: flex; gap: 4px; align-items: center; } .qProg i { width: 16px; height: 6px; border-radius: 3px; background: var(--track); }
+  .qProg { display: flex; gap: 4px; align-items: center; } .qProg { flex-wrap: wrap; justify-content: flex-end; max-width: 70%; } .qProg i { width: 16px; height: 6px; border-radius: 3px; background: var(--track); }
   .qProg i.ok { background: var(--good); } .qProg i.no { background: var(--danger); } .qProg i.now { background: var(--kid); }
   .quizCard { display: grid; gap: 16px; text-align: center; padding: 22px 18px; }
   .quizCard .ask { font-weight: 600; color: var(--ink-2); }
@@ -376,6 +376,12 @@
   .staff { width: 100%; max-width: 360px; height: auto; color: var(--ink); overflow: visible; }
   .staff line { stroke: currentColor; stroke-width: 1.3; } .staff .ledger { stroke-width: 1.5; } .staff .stem { stroke-width: 1.7; }
   .staff .head { fill: currentColor; } .staff text { fill: currentColor; font-family: 'Noto Music', serif; }
+  .staff .head.whole { fill: none; stroke: currentColor; stroke-width: 2.2; } .staff .brace { fill: none; stroke: currentColor; stroke-width: 2.4; }
+  .staff .ok { color: var(--good); fill: var(--good); stroke: var(--good); } .staff .no { color: var(--danger); fill: var(--danger); stroke: var(--danger); }
+  .staff .head.whole.ok, .staff .head.whole.no { fill: none; } .staff text.ok, .staff text.no { stroke: none; }
+  .staff.placeable { cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  .qTimer { height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; } .qTimer i { display: block; height: 100%; width: 100%; background: var(--kid); transition: width linear; }
+  .setCard { border: 1.5px solid color-mix(in srgb, var(--kid) 30%, transparent); }
   .glyph { font-family: 'Noto Music', serif; font-size: 96px; line-height: 1.1; } .glyph .dot { font-family: var(--sans); font-size: 40px; vertical-align: 12px; margin-left: -6px; }
   .dyn { font-family: 'Times New Roman', Georgia, serif; font-style: italic; font-weight: 700; font-size: 76px; letter-spacing: -.02em; }
   .term { font-family: var(--serif); font-style: italic; font-size: 42px; }
@@ -797,7 +803,7 @@
 
 <script src="badges.js?v=8"></script>
 <script src="signin.js?v=1"></script>
-<script src="theory.js?v=1"></script>
+<script src="theory.js?v=2"></script>
 <script>
 const $ = id => document.getElementById(id);
 const CIRC = 2 * Math.PI * 52;
@@ -2604,52 +2610,70 @@ $('tuWritten').onchange = () => { settings.tunerWritten = $('tuWritten').checked
 const kidTheory = k => (theory[k.id] ??= {});
 function saveTheory() { store.set('pt-theory', theory); pushRemote({ theory }); }
 const theoryPlanOf = k => teacherOf(k)?.theoryPlan || {};
-const theoryClef = k => theoryPlanOf(k).clef || defaultClef(k.instrument);
+const theoryClefs = k => normClefs(theoryPlanOf(k).clefs || theoryPlanOf(k).clef || defaultClef(k.instrument));
 const deckOn = (k, d) => theoryPlanOf(k).decks?.[d] !== false && !(d === 'echo' && k.instrument === 'drums');
-const THEORY_MODE_BTN = { cards: ['play', 'Flash cards'], play: ['mic', 'Play it'], echo: ['mic', 'Hear &amp; play back'] };
+// The teacher's own sets for this student (newest first); a set that needs the microphone is skipped for drums
+const teacherSets = k => Object.entries(theoryPlanOf(k).sets || {}).map(([id, s]) => ({ ...normalizeSet(s), id }))
+  .filter(s => !s.hidden && !(s.kind === 'play' && k.instrument === 'drums')).sort((a, b) => (b.created || '').localeCompare(a.created || ''));
+const THEORY_MODE_BTN = { cards: ['play', 'Flash cards'], place: ['target', 'Find it'], play: ['mic', 'Play it'], echo: ['mic', 'Hear &amp; play back'] };
+const clefWords = cl => cl.map(c => CLEF_CHOICES[c].toLowerCase()).join(' and ').replace('grand staff', 'the grand staff');
 
 function renderTheoryEntry() {
-  const el = $('theoryEntry');
-  if (!kid || listening || !THEORY_ORDER.some(d => deckOn(kid, d))) { el.hidden = true; return; }
+  const el = $('theoryEntry'), sets = kid ? teacherSets(kid) : [];
+  if (!kid || listening || !(THEORY_ORDER.some(d => deckOn(kid, d)) || sets.length)) { el.hidden = true; return; }
   el.hidden = false;
   const st = kidTheory(kid), goal = theoryPlanOf(kid).goal, played = THEORY_ORDER.filter(d => deckOn(kid, d) && st.levels?.[d] > 1);
+  const fresh = sets.filter(s => !st.sets?.[s.id]?.passes);
   el.innerHTML = `<div class="thMini" aria-hidden="true">𝅘𝅥𝅮</div><div class="grow"><b>Music theory</b>
-    <span>${goal && THEORY_DECKS[goal.deck] && theoryLevel(st, goal.deck) < goal.level ? `Goal: ${esc(THEORY_DECKS[goal.deck].name)} level ${goal.level}`
+    <span>${fresh.length ? `${fresh.length} ${fresh.length === 1 ? 'set' : 'sets'} from your teacher`
+      : goal && THEORY_DECKS[goal.deck] && theoryLevel(st, goal.deck) < goal.level ? `Goal: ${esc(THEORY_DECKS[goal.deck].name)} level ${goal.level}`
       : played.length ? played.slice(0, 2).map(d => `${THEORY_DECKS[d].name} level ${theoryLevel(st, d)}`).join(' · ') : 'Note flash cards, rhythm and ear games'}</span></div>${icon('chev', 'go')}`;
   el.onclick = () => show('theory');
 }
 function renderTheory() {
   const k = kid; if (!k) return show('home');
   document.body.style.setProperty('--kid', kidColor(k));
-  const st = kidTheory(k), plan = theoryPlanOf(k), t = teacherOf(k);
+  const st = kidTheory(k), plan = theoryPlanOf(k), t = teacherOf(k), cl = theoryClefs(k);
   if (applyTheoryPlan(st, plan)) saveTheory();
   $('thTitle').textContent = `${k.name}’s music theory`;
-  const g = plan.goal, clef = theoryClef(k);
-  $('thGoal').innerHTML = g && THEORY_DECKS[g.deck] ? `<div class="card thGoal">${icon('flag')}<div class="grow"><b>Goal from ${esc(t.teacherName)}</b>
-      <div class="small muted">Reach ${esc(THEORY_DECKS[g.deck].name)} level ${g.level}${g.due ? ` by ${parseDay(g.due).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}` : ''}</div></div>
-      <span class="lvl">${theoryLevel(st, g.deck) >= g.level ? 'Done!' : `Level ${theoryLevel(st, g.deck)} now`}</span></div>` : '';
+  const g = plan.goal, due = d => parseDay(d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  const sets = teacherSets(k);
+  $('thGoal').innerHTML = (g && THEORY_DECKS[g.deck] ? `<div class="card thGoal">${icon('flag')}<div class="grow"><b>Goal from ${esc(t.teacherName)}</b>
+      <div class="small muted">Reach ${esc(THEORY_DECKS[g.deck].name)} level ${g.level}${g.due ? ` by ${due(g.due)}` : ''}</div></div>
+      <span class="lvl">${theoryLevel(st, g.deck) >= g.level ? 'Done!' : `Level ${theoryLevel(st, g.deck)} now`}</span></div>` : '')
+    + (sets.length ? `<div class="sectionLabel" style="margin:6px 2px 0">From ${esc(t.teacherName)}</div>` + sets.map(s => {
+      const r = st.sets?.[s.id];
+      return `<div class="card deck setCard"><div class="top"><div class="grow"><b>${esc(s.name || SET_KINDS[s.kind].label)}</b><span>${esc(theorySetSummary(s))}</span></div>
+          <span class="lvl">${r?.passes ? `${icon('check', 'sm')} Passed` : r?.rounds ? `Best ${r.best}%` : 'New'}</span></div>
+        ${s.note ? `<div class="small">${esc(s.note)}</div>` : ''}
+        <div class="small muted">${r?.rounds ? `Played ${r.rounds} ${r.rounds === 1 ? 'time' : 'times'} · best ${r.best}%` : 'Not played yet'}${s.due ? ` · due ${due(s.due)}` : ''}</div>
+        <div class="modes"><button class="secondary" data-set="${esc(s.id)}">${icon(THEORY_MODE_BTN[SET_KINDS[s.kind].mode][0], 'sm')}Start</button></div></div>`; }).join('')
+      + '<div class="sectionLabel" style="margin:6px 2px 0">Games with levels</div>' : '');
   $('thDecks').innerHTML = THEORY_ORDER.filter(d => deckOn(k, d)).map(d => {
     const D = THEORY_DECKS[d], lv = theoryLevel(st, d), max = D.levels.length, passes = st.passes?.[d] || 0;
     const modes = D.modes.filter(m => m !== 'play' || k.instrument !== 'drums');
-    return `<div class="card deck"><div class="top"><div class="grow"><b>${esc(D.name)}</b><span>${esc(D.levels[lv - 1])}${d === 'notes' ? ` · ${clef === 'mixed' ? 'treble and bass' : CLEFS[clef].name.toLowerCase()} clef` : ''}</span></div>
+    return `<div class="card deck"><div class="top"><div class="grow"><b>${esc(D.name)}</b><span>${esc(D.levels[lv - 1])}${['notes', 'intervals', 'chords'].includes(d) && !(d === 'notes' && lv >= 8) ? ` · ${clefWords(cl)}` : ''}</span></div>
         <span class="lvl">Level ${lv}${lv < max ? ` of ${max}` : ' · top'}</span></div>
       ${lv < max ? `<div class="pips">${Array.from({ length: PASSES_TO_LEVEL }, (_, i) => `<i class="${i < passes ? 'on' : ''}"></i>`).join('')}
         <span class="small muted" style="margin-left:6px">${passes} of ${PASSES_TO_LEVEL} rounds passed toward level ${lv + 1}</span></div>` : '<div class="small muted">Top level – keep playing to stay sharp.</div>'}
       <div class="modes">${modes.map(m => `<button class="secondary" data-play="${d}:${m}">${icon(THEORY_MODE_BTN[m][0], 'sm')}${THEORY_MODE_BTN[m][1]}</button>`).join('')}</div></div>`;
-  }).join('') || '<div class="card empty muted">Your teacher hasn’t turned on any theory games yet.</div>';
+  }).join('') || (sets.length ? '' : '<div class="card empty muted">Your teacher hasn’t turned on any theory games yet.</div>');
   $('thDecks').querySelectorAll('[data-play]').forEach(b => b.onclick = () => { const [d, m] = b.dataset.play.split(':'); startQuiz(d, m); });
+  $('thGoal').querySelectorAll('[data-set]').forEach(b => b.onclick = () => { const s = sets.find(x => x.id === b.dataset.set); if (s) startQuiz('set:' + s.id, SET_KINDS[s.kind].mode, s); });
 }
 $('theoryBack').onclick = () => show('practice');
 $('quizStop').onclick = () => endQuiz();
 
-// A round: 10 questions. Flash cards are tapped; Play it and Echo listen for the note (on the device – nothing is recorded).
+// A round: 10 questions (a teacher's set chooses its own number, time limit and pass mark). Flash cards are tapped;
+// "Find it" taps the staff; Play it and Echo listen for the note (on the device – nothing is recorded).
 let quiz = null;
-async function startQuiz(deck, mode) {
+async function startQuiz(deck, mode, set = null) {
   if (quiz) endQuiz(true);
-  const k = kid, st = kidTheory(k);
-  const z = quiz = { k, deck, mode, level: theoryLevel(st, deck), i: 0, right: 0, results: [], miss: [], started: performance.now(), q: null, listener: null };
+  const k = kid, st = kidTheory(k), total = set ? set.cards : THEORY_ROUND;
+  const z = quiz = { k, deck, mode, set, level: theoryLevel(st, deck), total, passAt: set ? theoryPassAt(total, set.pass) : THEORY_PASS, seconds: set?.seconds || 0,
+                     i: 0, right: 0, results: [], miss: [], started: performance.now(), q: null, listener: null };
   show('quiz');
-  if (mode !== 'cards') {
+  if (mode === 'play' || mode === 'echo') {
     $('quizCard').innerHTML = '<p class="muted">Getting the microphone ready…</p>';
     try {
       z.listener = await theoryListen(onHeard, { pitchOf: yin, minF: 55, onLevel: v => { const m = $('qMic'); if (m) m.style.width = Math.min(100, v * 700) + '%'; } });
@@ -2669,12 +2693,12 @@ function endQuiz(silent) {
 }
 function drawProg() {
   const z = quiz;
-  $('qProg').innerHTML = Array.from({ length: THEORY_ROUND }, (_, i) => `<i class="${i < z.results.length ? (z.results[i] ? 'ok' : 'no') : i === z.i ? 'now' : ''}"></i>`).join('');
+  $('qProg').innerHTML = Array.from({ length: z.total }, (_, i) => `<i class="${i < z.results.length ? (z.results[i] ? 'ok' : 'no') : i === z.i ? 'now' : ''}"></i>`).join('');
 }
 function nextQuestion() {
   const z = quiz; if (!z) return;
-  if (z.i >= THEORY_ROUND) return finishQuiz();
-  z.q = theoryQuestion(z.deck, z.level, { clef: theoryClef(z.k), instrument: z.k.instrument, mode: z.mode, last: z.q?.id });
+  if (z.i >= z.total) return finishQuiz();
+  z.q = theoryQuestion(z.deck, z.level, { clefs: theoryClefs(z.k), instrument: z.k.instrument, mode: z.mode, last: z.q?.id, set: z.set });
   z.tries = 0; z.done = false;
   drawProg();
   const q = z.q, p = q.prompt;
@@ -2682,10 +2706,11 @@ function nextQuestion() {
     : p.text ? `<div class="term">${esc(p.text)}</div>` : `<div class="glyph" aria-hidden="true">𝄞</div>`);
   const body = z.mode === 'cards'
     ? `<div class="answers ${q.grid ? 'letters' : ''}">${q.choices.map(c => `<button data-a="${esc(c)}">${esc(c)}</button>`).join('')}</div>`
+    : z.mode === 'place' ? `<div class="small muted" id="qHint">Tap the line or space</div>`
     : `<div class="listenBox"><div class="heard" id="qHeard">&nbsp;</div><div class="micLevel"><i id="qMic"></i></div>
         <div class="small muted" id="qHint">${z.mode === 'echo' ? 'Listen…' : 'Play the note on your instrument'}</div>
         <div style="display:flex;gap:8px">${z.mode === 'echo' ? `<button class="secondary" id="qReplay">${icon('play', 'sm')}Hear it again</button>` : ''}<button class="ghost" id="qSkip">Skip</button></div></div>`;
-  $('quizCard').innerHTML = `<div class="ask">${esc(q.ask)}</div><div class="prompt">${prompt}</div>${body}<div class="feedback" id="qFb" role="status"></div>`;
+  $('quizCard').innerHTML = `${z.seconds ? `<div class="qTimer"><i id="qTime"></i></div>` : ''}<div class="ask">${esc(q.ask)}</div><div class="prompt" id="qPrompt">${prompt}</div>${body}<div class="feedback" id="qFb" role="status"></div>`;
   $('quizCard').querySelectorAll('[data-a]').forEach(b => b.onclick = () => {
     if (z.done) return;
     const ok = b.dataset.a === q.answer;
@@ -2693,20 +2718,35 @@ function nextQuestion() {
     if (!ok) $('quizCard').querySelectorAll('[data-a]').forEach(x => { if (x.dataset.a === q.answer) x.classList.add('right'); });
     judge(ok);
   });
+  if (z.mode === 'place') {                                          // tap the staff: snap to the nearest line or space
+    const svg = $('qPrompt').querySelector('svg');
+    svg.addEventListener('click', e => {
+      if (z.done) return;
+      const hit = theoryStaffHit(svg, e.clientX, e.clientY), ok = hit.p === q.target.p;
+      const marks = [{ staff: hit.staff, p: hit.p, whole: true, col: 0, mark: ok ? 'ok' : 'no' }];
+      if (!ok) marks.push({ staff: q.target.staff, p: q.target.p, whole: true, col: 1, mark: 'ok' });
+      $('qPrompt').innerHTML = theoryStaff({ clef: q.display, notes: marks, place: true });
+      judge(ok, ok ? '' : `You tapped ${noteName(hit.p) + posOctave(hit.p)}`);
+    });
+  }
   $('qSkip')?.addEventListener('click', () => judge(false));
   $('qReplay')?.addEventListener('click', playEcho);
-  if (z.mode !== 'cards') z.timeout = setTimeout(() => judge(false, 'No note heard'), 20000);
+  const limit = z.seconds ? z.seconds * 1000 : z.mode === 'play' || z.mode === 'echo' ? 20000 : 0;
+  if (limit) z.timeout = setTimeout(() => judge(false, z.seconds ? 'Out of time' : 'No note heard'), limit + (z.mode === 'echo' ? 1200 : 0));
+  if (z.seconds) requestAnimationFrame(() => { const bar = $('qTime'); if (bar) { bar.style.transitionDuration = z.seconds + 's'; bar.style.width = '0%'; } });
   if (z.mode === 'echo') playEcho();
 }
 function judge(ok, why = '') {
   const z = quiz; if (!z || z.done) return;
   z.done = true; clearTimeout(z.timeout); z.listener?.pause();
+  const bar = $('qTime'); if (bar) { bar.style.transitionDuration = '0s'; bar.style.width = getComputedStyle(bar).width; }
   z.results.push(ok); if (ok) z.right++; else z.miss.push(z.q.id);
   const fb = $('qFb'); fb.className = 'feedback ' + (ok ? 'ok' : 'no');
   fb.textContent = ok ? pick(['Yes!', 'Nice!', 'That’s it!', 'Great!']) : `${why ? why + ' – ' : ''}it was ${z.q.answer}`;
-  if (z.mode !== 'cards') $('qHeard').textContent = z.q.answer;
+  if (z.mode === 'play' || z.mode === 'echo') $('qHeard').textContent = z.q.answer;
+  if (z.mode === 'cards' && !ok) $('quizCard').querySelectorAll('[data-a]').forEach(x => { if (x.dataset.a === z.q.answer) x.classList.add('right'); });
   z.i++; drawProg();
-  setTimeout(() => { if (quiz === z) { z.listener?.resume(); nextQuestion(); } }, ok ? 900 : 1900);
+  setTimeout(() => { if (quiz === z) { z.listener?.resume(); nextQuestion(); } }, ok ? 900 : 2000);
 }
 // A steady note was heard (Play it / Echo)
 function onHeard(pc) {
@@ -2729,19 +2769,21 @@ async function playEcho() {
 function finishQuiz() {
   const z = quiz; z.listener?.stop(); z.listener = null;
   const st = kidTheory(z.k), before = theoryLevel(st, z.deck), D = THEORY_DECKS[z.deck];
-  const r = recordTheoryRound(st, { deck: z.deck, mode: z.mode, right: z.right, total: THEORY_ROUND, ms: performance.now() - z.started, miss: z.miss });
+  const r = recordTheoryRound(st, { deck: z.deck, mode: z.mode, right: z.right, total: z.total, ms: performance.now() - z.started, miss: z.miss, passAt: z.passAt });
   if (r.passed) addStat('theory', 1);                 // counts toward the "Theory whiz" badge
   saveTheory(); pushTeacher(z.k);
-  const stars = theoryStars(z.right);
+  const stars = theoryStars(z.right, z.total, z.passAt);
   $('qProg').innerHTML = '';
+  const detail = z.set ? (r.passed ? ` – passed (${z.passAt} needed)` : ` – get ${z.passAt} right to pass this set`)
+    : r.levelUp ? ` – next up: ${esc(theoryLevelName(z.deck, r.level))}`
+    : r.passed ? (before < D.levels.length ? ` – ${st.passes?.[z.deck] || 0} of ${PASSES_TO_LEVEL} rounds toward level ${before + 1}` : '') : ` – get ${THEORY_PASS} right to pass a round`;
   $('quizCard').innerHTML = `<div class="result">
     <div class="stars">${[0, 1, 2].map(i => `<svg class="ic ${i < stars ? 'on' : ''}"><use href="#i-star"/></svg>`).join('')}</div>
-    <h2 style="margin:0">${r.levelUp ? `Level up! ${esc(D.name)} level ${r.level}` : r.passed ? 'Round passed!' : 'Good practice!'}</h2>
-    <p class="muted">${z.right} of ${THEORY_ROUND} right${r.levelUp ? ` – next up: ${esc(theoryLevelName(z.deck, r.level))}`
-      : r.passed ? (before < D.levels.length ? ` – ${st.passes?.[z.deck] || 0} of ${PASSES_TO_LEVEL} rounds toward level ${before + 1}` : '') : ` – get ${THEORY_PASS} right to pass a round`}</p>
+    <h2 style="margin:0">${r.levelUp ? `Level up! ${esc(D.name)} level ${r.level}` : r.passed ? (z.set ? 'Set passed!' : 'Round passed!') : 'Good practice!'}</h2>
+    <p class="muted">${z.right} of ${z.total} right${detail}</p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center"><button class="secondary" id="qAgain">${icon('refresh', 'sm')}Play again</button><button class="secondary" id="qDone">Done</button></div></div>`;
   if (r.levelUp) confetti(160, kidColor(z.k)); else if (stars === 3) confetti(70, kidColor(z.k));
-  $('qAgain').onclick = () => startQuiz(z.deck, z.mode);
+  $('qAgain').onclick = () => startQuiz(z.deck, z.mode, z.set);
   $('qDone').onclick = () => { quiz = null; show('theory'); };
 }
 

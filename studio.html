@@ -17,7 +17,7 @@
 <meta name="apple-mobile-web-app-title" content="Allegrow Studio">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Noto+Music&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #f6f3ee; --card: #ffffff; --ink: #1e2a44; --ink-2: #3d4760; --muted: #6e7385;
@@ -243,6 +243,18 @@
   .thRow { display: grid; grid-template-columns: 1fr auto auto; gap: 8px 14px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
   .thRow.off .grow { opacity: .5; } .thRow select { width: auto; max-width: 210px; } .thOn { display: flex; gap: 6px; align-items: center; }
   @container (max-width: 620px) { .thRow { grid-template-columns: 1fr auto; } .thRow .grow { grid-column: 1 / -1; } }
+  .clefPick { display: flex; gap: 6px 14px; flex-wrap: wrap; align-items: center; margin-top: 4px; font-weight: 500; }
+  .clefPick label { display: flex; gap: 6px; align-items: center; }
+  .picker { border: 1.5px dashed var(--line); border-radius: 12px; padding: 6px; overflow-x: auto; }
+  .staff { width: 100%; height: auto; color: var(--ink); overflow: visible; } .picker .staff { max-width: 640px; min-width: 360px; }
+  .staff line { stroke: currentColor; stroke-width: 1.3; } .staff .ledger { stroke-width: 1.5; } .staff .stem { stroke-width: 1.7; }
+  .staff .head { fill: currentColor; } .staff .head.whole { fill: none; stroke: currentColor; stroke-width: 2.2; } .staff .brace { fill: none; stroke: currentColor; stroke-width: 2.4; }
+  .staff text { fill: currentColor; font-family: 'Noto Music', serif; } .staff.placeable { cursor: crosshair; }
+  .tsPreview { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 6px 0; }
+  .tsCard { border: 1px solid var(--line); border-radius: 12px; padding: 8px; display: grid; gap: 4px; text-align: center; font-weight: 500; }
+  .tsCard .staff { max-height: 150px; } .tsCard .term { font-family: var(--serif); font-style: italic; font-size: 22px; }
+  @container (max-width: 620px) { .tsPreview { grid-template-columns: 1fr; } }
+  .seg { display: inline-flex; flex-wrap: wrap; }
   .thScore { font-weight: 700; white-space: nowrap; color: #b88a1e; } .thScore .muted { color: var(--line); }
   .tword { font-size: 13.5px; font-weight: 700; color: var(--ink-2); } .tword.up { color: var(--good); } .tword.down { color: var(--warn); }
   .stat .tword { font-size: 17px; }
@@ -497,7 +509,7 @@
 <div id="toast"></div>
 
 <script src="badges.js?v=8"></script>
-<script src="theory.js?v=1"></script>
+<script src="theory.js?v=2"></script>
 <script src="signin.js?v=1"></script>
 <script>
 // ============================================================================================
@@ -1152,48 +1164,186 @@ function tEvents(s) {
 // ---------- Music theory (games and levels in theory.js; results come from the family app in practice.theory) ----------
 function tTheory(s) {
   const T = s.practice?.theory || {}, plan = s.theoryPlan || {}, first = esc(firstName(s.name));
-  const clef = plan.clef || defaultClef(s.instrument), rounds = (T.rounds || []).slice().sort((a, b) => b.at.localeCompare(a.at));
+  const clefs = normClefs(plan.clefs || plan.clef || defaultClef(s.instrument)), rounds = (T.rounds || []).slice().sort((a, b) => b.at.localeCompare(a.at));
   const since14 = dayKey(addDays(today(), -13)), since30 = dayKey(addDays(today(), -29));
   const g = plan.goal && THEORY_DECKS[plan.goal.deck] ? plan.goal : null, lv = d => Math.min(Math.max(T.levels?.[d] || 1, 1), THEORY_DECKS[d].levels.length);
   const miss = {}; rounds.filter(r => r.at.slice(0, 10) >= since30).forEach(r => (r.miss || []).forEach(id => miss[id] = (miss[id] || 0) + 1));
-  const trouble = Object.entries(miss).sort((a, b) => b[1] - a[1]).slice(0, 6);
-  const clefOpts = { treble: 'Treble', bass: 'Bass', alto: 'Alto', mixed: 'Treble and bass' };
+  const trouble = Object.entries(miss).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const sets = Object.entries(plan.sets || {}).map(([id, x]) => ({ ...normalizeSet(x), id })).sort((a, b) => (b.created || '').localeCompare(a.created || ''));
+  const deckName = d => d.startsWith('set:') ? (plan.sets?.[d.slice(4)]?.name || 'Your set') : THEORY_DECKS[d]?.name || d;
   const deckRow = d => {
     const D = THEORY_DECKS[d], on = plan.decks?.[d] !== false, cur = lv(d), max = D.levels.length, passes = T.passes?.[d] || 0;
     const r14 = rounds.filter(r => r.deck === d && r.at.slice(0, 10) >= since14), right = r14.reduce((a, r) => a + r.right, 0), total = r14.reduce((a, r) => a + r.total, 0);
     const set = plan.levels?.[d], pending = set && +set.level !== cur;
     return `<div class="thRow ${on ? '' : 'off'}">
       <div class="grow"><b>${esc(D.name)}</b> <span class="chip ${cur >= max ? 'good' : ''}">Level ${cur} of ${max}</span>
-        <div class="small muted">${esc(D.levels[cur - 1])}${d === 'notes' ? ` · ${clefOpts[clef].toLowerCase()} clef` : ''}${cur < max ? ` · ${passes} of ${PASSES_TO_LEVEL} rounds toward level ${cur + 1}` : ''}</div>
+        <div class="small muted">${esc(D.levels[cur - 1])}${cur < max ? ` · ${passes} of ${PASSES_TO_LEVEL} rounds toward level ${cur + 1}` : ''}</div>
         <div class="small">${r14.length ? `Last 2 weeks: ${r14.length} ${r14.length === 1 ? 'round' : 'rounds'} · ${pct(right / total)} right` : '<span class="muted">Not played in the last 2 weeks</span>'}
           ${pending ? `<span class="muted"> · you set level ${set.level} – it applies next time ${first} opens theory</span>` : ''}</div></div>
       <label class="small">Level <select data-thlevel="${d}">${D.levels.map((n, i) => `<option value="${i + 1}" ${i + 1 === (pending ? +set.level : cur) ? 'selected' : ''}>${i + 1} · ${esc(n)}</option>`).join('')}</select></label>
       <label class="small thOn"><input type="checkbox" data-thdeck="${d}" ${on ? 'checked' : ''}> On</label></div>`;
   };
+  const setRow = x => {
+    const r = T.sets?.[x.id], rs = rounds.filter(q => q.deck === 'set:' + x.id);
+    return `<div class="assign"><div class="grow"><div class="t">${esc(x.name || SET_KINDS[x.kind].label)} ${r?.passes ? `<span class="chip good">${icon('check')}Passed</span>` : rs.length ? `<span class="chip info">Best ${r?.best ?? Math.max(...rs.map(q => Math.round(100 * q.right / q.total)))}%</span>` : '<span class="chip">Not played yet</span>'}</div>
+      <div class="d">${esc(theorySetSummary(x))}${x.due ? ` · due ${fmtDate(x.due)}` : ''}</div>
+      ${rs.length ? `<div class="d">${rs.length} ${rs.length === 1 ? 'round' : 'rounds'} · last ${fmtDate(rs[0].at.slice(0, 10), { month: 'short', day: 'numeric' })} · ${rs[0].right}/${rs[0].total}</div>` : ''}</div>
+      <button class="ghost small" data-setedit="${esc(x.id)}">Edit</button><button class="ghost small" data-setdel="${esc(x.id)}">Remove</button></div>`;
+  };
+  const library = theoryLibrary().filter(x => !plan.sets?.[x.id]);
   return `<div class="stack">
-    ${!s.linkedAt ? `<div class="banner">${icon('link')}<div class="grow">Theory results appear here once ${first}’s family connects the app. You can set levels and goals now.</div></div>` : ''}
-    <div class="card"><h2>Theory goal ${g ? `<button class="ghost small" data-act="thGoal">Change</button>` : `<button class="accent" data-act="thGoal">${icon('flag', 'sm')}Set a goal</button>`}</h2>
+    ${!s.linkedAt ? `<div class="banner">${icon('link')}<div class="grow">Theory results appear here once ${first}’s family connects the app. You can set levels, sets and goals now.</div></div>` : ''}
+    <div class="card"><h2>Your sets for ${first} <span style="display:flex;gap:8px;flex-wrap:wrap">${library.length ? `<select id="setAdd" style="width:auto"><option value="">Add a set you made…</option>${library.map(x => `<option value="${esc(x.id)}">${esc(x.name || SET_KINDS[x.kind].label)}</option>`).join('')}</select>` : ''}
+        <button class="accent" data-act="setNew">${icon('plus', 'sm')}New set</button></span></h2>
+      ${sets.length ? `<div class="list">${sets.map(setRow).join('')}</div>`
+        : `<p class="muted">Build exactly what ${first} should practice: notes you pick on the staff, any clefs (including tenor and the grand staff), intervals, chords or key signatures – with your own number of cards, time limit and pass mark.</p>`}</div>
+    <div class="card"><h2>Theory goal ${g ? `<button class="ghost small" data-act="thGoal">Change</button>` : `<button class="secondary" data-act="thGoal">${icon('flag', 'sm')}Set a goal</button>`}</h2>
       ${g ? (() => { const now = lv(g.deck), done = now >= g.level; return `<div class="assign"><div class="grow"><div class="t">Reach ${esc(THEORY_DECKS[g.deck].name)} level ${g.level} <span class="chip ${done ? 'good' : 'info'}">${done ? `${icon('check')}Reached` : `Level ${now} now`}</span></div>
           <div class="d">${esc(theoryLevelName(g.deck, g.level))}${g.due ? ` · by ${fmtDate(g.due)}` : ''} · ${first} sees this on their theory screen</div></div>
           <button class="ghost small" data-act="thGoalClear">Remove</button></div>`; })()
-        : `<p class="muted">Give ${first} a target, like “Note names level 4 by Friday”. It shows on their theory screen and ticks itself off.</p>`}</div>
-    <div class="card"><h2>Levels <label class="small" style="font-weight:600">Note names clef <select id="thClef" style="width:auto;margin-left:6px">${Object.entries(clefOpts).map(([v, l]) => `<option value="${v}" ${v === clef ? 'selected' : ''}>${l}</option>`).join('')}</select></label></h2>
-      <p class="small muted" style="margin:-6px 0 10px">Levels go up by themselves: 8 of 10 right passes a round, and ${PASSES_TO_LEVEL} passed rounds unlock the next level. You can move ${first} up or down, or switch a game off.</p>
+        : `<p class="muted">Give ${first} a target in the games with levels, like “Note names level 4 by Friday”. It shows on their theory screen and ticks itself off.</p>`}</div>
+    <div class="card"><h2>Games with levels</h2>
+      <div class="clefPick"><span class="small" style="font-weight:600">Clefs for notes, intervals and chords</span>
+        ${Object.entries(CLEF_CHOICES).map(([c, l]) => `<label class="small"><input type="checkbox" data-thclef="${c}" ${clefs.includes(c) ? 'checked' : ''}> ${l}</label>`).join('')}</div>
+      <p class="small muted" style="margin:6px 0 10px">With more than one clef, each card uses one of them at random. Levels go up by themselves: 8 of 10 right passes a round, and ${PASSES_TO_LEVEL} passed rounds unlock the next level. You can move ${first} up or down, or switch a game off.</p>
       ${THEORY_ORDER.map(deckRow).join('')}</div>
     <div class="grid2">
       <div class="card"><h2>Trouble spots</h2>
         ${trouble.length ? `<div class="list">${trouble.map(([id, n]) => `<div class="assign"><div class="grow"><div class="t">${esc(theoryItemLabel(id))}</div></div><span class="chip bad">missed ${n}×</span></div>`).join('')}</div>
-          <p class="small muted" style="margin-top:8px">From the last 30 days.</p>` : `<div class="empty">Nothing ${first} keeps missing in the last 30 days.</div>`}</div>
+          <p class="small muted" style="margin-top:8px">From the last 30 days, in games and your sets. <button class="ghost small" data-act="setFromTrouble" style="padding:2px 4px">Make a set from these notes</button></p>` : `<div class="empty">Nothing ${first} keeps missing in the last 30 days.</div>`}</div>
       <div class="card"><h2>Recent rounds</h2>
-        ${rounds.length ? `<div class="list">${rounds.slice(0, 10).map(r => { const st = theoryStars(r.right, r.total);
-          return `<div class="assign"><div class="grow"><div class="t">${esc(THEORY_DECKS[r.deck]?.name || r.deck)} · ${THEORY_MODES[r.mode] || ''} <span class="muted small">level ${r.level}</span></div>
+        ${rounds.length ? `<div class="list">${rounds.slice(0, 12).map(r => { const st = theoryStars(r.right, r.total);
+          return `<div class="assign"><div class="grow"><div class="t">${esc(deckName(r.deck))} · ${THEORY_MODES[r.mode] || ''} ${r.deck.startsWith('set:') ? '' : `<span class="muted small">level ${r.level}</span>`}</div>
             <div class="d">${new Date(r.at).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} · ${Math.max(1, Math.round(r.ms / 60000))} min</div></div>
             <span class="thScore">${r.right}/${r.total} ${'★'.repeat(st)}<span class="muted">${'★'.repeat(3 - st)}</span></span></div>`; }).join('')}</div>`
           : `<div class="empty">No rounds yet. ${first} finds Music theory on their practice screen.</div>`}
         ${(T.ups || []).length ? `<p class="small muted" style="margin-top:10px">Level-ups: ${(T.ups || []).slice(-4).reverse().map(u => `${esc(THEORY_DECKS[u.deck]?.name || '')} ${u.level} (${fmtDate(u.at.slice(0, 10), { month: 'short', day: 'numeric' })})`).join(' · ')}</p>` : ''}</div>
     </div></div>`;
 }
+// Every set given to any student (the teacher's library), newest first
+function theoryLibrary() {
+  const seen = {};
+  for (const st of Object.values(students)) for (const [id, x] of Object.entries(st.theoryPlan?.sets || {})) if (!seen[id] || (x.updated || '') > (seen[id].updated || '')) seen[id] = { ...x, id };
+  return Object.values(seen).sort((a, b) => (b.created || '').localeCompare(a.created || ''));
+}
+
+// Build or edit a set. Notes can be picked by clicking the staff; a live preview shows sample cards.
+function theorySetModal(sid, setId, preset) {
+  const s = students[sid], existing = setId && (s.theoryPlan?.sets?.[setId] || theoryLibrary().find(x => x.id === setId));
+  const id = setId || newId();
+  let x = normalizeSet(existing || preset || { kind: 'name', clefs: normClefs(s.theoryPlan?.clefs || s.theoryPlan?.clef || defaultClef(s.instrument)), ledger: 1, cards: 10, pass: 80 });
+  let pickClef = x.picks[0]?.startsWith('grand:') ? 'grand' : x.picks[0]?.split(':')[0] || x.clefs[0];
+  const holders = active().filter(st => st.theoryPlan?.sets?.[id]).map(st => st.id);
+  const give = new Set(holders.length ? holders : [sid]); give.add(sid);
+  const isNote = () => ['name', 'place', 'play'].includes(x.kind);
+  const chk = (attr, val, on, label) => `<label class="small"><input type="checkbox" ${attr}="${val}" ${on ? 'checked' : ''}> ${label}</label>`;
+  const seg = (name, cur, opts) => `<div class="seg">${Object.entries(opts).map(([v, l]) => `<button type="button" data-${name}="${v}" class="${String(cur) === String(v) ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+  const pickerSvg = () => {
+    const mine = x.picks.filter(p => pickClef === 'grand' ? p.startsWith('grand:') : p.split(':')[0] === pickClef && p.split(':').length === 2);
+    const notes = mine.map(p => { const a = p.split(':'); return a.length === 3 ? { staff: a[1], p: +a[2] } : { staff: a[0], p: +a[1] }; })
+      .sort((a, b) => a.p - b.p).map((n, i) => ({ ...n, whole: true, col: i }));
+    return theoryStaff({ clef: pickClef, notes, place: true, width: Math.max(420, 150 + notes.length * 50) });
+  };
+  let drawn = false;
+  const draw = () => {
+    const m = $('modalCard'), ov = $('modal'), scrollY = [ov.scrollTop, m.scrollTop];   // keep the place while the builder redraws
+    const body = `
+      <label class="field">Name <input type="text" id="tsName" maxlength="60" value="${esc(x.name || '')}" placeholder="e.g. Bass clef ledger lines, Triads for the recital"></label>
+      <div class="field">What should ${esc(firstName(s.name))} do? ${seg('kind', x.kind, Object.fromEntries(Object.entries(SET_KINDS).map(([k, v]) => [k, v.label])))}</div>
+      ${x.kind !== 'key' || true ? `<div class="field">Clefs <div class="clefPick">${Object.entries(CLEF_CHOICES).filter(([c]) => x.kind !== 'key' || c !== 'tenor').map(([c, l]) => chk('data-tsclef', c, x.clefs.includes(c), l)).join('')}</div></div>` : ''}
+      ${isNote() ? `
+        <div class="field">Which notes ${seg('src', x.picks.length ? 'picks' : 'range', { range: 'A range', picks: 'Notes I pick on the staff' })}</div>
+        ${x.picks.length || x._picking ? `
+          <div class="field"><span class="small muted" style="font-weight:500">Click a line or space to add a note; click it again to remove it. ${x.picks.length} picked.</span>
+            <div class="clefPick">${Object.entries(CLEF_CHOICES).map(([c, l]) => `<label class="small"><input type="radio" name="tsPickClef" value="${c}" ${pickClef === c ? 'checked' : ''}> ${l}</label>`).join('')}</div>
+            <div class="picker" id="tsPicker">${pickerSvg()}</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="ghost small" id="tsClearPicks">Clear all</button><span class="small muted">${esc(x.picks.map(p => { const a = p.split(':'), pp = +a.at(-1); return noteName(pp) + posOctave(pp); }).join(', '))}</span></div></div>`
+        : `<div class="fields two"><label class="field">Ledger lines above and below <select id="tsLedger">${[[-1, 'None – on the staff'], [0, 'Just above and below'], [1, '1'], [2, '2'], [3, '3'], [4, '4']].map(([v, l]) => `<option value="${v}" ${x.ledger === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+            <label class="field">Lines or spaces <select id="tsLines">${[['both', 'Both'], ['lines', 'Lines only'], ['spaces', 'Spaces only']].map(([v, l]) => `<option value="${v}" ${x.lines === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div>`}
+        ${x.kind !== 'place' ? `<div class="field">Sharps and flats ${seg('acc', x.acc, { none: 'None', sharps: 'Sharps', flats: 'Flats', both: 'Both' })}</div>` : ''}
+        ${x.kind === 'name' ? `<label class="small"><input type="checkbox" id="tsOctave" ${x.octave ? 'checked' : ''}> Answer with the octave too (e.g. C4, not just C)</label>` : ''}` : ''}
+      ${x.kind === 'interval' ? `
+        <div class="field">Sizes <div class="clefPick">${[2, 3, 4, 5, 6, 7, 8].map(n => chk('data-tssize', n, x.sizes.includes(n), ORD[n])).join('')}</div></div>
+        <label class="small"><input type="checkbox" id="tsQuality" ${x.quality ? 'checked' : ''}> Name the quality too (major, minor, perfect, augmented, diminished)</label>
+        ${x.quality ? `<div class="field">Sharps and flats ${seg('acc', x.acc, { none: 'None', sharps: 'Sharps', flats: 'Flats', both: 'Both' })}</div>` : ''}
+        <label class="field">Ledger lines <select id="tsLedger">${[[-1, 'None'], [0, 'Just above and below'], [1, '1']].map(([v, l]) => `<option value="${v}" ${x.ledger === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>` : ''}
+      ${x.kind === 'chord' ? `
+        <div class="field">Chord types <div class="clefPick">${Object.entries({ maj: 'Major', min: 'Minor', dim: 'Diminished', aug: 'Augmented' }).map(([q, l]) => chk('data-tschord', q, x.chords.includes(q), l)).join('')}</div></div>
+        <label class="small"><input type="checkbox" id="tsInv" ${x.inversions ? 'checked' : ''}> Include inversions (and ask which position)</label>
+        <label class="small"><input type="checkbox" id="tsAccRoots" ${x.accRoots ? 'checked' : ''}> Roots with sharps and flats (like B♭ or F♯)</label>` : ''}
+      ${x.kind === 'key' ? `
+        <div class="fields two"><label class="field">Up to <select id="tsKeysMax">${[1, 2, 3, 4, 5, 6, 7].map(n => `<option value="${n}" ${x.keysMax === n ? 'selected' : ''}>${n} ${n === 1 ? 'sharp or flat' : 'sharps or flats'}</option>`).join('')}</select></label>
+          <div class="field">Keys ${seg('keymode', x.keyMode, { major: 'Major', minor: 'Minor', both: 'Both' })}</div></div>` : ''}
+      <div class="fields three">
+        <label class="field">Cards per round <select id="tsCards">${[5, 10, 15, 20, 25, 30].map(n => `<option ${x.cards === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+        <label class="field">Time per card <select id="tsSeconds">${[[0, 'No limit'], [15, '15 s'], [10, '10 s'], [7, '7 s'], [5, '5 s'], [3, '3 s']].map(([v, l]) => `<option value="${v}" ${x.seconds === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+        <label class="field">To pass <select id="tsPass">${[60, 70, 75, 80, 90, 100].map(n => `<option value="${n}" ${x.pass === n ? 'selected' : ''}>${n}%</option>`).join('')}</select></label></div>
+      <div class="fields two"><label class="field">Due (optional) <input type="date" id="tsDue" value="${esc(x.due || '')}"></label>
+        <label class="field">Note to ${esc(firstName(s.name))} (optional) <input type="text" id="tsNote" maxlength="120" value="${esc(x.note || '')}" placeholder="e.g. For the Winter Recital pieces"></label></div>
+      <div class="field">Preview <button type="button" class="ghost small" id="tsShuffle">${icon('refresh', 'sm')}New examples</button>
+        <div class="tsPreview">${[0, 1, 2].map(() => { const q = theoryQuestion('set', 1, { set: x, instrument: s.instrument }); return `<div class="tsCard"><div class="small muted">${esc(q.ask)}</div>${q.prompt.staff || `<div class="term">${esc(q.prompt.text || q.prompt.dyn || '')}</div>`}<div class="small"><b>${esc(q.answer)}</b></div></div>`; }).join('')}</div>
+        <div class="small muted">${esc(theorySetSummary(x))}</div></div>
+      <div class="field">Give this set to <div class="clefPick">${active().map(st => chk('data-tsgive', st.id, give.has(st.id), esc(st.name))).join('')}</div></div>`;
+    openModal(`${mhead(existing ? 'Edit set' : 'New theory set')}<div class="fields">${body}<div class="gateErr" id="tsErr"></div></div>
+      <footer><div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="tsSave">Save</button></div></footer>`, bind, { focus: !drawn });
+    drawn = true;
+    m.classList.add('wide'); ov.scrollTop = scrollY[0]; m.scrollTop = scrollY[1];
+  };
+  const read = () => {
+    const m = $('modalCard'), v = id => m.querySelector('#' + id);
+    x.name = v('tsName').value.trim();
+    x.clefs = [...m.querySelectorAll('[data-tsclef]:checked')].map(c => c.dataset.tsclef);
+    if (v('tsLedger')) x.ledger = +v('tsLedger').value;
+    if (v('tsLines')) x.lines = v('tsLines').value;
+    if (v('tsOctave')) x.octave = v('tsOctave').checked;
+    if (m.querySelector('[data-tssize]')) x.sizes = [...m.querySelectorAll('[data-tssize]:checked')].map(c => +c.dataset.tssize);
+    if (v('tsQuality')) x.quality = v('tsQuality').checked;
+    if (m.querySelector('[data-tschord]')) x.chords = [...m.querySelectorAll('[data-tschord]:checked')].map(c => c.dataset.tschord);
+    if (v('tsInv')) x.inversions = v('tsInv').checked;
+    if (v('tsAccRoots')) x.accRoots = v('tsAccRoots').checked;
+    if (v('tsKeysMax')) x.keysMax = +v('tsKeysMax').value;
+    x.cards = +v('tsCards').value; x.seconds = +v('tsSeconds').value; x.pass = +v('tsPass').value; x.due = v('tsDue').value; x.note = v('tsNote').value.trim();
+    give.clear(); m.querySelectorAll('[data-tsgive]:checked').forEach(c => give.add(c.dataset.tsgive));
+  };
+  const redraw = () => { read(); x = { ...normalizeSet(x), name: x.name, due: x.due, note: x.note, _picking: x._picking }; draw(); };
+  function bind(m) {
+    m.querySelectorAll('[data-kind]').forEach(b => b.onclick = () => { x.kind = b.dataset.kind; redraw(); });
+    m.querySelectorAll('[data-acc]').forEach(b => b.onclick = () => { x.acc = b.dataset.acc; redraw(); });
+    m.querySelectorAll('[data-keymode]').forEach(b => b.onclick = () => { x.keyMode = b.dataset.keymode; redraw(); });
+    m.querySelectorAll('[data-src]').forEach(b => b.onclick = () => { read(); if (b.dataset.src === 'range') { x.picks = []; x._picking = false; } else x._picking = true; draw(); });
+    m.querySelectorAll('input[type=checkbox], select').forEach(c => { if (!c.dataset.tsgive) c.onchange = redraw; });
+    m.querySelectorAll('[name=tsPickClef]').forEach(r => r.onchange = () => { read(); pickClef = r.value; draw(); });
+    m.querySelector('#tsClearPicks')?.addEventListener('click', () => { read(); x.picks = []; x._picking = true; draw(); });
+    m.querySelector('#tsShuffle').onclick = redraw;
+    const svg = m.querySelector('#tsPicker svg');
+    if (svg) svg.addEventListener('click', e => {
+      read();
+      const hit = theoryStaffHit(svg, e.clientX, e.clientY), key = pickClef === 'grand' ? `grand:${hit.staff}:${hit.p}` : `${pickClef}:${hit.p}`;
+      x.picks = x.picks.includes(key) ? x.picks.filter(p => p !== key) : [...x.picks, key].slice(0, 80);
+      x._picking = true; draw();
+    });
+    m.querySelector('#tsSave').onclick = async () => {
+      read();
+      const err = t => (m.querySelector('#tsErr').textContent = t);
+      if (!give.size) return err('Choose at least one student.');
+      if (isNote() && x._picking && !x.picks.length) return err('Pick at least one note on the staff, or choose “A range”.');
+      if (!x.clefs.length && !x.picks.length && x.kind !== 'key') return err('Choose at least one clef.');
+      if (x.kind === 'interval' && !x.sizes.length) return err('Choose at least one interval size.');
+      if (x.kind === 'chord' && !x.chords.length) return err('Choose at least one chord type.');
+      const { _picking, ...clean } = normalizeSet(x);
+      const set = { ...clean, name: x.name || SET_KINDS[x.kind].label, due: x.due || '', note: x.note || '', created: existing?.created || new Date().toISOString(), updated: new Date().toISOString() };
+      delete set.id; delete set.hidden;
+      for (const st of active()) {
+        if (give.has(st.id)) await api.patchStudent(st.id, { [`theoryPlan.sets.${id}`]: set });
+        else if (st.theoryPlan?.sets?.[id]) await api.patchStudent(st.id, { [`theoryPlan.sets.${id}`]: DEL });
+      }
+      closeModal(); toast(`Set saved for ${give.size} ${give.size === 1 ? 'student' : 'students'}`);
+    };
+  }
+  draw();
+}
 function theoryGoalModal(sid) {
+
   const s = students[sid], g = s.theoryPlan?.goal, lvNow = d => s.practice?.theory?.levels?.[d] || 1;
   const levelOpts = d => THEORY_DECKS[d].levels.map((n, i) => `<option value="${i + 1}" ${(g?.deck === d ? g.level : Math.min(lvNow(d) + 1, THEORY_DECKS[d].levels.length)) === i + 1 ? 'selected' : ''}>${i + 1} · ${esc(n)}</option>`).join('');
   openModal(`${mhead('Theory goal for ' + esc(firstName(s.name)))}
@@ -1312,7 +1462,17 @@ function bindView() {
   V.querySelectorAll('[data-lesson]').forEach(b => b.onclick = () => lessonModal(b.dataset.lesson));
   V.querySelectorAll('[data-thlevel]').forEach(sel => sel.onchange = () => api.patchStudent(route.id, { [`theoryPlan.levels.${sel.dataset.thlevel}`]: { level: +sel.value, at: new Date().toISOString() } }).then(() => toast('Level set')));
   V.querySelectorAll('[data-thdeck]').forEach(c => c.onchange = () => api.patchStudent(route.id, { [`theoryPlan.decks.${c.dataset.thdeck}`]: c.checked }));
-  const thClef = V.querySelector('#thClef'); if (thClef) thClef.onchange = () => api.patchStudent(route.id, { 'theoryPlan.clef': thClef.value }).then(() => toast('Clef set'));
+  V.querySelectorAll('[data-thclef]').forEach(c => c.onchange = () => {
+    const cl = [...V.querySelectorAll('[data-thclef]:checked')].map(x => x.dataset.thclef);
+    if (!cl.length) { c.checked = true; return toast('Keep at least one clef'); }
+    api.patchStudent(route.id, { 'theoryPlan.clefs': cl }).then(() => toast('Clefs saved'));
+  });
+  V.querySelectorAll('[data-setedit]').forEach(b => b.onclick = () => theorySetModal(route.id, b.dataset.setedit));
+  V.querySelectorAll('[data-setdel]').forEach(b => b.onclick = () => { if (confirm('Remove this set from this student? Their results stay in Recent rounds.')) api.patchStudent(route.id, { [`theoryPlan.sets.${b.dataset.setdel}`]: DEL }); });
+  const setAdd = V.querySelector('#setAdd'); if (setAdd) setAdd.onchange = () => {
+    const x = theoryLibrary().find(y => y.id === setAdd.value); if (!x) return;
+    const { id, ...set } = x; api.patchStudent(route.id, { [`theoryPlan.sets.${id}`]: set }).then(() => toast('Set added'));
+  };
   V.querySelectorAll('[data-insight]').forEach(b => b.onclick = e => { e.stopPropagation(); insightInfoModal(b.dataset.insight, b.dataset.sid); });
   V.querySelectorAll('[data-event]').forEach(b => b.onclick = () => eventModal(b.dataset.event));
   V.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { sub.tab = b.dataset.tab; render(); });
@@ -1328,6 +1488,15 @@ function bindView() {
     addEvent: () => eventModal(null, route.view === 'student' ? route.id : null),
     unarchive: () => api.patchStudent(route.id, { archived: false }),
     thGoal: () => theoryGoalModal(route.id),
+    setNew: () => theorySetModal(route.id),
+    setFromTrouble: () => {                                          // a set of exactly the notes this student keeps missing
+      const s = students[route.id], since = dayKey(addDays(today(), -29)), picks = new Set();
+      for (const r of s.practice?.theory?.rounds || []) if (r.at.slice(0, 10) >= since) for (const id of r.miss || []) {
+        const a = id.split(':'); if (CLEFS[a[0]]) picks.add(`${a[0]}:${parseInt(a[1])}`); else if (a[0] === 'place') picks.add(`${a[1]}:${a[2]}`);
+      }
+      if (!picks.size) return toast('No missed notes to use yet');
+      theorySetModal(route.id, null, { name: 'Notes to review', kind: 'name', picks: [...picks], cards: 10, pass: 80 });
+    },
     thGoalClear: () => api.patchStudent(route.id, { 'theoryPlan.goal': DEL }),
     archiveLeft: () => { if (confirm(`Archive ${students[route.id].name}? You can restore them any time from the Students page.`)) api.patchStudent(route.id, { archived: true }).then(() => toast('Archived')); },
     star: () => cheerModal(route.id, 'star'), award: () => cheerModal(route.id, 'badge'), challenge: () => challengeModal(route.id),
@@ -1348,11 +1517,11 @@ function bindView() {
 }
 
 // ---------- Modals ----------
-function openModal(html, bind) {
+function openModal(html, bind, { focus = true } = {}) {
   $('modalCard').innerHTML = html; $('modalCard').classList.remove('wide'); $('modal').hidden = false;
   $('modalCard').querySelectorAll('[data-close]').forEach(b => b.onclick = closeModal);
   bind?.($('modalCard'));
-  setTimeout(() => $('modalCard').querySelector('input:not([type=checkbox]), textarea, select')?.focus(), 50);
+  if (focus) setTimeout(() => $('modalCard').querySelector('input:not([type=checkbox]), textarea, select')?.focus(), 50);
 }
 function closeModal() { $('modal').hidden = true; $('modalCard').innerHTML = ''; }
 $('modal').onclick = e => { if (e.target === $('modal')) closeModal(); };

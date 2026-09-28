@@ -3,9 +3,9 @@
 //  • Our own files: served from the saved copy, refreshed in the background.
 //  • Libraries, fonts and the sound model from their CDNs (versioned, never change): saved once, then reused.
 //  • Database, sign-in and email-service requests are never touched – they always go to the network.
-const VERSION = 'allegrow-v18';          // bump when the app's own files change
+const VERSION = 'allegrow-v20';          // bump when the app's own files change
 const CDN_CACHE = 'allegrow-cdn';       // versioned library files: kept across updates
-const SHELL = ['./', './app', './studio', './moved.js?v=1', './badges.js?v=8', './signin.js?v=1', './theory.js?v=1', './manifest.webmanifest', './manifest-studio.webmanifest',
+const SHELL = ['./', './app', './studio', './moved.js?v=1', './badges.js?v=8', './signin.js?v=1', './theory.js?v=2', './manifest.webmanifest', './manifest-studio.webmanifest',
                './brand/allegrow-icon.svg', './brand/png/allegrow-icon-192.png', './brand/png/apple-touch-icon.png'];
 const CDN = ['fonts.googleapis.com', 'fonts.gstatic.com', 'www.gstatic.com', 'cdn.jsdelivr.net', 'storage.googleapis.com'];
 
