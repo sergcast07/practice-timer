@@ -1,0 +1,80 @@
+/* Allegrow – shared styles for the public pages (home, teachers) */
+  :root { --bg: #f6f3ee; --card: #fff; --ink: #1e2a44; --ink-2: #3d4760; --muted: #6e7385; --line: #e9e3da; --soft: #f8f5f0;
+          --leaf: #23865f; --accent: #3b5bab; --danger: #b8402f; --shadow: 0 1px 2px rgba(30,42,68,.05), 0 8px 26px rgba(30,42,68,.07);
+          --serif: 'Fraunces', Georgia, serif; --sans: 'Figtree', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #14171f; --card: #1d212b; --ink: #eef0f5; --ink-2: #c9cdd8; --muted: #9aa0ae; --line: #2b303c; --soft: #222733;
+            --leaf: #4cc08d; --accent: #8aa4f0; --danger: #f07a66; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25); }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 17px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+  a { color: var(--accent); }
+  h1, h2, h3 { font-family: var(--serif); font-weight: 600; letter-spacing: -0.015em; margin: 0; line-height: 1.15; }
+  h1 { font-size: clamp(38px, 7vw, 62px); }
+  h2 { font-size: clamp(28px, 4.5vw, 40px); }
+  h3 { font-size: 20px; }
+  p { margin: 0; }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 0 20px; }
+  .ic { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  .wm b { color: var(--leaf); font-weight: inherit; }
+  .chip { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px;
+          background: color-mix(in srgb, var(--leaf) 15%, transparent); color: var(--leaf); }
+  .btn { display: inline-flex; align-items: center; gap: 8px; font: inherit; font-weight: 600; font-size: 16px; padding: 13px 20px; border-radius: 14px;
+         text-decoration: none; border: 0; cursor: pointer; }
+  .btn.primary { background: var(--ink); color: var(--bg); }
+  .btn.secondary { background: var(--card); color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--line); }
+  .btn.leaf { background: var(--leaf); color: #fff; }
+
+  nav.top { display: flex; align-items: center; justify-content: space-between; padding: 18px 0; gap: 12px; }
+  nav.top .brand { display: flex; align-items: center; gap: 10px; font-family: var(--serif); font-weight: 600; font-size: 22px; text-decoration: none; color: var(--ink); }
+  nav.top .brand img { width: 36px; height: 36px; }
+  nav.top .links { display: flex; gap: 18px; align-items: center; font-weight: 600; font-size: 15px; }
+  nav.top .links a { color: var(--ink-2); text-decoration: none; }
+  @media (max-width: 640px) { nav.top .links .hideS { display: none; } }
+
+  .hero { display: grid; grid-template-columns: 1.1fr .9fr; gap: 40px; align-items: center; padding: 40px 0 70px; }
+  .hero .lead { font-size: clamp(18px, 2.2vw, 21px); color: var(--ink-2); margin: 18px 0 28px; max-width: 34em; }
+  .hero .ctas { display: flex; gap: 10px; flex-wrap: wrap; }
+  .hero .small { margin-top: 14px; font-size: 14px; color: var(--muted); }
+  @media (max-width: 860px) { .hero { grid-template-columns: 1fr; padding-top: 16px; } }
+
+  /* the practice ring illustration */
+  .phone { background: var(--card); border-radius: 34px; box-shadow: var(--shadow); padding: 26px 22px; max-width: 340px; margin: 0 auto; width: 100%; }
+  .phone .who { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; }
+  .phone .av { width: 34px; height: 34px; border-radius: 50%; background: #cf5c3c; color: #fff; display: grid; place-items: center; font-family: var(--serif); }
+  .ring { position: relative; width: 210px; aspect-ratio: 1; margin: 18px auto 10px; }
+  .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .ring .c { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+  .ring .t { font-size: 46px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+  .ring .g { font-size: 13px; color: var(--muted); }
+  .pill { display: flex; justify-content: center; } .pill span { background: color-mix(in srgb, var(--leaf) 13%, transparent); color: var(--leaf); font-weight: 600; font-size: 14px; padding: 6px 12px; border-radius: 999px; }
+  .medals { display: flex; justify-content: center; gap: 10px; margin-top: 16px; }
+
+  section { padding: 64px 0; }
+  .sectionHead { max-width: 640px; margin-bottom: 30px; }
+  .sectionHead p { color: var(--ink-2); margin-top: 12px; font-size: 18px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 860px) { .grid3, .grid2 { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border-radius: 22px; padding: 24px; box-shadow: var(--shadow); }
+  .card .icon { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; background: color-mix(in srgb, var(--leaf) 13%, transparent); color: var(--leaf); margin-bottom: 14px; }
+  .card p { color: var(--ink-2); margin-top: 6px; font-size: 16px; }
+  .band { background: var(--card); }
+  .list { display: grid; gap: 14px; margin-top: 8px; }
+  .list div { display: flex; gap: 12px; align-items: flex-start; color: var(--ink-2); }
+  .list .ic { color: var(--leaf); margin-top: 3px; }
+
+  form { display: grid; gap: 12px; }
+  label { display: grid; gap: 6px; font-size: 14px; font-weight: 600; color: var(--muted); }
+  input, textarea, select { font: inherit; font-size: 16px; padding: 11px 13px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--soft); color: var(--ink); width: 100%; }
+  textarea { min-height: 110px; resize: vertical; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; } @media (max-width: 560px) { .two { grid-template-columns: 1fr; } }
+  .formMsg { min-height: 1.3em; font-size: 15px; font-weight: 600; }
+  .formMsg.err { color: var(--danger); } .formMsg.ok { color: var(--leaf); }
+  .hp { position: absolute; left: -9999px; }
+  details { background: var(--card); border-radius: 16px; padding: 16px 20px; box-shadow: var(--shadow); }
+  details + details { margin-top: 10px; }
+  summary { cursor: pointer; font-weight: 700; }
+  details p { color: var(--ink-2); margin-top: 10px; }
+  footer { padding: 40px 0 60px; color: var(--muted); font-size: 14px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  footer a { color: var(--muted); }
