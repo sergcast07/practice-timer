@@ -205,6 +205,9 @@ function lastPracticed(s, todayKey) {
 }
 const CHALLENGE_LABELS = { days: 'Practice on {n} days', minutes: 'Practice {n} minutes in total', goals: 'Reach the daily goal {n} times',
   streak: 'Practice {n} days in a row', metronome: 'Use the metronome on {n} days', homework: 'Tick off assignments on {n} days' };
+// Weekly plan (minutes per weekday, Sunday first; 0 = rest). The family's shared plan wins, then the teacher's.
+const planOf = s => { const p = s.practice?.plan || s.plan; return Array.isArray(p) && p.length === 7 ? p : Array(7).fill(s.target || 20); };
+const plannedDays = s => planOf(s).filter(n => n > 0).length;
 const currentAssignment = s => Object.values(s.assignments || {}).filter(a => a.status === 'active').sort((a, b) => (a.due || '9').localeCompare(b.due || '9'))[0];
 const first = n => (n || '').split(' ')[0];
 function nextLessonAfter(s, fromKey, days = 14) {
@@ -240,7 +243,7 @@ const trendTxt = (a, b) => { if (a == null || b == null) return ''; const d = Ma
 // One line that tells the teacher how the week went, in the order a teacher cares about (numbers only – safe as HTML)
 function weekLine(s, todayKey) {
   if (!s.linkedAt) return 'Not connected to the app yet';
-  const c = week(s, todayKey), p = week(s, todayKey, 1), parts = [`${c.days} of 7 days · ${minsText(c.total)}${c.manual ? ` <span style="color:#6e7385">(${minsText(c.manual)} by hand)</span>` : ''}`];
+  const c = week(s, todayKey), p = week(s, todayKey, 1), parts = [`${c.days} of ${plannedDays(s)} planned days · ${minsText(c.total)}${c.manual ? ` <span style="color:#6e7385">(${minsText(c.manual)} by hand)</span>` : ''}`];
   if (c.focus != null) parts.push(`focus ${pct(c.focus)}${trendTxt(c.focus, p.focus)}`);
   if (s.instrument !== 'piano' && c.tune != null) parts.push(`in tune ${pct(c.tune)}${trendTxt(c.tune, p.tune)}`);
   if (c.rhythm != null) parts.push(`rhythm ${pct(c.rhythm)}${trendTxt(c.rhythm, p.rhythm)}`);
@@ -286,7 +289,8 @@ function digestEmail(env, feed, students, now, test) {
   const total = weeks.reduce((a, w) => a + w.c.total, 0), prevTotal = weeks.reduce((a, w) => a + w.p.total, 0);
   const wins = [];
   for (const { s, c, p } of weeks) {
-    if (c.days >= 6) wins.push([90, `${esc(first(s.name))} practiced ${c.days} of 7 days.`]);
+    const planned = plannedDays(s);
+    if (planned && c.days >= planned) wins.push([90, `${esc(first(s.name))} practiced on ${c.days > planned ? `${c.days} days – more than the ${planned} planned` : `every planned day (${planned})`}.`]);
     if (s.instrument !== 'piano' && c.tune != null && p.tune != null && c.tune - p.tune >= 0.05) wins.push([80, `${esc(first(s.name))}’s tuning improved from ${pct(p.tune)} to ${pct(c.tune)}.`]);
     if (c.rhythm != null && p.rhythm != null && c.rhythm - p.rhythm >= 0.05) wins.push([75, `${esc(first(s.name))}’s rhythm got steadier: ${pct(p.rhythm)} → ${pct(c.rhythm)}.`]);
     if (p.total > 0 && c.total >= p.total * 1.5 && c.total - p.total >= 20 * 60000) wins.push([65, `${esc(first(s.name))} practiced ${minsText(c.total - p.total)} more than last week.`]);
@@ -296,10 +300,10 @@ function digestEmail(env, feed, students, now, test) {
       wins.push([88, `${esc(first(s.name))} completed your challenge “${esc(s.challenges[id].title || CHALLENGE_LABELS[s.challenges[id].kind]?.replace('{n}', s.challenges[id].target) || 'Challenge')}”.`]);
     const done = Object.values(s.assignments || {}).filter(a => a.status === 'done' && a.completed && a.completed > addKey(now.key, -7));
     for (const a of done) wins.push([60, `${esc(first(s.name))} finished “${esc(a.title)}”.`]);
-    if (c.days === 5) wins.push([50, `${esc(first(s.name))} practiced 5 of 7 days.`]);
+    else if (planned && c.days === planned - 1 && c.days >= 3) wins.push([50, `${esc(first(s.name))} practiced ${c.days} of ${planned} planned days.`]);
   }
   const topWins = wins.sort((a, b) => b[0] - a[0]).slice(0, 3).map(w => w[1]);
-  const nudges = weeks.filter(({ c }) => c.days <= 1).sort((a, b) => a.c.total - b.c.total).slice(0, 3);
+  const nudges = weeks.filter(({ s, c }) => c.days <= Math.min(1, plannedDays(s) - 2)).sort((a, b) => a.c.total - b.c.total).slice(0, 3);
   const upcoming = Object.values(Object.fromEntries(students.flatMap(s => Object.entries(s.upcoming || {}).map(([id, e]) => [id, e]))))
     .filter(e => e.date >= now.key && e.date <= addKey(now.key, 21)).sort((a, b) => a.date.localeCompare(b.date));
   const lessonsNext = Array.from({ length: 7 }, (_, i) => todaysLessons(students, addKey(now.key, i + 1)).length).reduce((a, b) => a + b, 0);

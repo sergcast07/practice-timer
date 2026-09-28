@@ -212,6 +212,7 @@
   .chart .col { flex: 1; height: 100%; display: flex; align-items: flex-end; }
   .chart .b { width: 100%; background: var(--kid); opacity: .35; border-radius: 4px 4px 1px 1px; min-height: 2px; }
   .chart .b.met { opacity: 1; }
+  .chart .dayGoal { position: absolute; left: -1px; right: -1px; border-top: 2px solid var(--muted); opacity: .6; }
   .chart .goal { position: absolute; left: 0; right: 0; border-top: 1.5px dashed var(--muted); opacity: .55; }
   .axis { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--muted); margin-top: 6px; }
 
@@ -254,6 +255,11 @@
   .modal footer { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding-top: 4px; }
   .modal footer .right { display: flex; gap: 8px; margin-left: auto; }
   @keyframes pop { from { transform: translateY(12px) scale(.97); opacity: 0; } to { transform: none; opacity: 1; } }
+  .presetRow { display: flex; gap: 6px; flex-wrap: wrap; }
+  .presetRow button { font-size: 12.5px; padding: 5px 10px; font-weight: 500; border-radius: 999px; }
+  .planInputs { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .planInputs label { display: grid; gap: 4px; text-align: center; font-size: 12px; }
+  .planInputs input { text-align: center; padding: 8px 2px; }
   .swatches { display: flex; gap: 8px; flex-wrap: wrap; }
   .swatches button { width: 32px; height: 32px; border-radius: 50%; padding: 0; border: 3px solid transparent; }
   .swatches button.on { border-color: var(--card); box-shadow: 0 0 0 2px var(--ink); }
@@ -395,7 +401,7 @@
 <div class="overlay" id="modal" hidden><div class="card modal" id="modalCard" role="dialog" aria-modal="true"></div></div>
 <div id="toast"></div>
 
-<script src="badges.js?v=2"></script>
+<script src="badges.js?v=3"></script>
 <script>
 // ============================================================================================
 // Practice Timer for Teachers
@@ -460,6 +466,10 @@ function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add
 const recDay = (s, d) => s.practice?.log?.[dayKey(d)] || 0;
 const manDay = (s, d) => s.practice?.manual?.[dayKey(d)] || 0;
 const pDay = (s, d) => recDay(s, d) + manDay(s, d);
+// The student's weekly plan (minutes per weekday, Sunday first; 0 = rest). The family's own plan, if they've
+// shared one, shows what the child is actually aiming for; the teacher's plan is the minimum.
+const planOfStudent = s => planOf(s.plan, s.target || 20);
+const goalMsOn = (s, key) => planOfStudent(s)[parseDay(key).getDay()] * 60000;
 const sDay = (s, d) => s.practice?.stats?.[dayKey(d)] || {};
 function practiceSummary(s, days) {
   const t = { total: 0, manual: 0, days: 0, active: 0, played: 0, notes: 0, inTune: 0, beats: 0, steady: 0 };
@@ -675,12 +685,12 @@ function practiceTable(list) {
     ${list.map(s => {
       if (!s.linkedAt) return `<div class="ptr" data-student="${s.id}" style="--kid:${s.color}"><div class="name"><div class="avatar sm">${initial(s.name)}</div><span>${esc(s.name)}</span></div>
         <div class="mins"><span class="chip info">${icon('link')}Not connected</span></div><div></div><div></div><div></div><div></div><div></div></div>`;
-      const c = practiceSummary(s, wk), p = practiceSummary(s, prev), target = (s.target || 20) * 7 * 60000, f = Math.min(c.total / target, 1);
+      const c = practiceSummary(s, wk), p = practiceSummary(s, prev), plan = planOfStudent(s), target = Math.max(1, planTotal(plan)) * 60000, f = Math.min(c.total / target, 1);
       return `<div class="ptr" data-student="${s.id}" style="--kid:${s.color}">
         <div class="name"><div class="avatar sm">${initial(s.name)}</div><span>${esc(s.name)}</span></div>
         <div class="mins"><span class="num">${mins(c.total)}</span> <span class="muted small">/ ${mins(target)}</span>${c.manual ? `<span class="byHand" title="Logged by hand">${icon('edit')}${mins(c.manual)}</span>` : ''}
           <div class="mbar ${f >= 1 ? 'full' : ''}"><div style="width:${Math.min((c.total - c.manual) / target, 1) * 100}%"></div><div class="hatch" style="width:${(f - Math.min((c.total - c.manual) / target, 1)) * 100}%"></div></div></div>
-        <div><span class="lbl-m">Days</span><span class="num">${c.days}</span></div>
+        <div><span class="lbl-m">Days</span><span class="num">${c.days}<span class="muted small"> / ${planDayCount(plan)}</span></span></div>
         <div><span class="lbl-m">Focus</span><span class="num">${pct(c.focus)}</span>${trend(c.focus, p.focus)}</div>
         <div><span class="lbl-m">In tune</span><span class="num">${s.instrument === 'piano' ? '<span class="muted">n/a</span>' : pct(c.tune)}</span>${trend(c.tune, p.tune)}</div>
         <div><span class="lbl-m">Rhythm</span><span class="num">${pct(c.rhythm)}</span>${trend(c.rhythm, p.rhythm)}</div>
@@ -730,6 +740,7 @@ function vStudents() {
   ${archived.length ? `<details class="card" style="margin-top:16px"><summary style="cursor:pointer;font-weight:700">Archived (${archived.length})</summary>
     <div class="list" style="margin-top:10px">${archived.map(s => `<button class="rowLink" data-student="${s.id}" style="--kid:${s.color}"><div class="avatar sm">${initial(s.name)}</div><div class="grow">${esc(s.name)}</div></button>`).join('')}</div></details>` : ''}`;
 }
+const planLine = s => `Plan: ${planText(planOfStudent(s))}`;
 const lessonText = s => s.lesson && s.lesson.day !== '' && s.lesson.day != null && s.lesson.time
   ? `${DAYS[s.lesson.day]}s at ${fmtTime(s.lesson.time)}, ${s.lesson.length || 30} min` : 'No regular lesson time';
 
@@ -742,7 +753,7 @@ function vStudent() {
     <button class="ghost" data-go2="students" style="margin-left:-10px;margin-bottom:10px">${icon('back', 'sm')}Students</button>
     <div class="studentHead">
       <div class="avatar lg">${initial(s.name)}</div>
-      <div class="grow"><h1>${esc(s.name)}</h1><div class="muted">${esc(INSTRUMENTS[s.instrument] || 'Instrument not set')} · ${lessonText(s)}</div></div>
+      <div class="grow"><h1>${esc(s.name)}</h1><div class="muted">${esc(INSTRUMENTS[s.instrument] || 'Instrument not set')} · ${lessonText(s)}</div><div class="muted small">${planLine(s)}</div></div>
       <div class="actions" style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="secondary" data-act="invite">${icon('link', 'sm')}${s.linkedAt ? 'Invite link' : 'Invite family'}</button>
         <button class="secondary" data-act="editStudent">${icon('edit', 'sm')}Edit</button>
@@ -760,23 +771,23 @@ function vStudent() {
 function tProgress(s) {
   if (!s.linkedAt) return `<div class="card emptyBig">${icon('clock', 'lg')}<p>Practice data appears here once the family connects the app.</p></div>`;
   const wk = lastDays(7), prev = lastDays(7, addDays(today(), -7)), c = practiceSummary(s, wk), p = practiceSummary(s, prev), m = practiceSummary(s, lastDays(30));
-  const days = lastDays(28), vals = days.map(d => pDay(s, d)), target = (s.target || 20) * 60000, top = Math.max(target, ...vals) * 1.1;
+  const days = lastDays(28), vals = days.map(d => pDay(s, d)), goals = days.map(d => goalMsOn(s, dayKey(d))), top = Math.max(...goals, ...vals, 60000) * 1.1;
   return `<div class="stack">
     <div class="card">
       <div class="stats">
         <div class="stat"><b>${mins(c.total)}</b><span>last 7 days${c.manual ? ` · ${mins(c.manual)} by hand` : ''}</span></div>
-        <div class="stat"><b>${c.days}/7</b><span>days practiced</span></div>
+        <div class="stat"><b>${c.days} ${c.days === 1 ? 'day' : 'days'}</b><span>practiced · ${planDayCount(planOfStudent(s))} planned</span></div>
         <div class="stat"><b>${pct(c.focus)}${trend(c.focus, p.focus)}</b><span>focus</span></div>
         ${s.instrument !== 'piano' ? `<div class="stat"><b>${pct(c.tune)}${trend(c.tune, p.tune)}</b><span>in tune</span></div>` : ''}
         <div class="stat"><b>${pct(c.rhythm)}${trend(c.rhythm, p.rhythm)}</b><span>steady rhythm</span></div>
         <div class="stat"><b>${mins(m.total)}</b><span>last 30 days</span></div>
       </div>
       <div class="chart">
-        <div class="goal" style="bottom:${target / top * 100}%" title="Target ${s.target || 20} min"></div>
-        ${vals.map((v, i) => { const m = manDay(s, days[i]); return `<div class="col" style="flex-direction:column;justify-content:flex-end" title="${fmtDate(days[i])}: ${mins(v)}${m ? ` (${mins(m)} by hand)` : ''}">
-          ${m ? `<div class="b hatch" style="height:${m / top * 100}%;min-height:0"></div>` : ''}<div class="b ${v >= target ? 'met' : ''}" style="height:${(v - m) / top * 100}%;${m ? 'border-radius:0' : ''}"></div></div>`; }).join('')}
+        ${vals.map((v, i) => { const m = manDay(s, days[i]), g = goals[i]; return `<div class="col" style="flex-direction:column;justify-content:flex-end;position:relative" title="${fmtDate(days[i])}: ${mins(v)}${m ? ` (${mins(m)} by hand)` : ''}${g ? ` · goal ${mins(g)}` : ' · rest day'}">
+          ${g ? `<div class="dayGoal" style="bottom:${g / top * 100}%"></div>` : ''}
+          ${m ? `<div class="b hatch" style="height:${m / top * 100}%;min-height:0"></div>` : ''}<div class="b ${g && v >= g ? 'met' : ''}" style="height:${(v - m) / top * 100}%;${m ? 'border-radius:0' : ''}"></div></div>`; }).join('')}
       </div>
-      <div class="axis"><span>${fmtDate(days[0], { day: 'numeric', month: 'short' })}</span><span>Last 4 weeks · dashed line = ${s.target || 20} min/day minimum · striped = logged by hand</span><span>Today</span></div>
+      <div class="axis"><span>${fmtDate(days[0], { day: 'numeric', month: 'short' })}</span><span>Last 4 weeks · dashes = each day’s goal (${planText(planOfStudent(s))}) · striped = logged by hand</span><span>Today</span></div>
     </div>
     <p class="small muted">Last practiced: ${lastPracticedText(lastPracticed(s))}. Practice data comes from ${esc(s.kidName || firstName(s.name))}’s Practice Timer app.</p>
   </div>`;
@@ -903,7 +914,7 @@ function vReports() {
   const asg = Object.values(s.assignments || {}), asgDone = asg.filter(a => a.status === 'done' && a.completed && a.completed >= dayKey(start));
   const ev = Object.values(events).filter(e => e.participants?.[sid] && e.date >= dayKey(start)).sort((a, b) => a.date.localeCompare(b.date));
   const weeks = []; for (let i = 0; i < range; i += 7) weeks.push(days.slice(i, i + 7));
-  const wVals = weeks.map(w => w.reduce((a, d) => a + pDay(s, d), 0)), wTop = Math.max((s.target || 20) * 7 * 60000, ...wVals) * 1.1;
+  const weekTarget = planTotal(planOfStudent(s)) * 60000, wVals = weeks.map(w => w.reduce((a, d) => a + pDay(s, d), 0)), wTop = Math.max(weekTarget, ...wVals, 60000) * 1.1;
   return `
   <div class="pageHead noprint"><div><div class="eyebrow">Progress report</div><h1>Reports</h1></div>
     <div class="actions">
@@ -923,8 +934,8 @@ function vReports() {
         ${s.instrument !== 'piano' ? `<div class="stat"><b>${pct(P.tune)}</b><span>in tune</span></div>` : ''}
         <div class="stat"><b>${pct(P.rhythm)}</b><span>steady rhythm</span></div></div>
       <div class="chart" style="height:110px">${wVals.map((v, i) => `<div class="col" title="Week of ${fmtDate(weeks[i][0])}: ${mins(v)}"><div class="b met" style="height:${v / wTop * 100}%"></div></div>`).join('')}
-        <div class="goal" style="bottom:${(s.target || 20) * 7 * 60000 / wTop * 100}%"></div></div>
-      <div class="axis"><span>Minutes per week</span><span>dashed line = ${(s.target || 20) * 7} min/week target</span></div>`
+        <div class="goal" style="bottom:${weekTarget / wTop * 100}%"></div></div>
+      <div class="axis"><span>Minutes per week</span><span>dashed line = weekly plan (${planText(planOfStudent(s))})</span></div>`
       : '<p class="muted">Not connected to the Practice Timer app, so no practice data.</p>'}
     </section>
     <section><h3>Lessons</h3>
@@ -997,8 +1008,12 @@ function studentModal(sid) {
       <label class="field">Name <input type="text" id="fName" value="${esc(s.name)}" maxlength="40" placeholder="Student’s name"></label>
       <div class="fields two">
         <label class="field">Instrument <select id="fInstr"><option value="">Choose…</option>${Object.entries(INSTRUMENTS).map(([k, v]) => `<option value="${k}" ${s.instrument === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
-        <label class="field">Daily practice minimum (min) <input type="number" id="fTarget" min="5" max="180" value="${s.target || 20}"></label>
+        <div></div>
       </div>
+      <div class="field">Practice plan – minutes each day (leave 0 for a rest day). The family’s app uses this as the minimum.
+        <div class="presetRow">${PLAN_PRESETS.map(([n], i) => `<button type="button" class="secondary" data-preset="${i}">${n}</button>`).join('')}</div>
+        <div class="planInputs">${PLAN_ORDER.map(i => `<label><span>${PLAN_DAYS[i]}</span><input type="number" min="0" max="180" step="5" data-day="${i}" value="${planOfStudent(s)[i]}"></label>`).join('')}</div>
+        <span class="small muted" id="fPlanText" style="font-weight:500"></span></div>
       <div class="field">Color <div class="swatches">${COLORS.map(c => `<button type="button" data-color="${c}" style="background:${c}" class="${c === color ? 'on' : ''}" aria-label="Color"></button>`).join('')}</div></div>
       <div class="fields three">
         <label class="field">Lesson day <select id="fDay"><option value="">No regular lesson</option>${[1, 2, 3, 4, 5, 6, 0].map(d => `<option value="${d}" ${String(s.lesson?.day) === String(d) ? 'selected' : ''}>${DAYS[d]}</option>`).join('')}</select></label>
@@ -1009,11 +1024,17 @@ function studentModal(sid) {
     </div>
     <footer>${sid ? `<button class="danger" id="fArchive">${s.archived ? 'Delete permanently' : 'Archive student'}</button>` : ''}
       <div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="fSave">${sid ? 'Save' : 'Add student'}</button></div></footer>`, m => {
+    const readPlan = () => { const p = Array(7).fill(0); m.querySelectorAll('[data-day]').forEach(i => p[+i.dataset.day] = Math.max(0, Math.min(180, +i.value || 0))); return p; };
+    const showPlan = () => { const p = readPlan(); m.querySelector('#fPlanText').textContent = `${planText(p)} · ${mins(planTotal(p) * 60000)} a week`; };
+    m.querySelectorAll('[data-day]').forEach(i => i.oninput = showPlan);
+    m.querySelectorAll('[data-preset]').forEach(b => b.onclick = () => { const p = PLAN_PRESETS[+b.dataset.preset][1]; m.querySelectorAll('[data-day]').forEach(i => i.value = p[+i.dataset.day]); showPlan(); });
+    showPlan();
     m.querySelectorAll('[data-color]').forEach(b => b.onclick = () => { color = b.dataset.color; m.querySelectorAll('[data-color]').forEach(x => x.classList.toggle('on', x === b)); });
     m.querySelector('#fSave').onclick = async () => {
       const name = val('fName'); if (!name) return (m.querySelector('#fErr').textContent = 'Please enter a name.');
       const day = val('fDay');
-      const data = { name, instrument: val('fInstr'), color, target: Math.max(5, Math.min(180, +val('fTarget') || 20)),
+      const plan = readPlan(); if (!planDayCount(plan)) return (m.querySelector('#fErr').textContent = 'Add minutes for at least one day.');
+      const data = { name, instrument: val('fInstr'), color, plan, target: Math.round(planTotal(plan) / planDayCount(plan)),
                      lesson: { day: day === '' ? '' : +day, time: val('fTime'), length: +val('fLen'), start: s.lesson?.start || dayKey() } };
       if (sid) {
         if (String(s.lesson?.day) !== String(data.lesson.day) || s.lesson?.time !== data.lesson.time) data.lesson.start = dayKey();
@@ -1235,7 +1256,7 @@ function studentDays(s) {
 }
 const studentTicks = s => new Set(Object.values(s.progress || {}).flatMap(d => Object.keys(d)));
 function tRewards(s) {
-  const first = esc(firstName(s.name)), days = studentDays(s), ticks = studentTicks(s), goalMs = (s.practice?.goal || s.target || 20) * 60000;
+  const first = esc(firstName(s.name)), days = studentDays(s), ticks = studentTicks(s), goalMs = key => (s.practice?.plan ? planOf(s.practice.plan)[parseDay(key).getDay()] * 60000 : goalMsOn(s, key));
   const ch = Object.entries(s.challenges || {}).map(([id, c]) => ({ id, c, p: challengeProgress(c, days, goalMs, ticks), done: s.challengeDone?.[id] }))
     .sort((a, b) => b.c.start.localeCompare(a.c.start));
   const earned = Object.entries(s.badges || {}).map(([id, b]) => ({ ...b, def: BADGES.find(x => x.id === id) })).filter(b => b.def).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
@@ -1544,7 +1565,8 @@ function seedDemo() {
     }
     const man = {};                                   // some practice logged by hand on days the app wasn't used
     if (keen > 0) for (let d = 1; d < 60; d++) { const k = dayKey(addDays(t, -d)); if (!log[k] && Math.random() < .18) man[k] = Math.round(rnd(10, 25)) * 60000; }
-    students[id] = { id, name, instrument, color: COLORS[ci], target, studioId: 'demo', lesson: { day, time, length, start: '2025-01-01' },
+    const plan = [[0, 30, 30, 30, 30, 30, 0], [0, 60, 30, 60, 30, 60, 0], PLAN_PRESETS[0][1], [0, 30, 0, 30, 0, 30, 30], [0, 45, 45, 45, 45, 45, 45], [0, 20, 20, 20, 20, 20, 20]][i];
+    students[id] = { id, name, instrument, color: COLORS[ci], target, plan, studioId: 'demo', lesson: { day, time, length, start: '2025-01-01' },
       practice: keen > 0 ? { log, stats: st, manual: man } : null, linkedAt: keen > 0 ? '2026-01-10' : null, kidName: firstName(name),
       assignments: {}, progress: {}, upcoming: {}, lessonChanges: {}, archived: false };
     const L = students[id].lesson;
@@ -1577,7 +1599,7 @@ function seedDemo() {
   // rewards: badges the family app would have reported, a challenge, and some stars
   for (const id of ids) {
     const s = students[id]; if (!s.practice) continue;
-    const lv = badgeLevels(badgeMetrics({ days: studentDays(s), goalMs: s.target * 60000, tickDays: studentTicks(s) }), {}, { strings: s.instrument !== 'piano' });
+    const lv = badgeLevels(badgeMetrics({ days: studentDays(s), goalFor: key => goalMsOn(s, key), tickDays: studentTicks(s) }), {}, { strings: s.instrument !== 'piano' });
     s.badges = Object.fromEntries(lv.filter(b => b.tier >= 0).map((b, i) => [b.id, { tier: b.tier, date: dayKey(addDays(t, -i * 3)), label: b.name }]));
   }
   const sun = dayKey(addDays(t, (7 - t.getDay()) % 7)), mon = dayKey(addDays(t, -((t.getDay() + 6) % 7)));

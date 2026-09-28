@@ -126,6 +126,17 @@
   .stepper { display: flex; align-items: center; gap: 8px; }
   .stepper button:disabled { opacity: .35; cursor: default; transform: none; }
   #goalNote:empty { display: none; }
+  .weekStrip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 12px; }
+  .weekStrip div { text-align: center; background: var(--soft); border-radius: 10px; padding: 6px 0; font-size: 12px; color: var(--muted); }
+  .weekStrip b { display: block; font-size: 14px; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .weekStrip .rest b { color: var(--muted); }
+  .weekStrip .today { background: color-mix(in srgb, var(--kid) 14%, var(--card)); box-shadow: inset 0 0 0 2px var(--kid); color: var(--kid); }
+  .planGrid { display: grid; gap: 6px; margin-top: 12px; }
+  .planRow { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; padding: 4px 0; font-weight: 600; }
+  .planRow small { font-weight: 500; color: var(--muted); }
+  .planRow .stepper .val { min-width: 64px; }
+  .presets { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .presets button { font-size: 12.5px; padding: 6px 10px; font-weight: 500; border-radius: 999px; }
   .stepper button { flex: none; width: 42px; height: 42px; padding: 0; border-radius: 12px; }
   .stepper .val { min-width: 70px; text-align: center; font-weight: 700; font-size: 17px; font-variant-numeric: tabular-nums; }
   .stepper input[type=number] { flex: none; width: 72px; text-align: center; font: inherit; font-weight: 700; font-size: 17px; padding: 9px 4px; }
@@ -219,6 +230,7 @@
   .chart .col { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
   .chart .b { width: 100%; background: var(--kid); opacity: .35; border-radius: 5px 5px 2px 2px; min-height: 3px; }
   .chart .b.met { opacity: 1; }
+  .chart .dayGoal { position: absolute; left: -2px; right: -2px; border-top: 2px solid var(--muted); opacity: .55; }
   .chart .goalLine { position: absolute; left: 0; right: 0; border-top: 1.5px dashed var(--muted); opacity: .5; }
   .days { display: flex; gap: 5px; margin-top: 6px; }
   .days span { flex: 1; text-align: center; font-size: 11px; color: var(--muted); }
@@ -453,14 +465,15 @@
     </div>
     <div class="card">
       <div class="rowBetween">
-        <div class="label"><svg class="ic"><use href="#i-flag"/></svg>Daily goal</div>
+        <div class="label"><svg class="ic"><use href="#i-flag"/></svg><span id="goalLabel">Today’s goal</span></div>
         <div class="stepper">
           <button id="goalDown" aria-label="Lower goal"><svg class="ic"><use href="#i-minus"/></svg></button>
           <span class="val" id="goalVal"></span>
           <button id="goalUp" aria-label="Raise goal"><svg class="ic"><use href="#i-plus"/></svg></button>
         </div>
       </div>
-      <p class="muted small" id="goalNote" style="margin-top:8px;text-align:right"></p>
+      <div class="weekStrip" id="weekStrip"></div>
+      <div class="rowBetween" style="margin-top:8px"><p class="muted small" id="goalNote"></p><button class="ghost small" id="editWeek">Edit week</button></div>
     </div>
     <div class="card sketch">
       <div class="rowBetween">
@@ -586,7 +599,7 @@
   </div>
 </div>
 
-<script src="badges.js?v=2"></script>
+<script src="badges.js?v=3"></script>
 <script>
 const $ = id => document.getElementById(id);
 const CIRC = 2 * Math.PI * 52;
@@ -599,15 +612,23 @@ const tracksPitch = k => hasPitch(k) && k.tuning !== false;      // …and the p
 const COLORS = ['#cf5c3c', '#1f8a7e', '#6a55c8', '#2f6bcc', '#b3821c', '#c2457a'];
 const OLD_COLORS = ['#e0653a', '#2a9d8f', '#7b5cd6', '#2f7ed8', '#d4a017', '#d6457a'];   // earlier palette → map to the refined one
 const kidColor = k => OLD_COLORS.includes(k.color) ? COLORS[OLD_COLORS.indexOf(k.color)] : k.color;
-// Daily goal: a parent's minimum wins; otherwise a connected teacher's target; otherwise the child chooses.
-// The child can always aim higher than the minimum, never lower.
-function goalFloor(k) {
-  if (k.parentGoal) return { min: k.parentGoal, by: 'a parent' };
+// Practice plan: minutes for each day of the week (0 = rest day). A parent's plan wins; otherwise a
+// connected teacher's; otherwise the child sets their own. Over a parent/teacher plan the child can raise
+// any day (kid.raise) but never go below it.
+function planFloor(k) {
+  if (k.parentPlan) return { plan: planOf(k.parentPlan), by: 'a parent' };
+  if (k.parentGoal) return { plan: planOf(null, k.parentGoal), by: 'a parent' };        // older single-number setting
   const t = k.link && teacherData[k.link];
-  if (t && !t.missing && t.target) return { min: t.target, by: t.teacherName };
+  if (t && !t.missing && (t.plan || t.target)) return { plan: planOf(t.plan, t.target), by: t.teacherName };
   return null;
 }
-const goalOf = k => Math.max(k.goal || 20, goalFloor(k)?.min || 0);
+const ownPlan = k => planOf(k.plan, k.goal || 20);
+function planFor(k) {                                   // the plan in effect, Sunday first
+  const f = planFloor(k);
+  return f ? f.plan.map((n, i) => Math.max(n, k.raise?.[i] || 0)) : ownPlan(k);
+}
+const goalOf = (k, d = new Date()) => planFor(k)[d.getDay()];                 // minutes for that day; 0 = rest day
+const goalMsFor = k => key => goalOf(k, parseDay(key)) * 60000;
 const icon = (name, cls = '') => `<svg class="ic ${cls}" aria-hidden="true"><use href="#i-${name}"/></svg>`;
 
 // ---------- Storage ----------
@@ -814,12 +835,12 @@ function mins(ms) {
   const m = Math.floor(ms / 60000);
   return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m} min`;
 }
-function streak(kid) {            // days in a row with at least 1 minute (today may still be in progress)
+function streak(kid) {            // practice days in a row (today may still be in progress; planned rest days don't break it)
   const days = lastDays(366).reverse();
   let n = 0;
   for (let i = 0; i < days.length; i++) {
     if (msOn(kid, days[i]) >= 60000) n++;
-    else if (i > 0) break;
+    else if (i > 0 && goalOf(kid, days[i]) > 0) break;
   }
   return n;
 }
@@ -843,20 +864,20 @@ function renderHome() {
   $('noKids').hidden = kids.length > 0;
   $('historyBtn').hidden = kids.length === 0;
   $('kidList').innerHTML = kids.map(k => {
-    const today = msOn(k), frac = Math.min(today / (goalOf(k) * 60000), 1), st = streak(k);
+    const today = msOn(k), g = goalOf(k) * 60000, frac = g ? Math.min(today / g, 1) : (today ? 1 : 0), st = streak(k);
     return `<button class="tile" data-kid="${k.id}" style="--kid:${kidColor(k)}">
       <div class="avatar">${initial(k)}</div>
       <div class="info">
         <div class="name">${esc(k.name)}
-          ${frac >= 1 ? `<span class="badge good">${icon('check')}Done</span>` : ''}
+          ${g && frac >= 1 ? `<span class="badge good">${icon('check')}Done</span>` : ''}
           ${st > 1 ? `<span class="badge">${icon('flame')}${st} days</span>` : ''}</div>
-        <div class="sub">${mins(today)} of ${goalOf(k)} min today</div>
+        <div class="sub">${g ? `${mins(today)} of ${goalOf(k)} min today` : `Rest day${today ? ` · ${mins(today)} bonus practice` : ''}`}</div>
         ${(t => {
           if (!t || t.missing) return '';
           const nl = nextLesson(t), ev = upcomingEvents(t).find(e => daysUntil(e.date) <= 30);
           return nl || ev ? `<div class="lessonLine">${nl ? `${icon('calendar')}Lesson ${lessonLabel(nl)}` : ''}${ev ? `<span class="badge">${icon('trophy')}${esc(ev.title)} ${countdown(ev.date)}</span>` : ''}</div>` : '';
         })(k.link && teacherData[k.link])}
-        ${(() => { const g = goalOf(k) * 60000, r = Math.min(recordedOn(k) / g, 1);
+        ${(() => { const r = g ? Math.min(recordedOn(k) / g, 1) : (recordedOn(k) ? 1 : 0);
           return `<div class="bar"><div style="width:${r * 100}%"></div><div class="hatch" style="width:${(frac - r) * 100}%"></div></div>`; })()}
       </div>${icon('chev', 'go')}</button>`;
   }).join('');
@@ -875,23 +896,26 @@ function renderPractice(playing, talking) {
   document.body.style.setProperty('--kid', kidColor(kid));
   $('pAvatar').innerHTML = initial(kid);
   $('pName').textContent = kid.name;
-  const today = msOn(kid), goal = goalOf(kid) * 60000, frac = Math.min(today / goal, 1);
+  const today = msOn(kid), goal = goalOf(kid) * 60000, frac = goal ? Math.min(today / goal, 1) : (today ? 1 : 0);
   $('time').textContent = clock(today);
-  $('ofGoal').textContent = `of ${goalOf(kid)} min today`;
-  const recFrac = Math.min(recordedOn(kid) / goal, 1), manLen = CIRC * (frac - recFrac), man = manualOn(kid);
+  $('ofGoal').textContent = goal ? `of ${goalOf(kid)} min today` : 'Rest day – practice is a bonus';
+  const recFrac = goal ? Math.min(recordedOn(kid) / goal, 1) : (recordedOn(kid) ? 1 : 0), manLen = CIRC * (frac - recFrac), man = manualOn(kid);
   $('prog').style.strokeDashoffset = CIRC * (1 - recFrac);
   $('progManual').style.strokeDasharray = `${manLen} ${CIRC}`;
   $('progManual').style.strokeDashoffset = -CIRC * recFrac;
   $('manualNote').innerHTML = man ? `${icon('pencil')}${mins(man)} logged by hand` : '';
-  $('ring').classList.toggle('done', frac >= 1);
-  const floor = goalFloor(kid);
-  $('goalVal').textContent = goalOf(kid) + ' min';
-  $('goalDown').disabled = goalOf(kid) <= (floor?.min || 5);
-  $('goalNote').textContent = floor ? `Minimum ${floor.min} min, set by ${floor.by}` : '';
+  $('ring').classList.toggle('done', goal > 0 && frac >= 1);
+  const floor = planFloor(kid), dow = new Date().getDay(), plan = planFor(kid);
+  $('goalLabel').textContent = `${new Date().toLocaleDateString(undefined, { weekday: 'long' })}’s goal`;
+  $('goalVal').textContent = plan[dow] ? plan[dow] + ' min' : 'Rest';
+  $('goalDown').disabled = plan[dow] <= (floor ? floor.plan[dow] : 0);
+  $('weekStrip').innerHTML = PLAN_ORDER.map(i => `<div class="${i === dow ? 'today' : ''} ${plan[i] ? '' : 'rest'}"><span>${PLAN_DAYS[i][0]}</span><b>${plan[i] || '–'}</b></div>`).join('');
+  $('goalNote').textContent = `Plan: ${planText(plan)}${floor ? ` · set by ${floor.by}` : ''}`;
   $('session').textContent = sessionMs ? `This session: ${clock(sessionMs)}` : '';
+  const met = goal > 0 && frac >= 1;
   const [text, kind] =
-    !listening ? (frac >= 1 ? ['Goal reached today', 'done'] : ['Press Start, then play', ''])
-    : playing ? (frac >= 1 ? ['Goal met – keep going!', 'playing'] : ['Playing', 'playing'])
+    !listening ? (met ? ['Goal reached today', 'done'] : ['Press Start, then play', ''])
+    : playing ? (met ? ['Goal met – keep going!', 'playing'] : ['Playing', 'playing'])
     : talking ? ['Talking isn’t counted', 'talking']
     : musicOnly() && classifierState === 'loading' ? ['Getting ready…', '']
     : ['Listening for music…', ''];
@@ -946,8 +970,51 @@ function changeBpm(d) {
 }
 $('bpmUp').onclick = () => changeBpm(5);
 $('bpmDown').onclick = () => changeBpm(-5);
-function changeGoal(d) { kid.goal = Math.max(goalFloor(kid)?.min || 5, Math.min(180, goalOf(kid) + d)); saveKids(); renderPractice(); }
+// The stepper changes today's weekday in the plan (e.g. every Monday). Over a teacher/parent plan it can only go up.
+function changeGoal(d) {
+  const dow = new Date().getDay(), floor = planFloor(kid), v = Math.max(floor ? floor.plan[dow] : 0, Math.min(180, goalOf(kid) + d));
+  if (floor) { kid.raise = kid.raise || Array(7).fill(0); kid.raise[dow] = v; } else { kid.plan = ownPlan(kid); kid.plan[dow] = v; }
+  saveKids(); renderPractice();
+}
 $('goalUp').onclick = () => changeGoal(5);
+$('editWeek').onclick = () => planDialog(kid, 'child');
+
+// Week plan editor. mode 'parent': sets the parent's plan (overrides the teacher's).
+// mode 'child': the child's own plan – or, over a teacher/parent plan, raises days above it.
+function planDialog(k, mode) {
+  const floor = mode === 'child' ? planFloor(k) : null, t = k.link && teacherData[k.link] && !teacherData[k.link].missing ? teacherData[k.link] : null;
+  const teacherPlan = t && (t.plan || t.target) ? planOf(t.plan, t.target) : null;
+  const mins0 = floor ? floor.plan : Array(7).fill(0);
+  let plan = [...planFor(k)];                          // start from the plan in effect today
+  const card = $('linkCard');
+  card.style.setProperty('--kid', kidColor(k));
+  const draw = () => {
+    card.innerHTML = `<h2 style="text-align:center">${mode === 'parent' ? `${esc(k.name)}’s practice plan` : 'Your practice week'}</h2>
+      <p class="muted small" style="text-align:center">${mode === 'parent' ? `Minutes for each day. Your plan replaces ${teacherPlan ? 'the teacher’s' : 'the one ' + esc(k.name) + ' chooses'}; ${esc(k.name)} can add more but not less.`
+        : floor ? `Set by ${esc(floor.by)}. You can add more to any day, but not less.` : 'Pick how long to practice each day. Set a day to Rest for a day off.'}</p>
+      ${floor ? '' : `<div class="presets">${PLAN_PRESETS.map(([n], i) => `<button class="secondary" data-preset="${i}">${n}</button>`).join('')}</div>`}
+      <div class="planGrid">${PLAN_ORDER.map(i => `<div class="planRow"><span>${new Date(2024, 0, 7 + i).toLocaleDateString(undefined, { weekday: 'long' })}${floor && floor.plan[i] ? `<br><small>at least ${floor.plan[i]} min</small>` : ''}</span>
+        <div class="stepper"><button data-d="${i}" data-step="-5" aria-label="Less" ${plan[i] <= mins0[i] ? 'disabled' : ''}>${icon('minus')}</button><span class="val">${plan[i] ? plan[i] + ' min' : 'Rest'}</span><button data-d="${i}" data-step="5" aria-label="More">${icon('plus')}</button></div></div>`).join('')}</div>
+      <p class="muted small" style="text-align:center;margin-top:8px">${planText(plan)} · ${mins(planTotal(plan) * 60000)} a week</p>
+      <div class="pickList" style="margin-top:8px">
+        <button class="primary" id="plSave" style="--kid:var(--brand);color:var(--bg);justify-content:center">Save</button>
+        ${mode === 'parent' && (k.parentPlan || k.parentGoal) ? `<button class="secondary block" id="plClear" style="justify-content:center">${teacherPlan ? 'Use the teacher’s plan' : `Let ${esc(k.name)} choose`}</button>` : ''}
+        <button class="ghost block" id="plCancel" style="justify-content:center">Cancel</button></div>`;
+    card.querySelectorAll('[data-step]').forEach(b => b.onclick = () => { const i = +b.dataset.d; plan[i] = Math.max(mins0[i], Math.min(180, plan[i] + +b.dataset.step)); draw(); });
+    card.querySelectorAll('[data-preset]').forEach(b => b.onclick = () => { plan = [...PLAN_PRESETS[+b.dataset.preset][1]]; draw(); });
+    card.querySelector('#plCancel').onclick = () => { $('linkDlg').hidden = true; };
+    card.querySelector('#plClear')?.addEventListener('click', () => { k.parentPlan = null; k.parentGoal = null; done(); });
+    card.querySelector('#plSave').onclick = () => {
+      if (mode === 'parent') { k.parentPlan = plan; k.parentGoal = null; }
+      else if (floor) k.raise = plan.map((n, i) => n > floor.plan[i] ? n : 0);
+      else { k.plan = plan; }
+      done();
+    };
+  };
+  const done = () => { saveKids(); $('linkDlg').hidden = true; if (screen === 'parent') renderParent(); else { renderPractice(); renderBadgeEntry(); } pushTeacher(k); };
+  draw();
+  $('linkDlg').hidden = false;
+}
 
 // ---------- Practice logged by hand ----------
 // For practice the app didn't hear. It counts toward goals and streaks, but is always drawn "sketched"
@@ -1040,7 +1107,7 @@ function addPractice(ms) {
   sessionMs += ms;
   if (new Date().getHours() < 8) addStat('early', ms);          // for the Early bird badge
   const goal = goalOf(kid) * 60000;
-  if (before < goal && before + ms >= goal) {
+  if (goal && before < goal && before + ms >= goal) {
     celebrate(kid);
     $('ring').classList.remove('cheer'); void $('ring').offsetWidth; $('ring').classList.add('cheer');
   }
@@ -1056,8 +1123,9 @@ function showSummary(k, s, played) {
   ];
   if (tracksPitch(k) && s.notes >= 10) rows.push(['tune', pct(s.inTune / s.notes) + ' in tune', `${s.notes} notes checked`]);
   if (s.beats >= 8) rows.push(['metronome', pct(s.steady / s.beats) + ' steady rhythm', `${s.beats} notes with the metronome`]);
-  rows.push(today >= goal ? ['check', 'Daily goal reached', `${mins(today)} practiced today`] : ['flag', `${mins(goal - today)} to go`, `toward today’s ${goalOf(k)} min goal`]);
-  const won = today >= goal, great = focus >= 0.8;
+  rows.push(!goal ? ['star', 'Bonus practice on a rest day', `${mins(today)} practiced today`]
+    : today >= goal ? ['check', 'Today’s goal reached', `${mins(today)} practiced today`] : ['flag', `${mins(goal - today)} to go`, `toward today’s ${goalOf(k)} min goal`]);
+  const won = goal > 0 && today >= goal, great = focus >= 0.8;
   $('summary').querySelector('.card').style.setProperty('--kid', kidColor(k));
   $('sumBadge').innerHTML = icon(won ? 'trophy' : great ? 'star' : 'spark');
   $('sumTitle').textContent = won ? `Goal reached, ${k.name}!` : great ? `Great focus, ${k.name}!` : `Nice work, ${k.name}!`;
@@ -1085,9 +1153,8 @@ const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 function renderHistory() {
   const days = lastDays(14);
   $('histList').innerHTML = kids.map(k => {
-    const vals = days.map(d => msOn(k, d));
-    const goal = goalOf(k) * 60000;
-    const top = Math.max(goal, ...vals) * 1.1;
+    const vals = days.map(d => msOn(k, d)), goals = days.map(d => goalOf(k, d) * 60000);
+    const top = Math.max(...goals, ...vals, 60000) * 1.1;
     const week = lastDays(7).reduce((a, d) => a + msOn(k, d), 0);
     const month = lastDays(30).reduce((a, d) => a + msOn(k, d), 0);
     const daysPracticed = lastDays(30).filter(d => msOn(k, d) >= 60000).length;
@@ -1107,12 +1174,12 @@ function renderHistory() {
         </div>`;
       })()}
       <div class="chart">
-        <div class="goalLine" style="bottom:${goal / top * 100}%"></div>
-        ${vals.map((v, i) => { const m = manualOn(k, days[i]); return `<div class="col" title="${days[i].toDateString()}: ${mins(v)}${m ? ` (${mins(m)} by hand)` : ''}">
-          ${m ? `<div class="b hatch" style="height:${m / top * 100}%;border-radius:4px 4px 0 0;min-height:0"></div>` : ''}<div class="b ${v >= goal ? 'met' : ''}" style="height:${(v - m) / top * 100}%;${m ? 'border-radius:0' : ''}"></div></div>`; }).join('')}
+        ${vals.map((v, i) => { const m = manualOn(k, days[i]), g = goals[i]; return `<div class="col" style="position:relative" title="${days[i].toDateString()}: ${mins(v)}${m ? ` (${mins(m)} by hand)` : ''}${g ? ` · goal ${mins(g)}` : ' · rest day'}">
+          ${g ? `<div class="dayGoal" style="bottom:${g / top * 100}%"></div>` : ''}
+          ${m ? `<div class="b hatch" style="height:${m / top * 100}%;border-radius:4px 4px 0 0;min-height:0"></div>` : ''}<div class="b ${g && v >= g ? 'met' : ''}" style="height:${(v - m) / top * 100}%;${m ? 'border-radius:0' : ''}"></div></div>`; }).join('')}
       </div>
       <div class="days">${days.map((d, i) => `<span>${i === days.length - 1 ? 'Today' : DOW[d.getDay()]}</span>`).join('')}</div>
-      <div class="footnote">Last two weeks. Solid bars met the ${goalOf(k)}-minute goal (dashed line); striped parts were logged by hand.
+      <div class="footnote">Last two weeks. Dashes mark each day’s goal (plan: ${planText(planFor(k))}); solid bars met it; striped parts were logged by hand.
         Focus, tuning and rhythm cover the last 7 days, with the change from the week before.
         ${tracksPitch(k) ? `A note is in tune within ${IN_TUNE_CENTS} cents of the instrument’s own tuning.` : ''}</div>
     </div>`;
@@ -1155,10 +1222,8 @@ function renderParent() {
         <select data-instr="${k.id}" aria-label="Instrument">${Object.entries(INSTRUMENTS).map(([v, l]) =>
           `<option value="${v}" ${(k.instrument || '') === v ? 'selected' : ''} ${v === '' ? 'disabled' : ''}>${l}</option>`).join('')}</select>
         ${hasPitch(k) ? `<label class="opt">Tuner and in-tune score <input type="checkbox" class="toggle" data-tuning="${k.id}" ${k.tuning !== false ? 'checked' : ''}></label>` : ''}
-        <label class="opt">Daily goal minimum <select data-pgoal="${k.id}" style="width:auto;padding-top:7px;padding-bottom:7px">
-          ${(t => `<option value="">${t && !t.missing && t.target ? `Teacher’s (${t.target} min)` : 'Child chooses'}</option>`)(k.link && teacherData[k.link])}
-          ${[5, 10, 15, 20, 25, 30, 40, 45, 60, 75, 90, 120].map(n => `<option value="${n}" ${k.parentGoal === n ? 'selected' : ''}>${n} min</option>`).join('')}
-        </select></label>
+        <div class="opt"><span>Practice plan<br><small class="muted">${esc(planText(planFor(k)))}${(f => f ? ` · ${f.by === 'a parent' ? 'set by you' : 'set by ' + esc(f.by)}` : ' · child chooses')(planFloor(k))}</small></span>
+          <button class="secondary" data-plan="${k.id}">Edit</button></div>
         <label class="opt">Chime at goal <input type="checkbox" class="toggle" data-chime="${k.id}" ${k.chime !== false ? 'checked' : ''}></label>
         ${k.link ? `<div class="opt"><span class="small">${icon('link', 'sm')} ${(t => t?.missing ? 'Teacher removed this connection' : t ? 'Teacher: ' + esc(t.teacherName) : 'Connected to a teacher')(teacherData[k.link])}</span>
           <button class="ghost small" data-unlink="${k.id}">Disconnect</button></div>`
@@ -1178,9 +1243,7 @@ function renderParent() {
     if (code) startLink(code, kids.find(k => k.id === b.dataset.link));
   });
   document.querySelectorAll('[data-unlink]').forEach(b => b.onclick = () => unlink(kids.find(k => k.id === b.dataset.unlink)));
-  document.querySelectorAll('[data-pgoal]').forEach(sel => sel.onchange = () => {
-    kids.find(k => k.id === sel.dataset.pgoal).parentGoal = +sel.value || null; saveKids();
-  });
+  document.querySelectorAll('[data-plan]').forEach(b => b.onclick = () => planDialog(kids.find(k => k.id === b.dataset.plan), 'parent'));
   document.querySelectorAll('[data-chime]').forEach(c => c.onchange = () => {
     kids.find(k => k.id === c.dataset.chime).chime = c.checked; saveKids();
   });
@@ -1591,7 +1654,7 @@ function pushTeacher(k) {
     if (man) manual60[key] = Math.round(man);
     if (Object.keys(st).length) stats60[key] = Object.fromEntries(Object.entries(st).map(([f, v]) => [f, Math.round(v)]));
   }
-  F.updateDoc(F.doc(db, 'students', k.link), { practice: { log: log60, manual: manual60, stats: stats60, goal: goalOf(k), updated: Date.now() }, kidName: k.name,
+  F.updateDoc(F.doc(db, 'students', k.link), { practice: { log: log60, manual: manual60, stats: stats60, goal: goalOf(k), plan: planFor(k), updated: Date.now() }, kidName: k.name,
       badges: Object.fromEntries(kidBadges(k).filter(b => b.tier >= 0).map(b => [b.id, { tier: b.tier, label: `${b.name} – ${BADGE_TIERS[b.tier].name} (${b.unit(b.tiers[b.tier])})`, date: badgeSeen[k.id]?.[b.id]?.date || dayKey() }])) })
     .catch(e => console.error(e));
 }
@@ -1777,22 +1840,24 @@ function recapWeek() {                               // the 7 days ending on the
 }
 function kidRecap(k, w) {
   const sum = ds => ds.reduce((a, d) => a + msOn(k, d), 0), cur = sum(w.days), prev = sum(w.prev);
-  const practiced = w.days.filter(d => msOn(k, d) >= 60000).length, goalDays = w.days.filter(d => msOn(k, d) >= goalOf(k) * 60000).length;
+  const practiced = w.days.filter(d => msOn(k, d) >= 60000).length, goalDays = w.days.filter(d => goalOf(k, d) > 0 && msOn(k, d) >= goalOf(k, d) * 60000).length;
+  const planned = planDayCount(planFor(k));
   const sc = statsOver(k, w.days), sp = statsOver(k, w.prev);
   const longest = Math.max(0, ...w.days.map(d => statsOn(k, d).longest || 0)), best = Math.max(0, ...w.before.map(d => statsOn(k, d).longest || 0));
   const wins = [];
-  if (practiced >= 5) wins.push([90, `Practiced ${practiced} of 7 days – brilliant consistency.`]);
+  if (practiced >= 3 && practiced >= Math.min(5, planned))
+    wins.push([90, practiced > planned ? `Practiced ${practiced} days – more than planned!` : practiced === planned ? `Practiced on every planned day (${planned}) – brilliant consistency.` : `Practiced ${practiced} of ${planned} planned days – great consistency.`]);
   if (tracksPitch(k) && sc.tune != null && sp.tune != null && sc.tune - sp.tune >= 0.05) wins.push([80, `Tuning improved from ${pct(sp.tune)} to ${pct(sc.tune)}.`]);
   if (sc.rhythm != null && sp.rhythm != null && sc.rhythm - sp.rhythm >= 0.05) wins.push([75, `Steadier rhythm: ${pct(sp.rhythm)} → ${pct(sc.rhythm)}.`]);
   if (longest >= 5 * 60000 && longest > best) wins.push([70, `Longest focused stretch yet: ${mins(longest)}.`]);
-  if (goalDays >= 3) wins.push([60, `Reached the daily goal ${goalDays} times.`]);
+  if (goalDays >= 3) wins.push([60, `Reached the day’s goal ${goalDays} times.`]);
   if (prev > 0 && cur > prev + 10 * 60000) wins.push([55, `${mins(cur - prev)} more practice than the week before.`]);
   if (cur > 0) wins.push([10, `${mins(cur)} of practice this week – every minute counts.`]);
   else wins.push([0, 'A new week is a fresh start.']);
   const t = k.link && teacherData[k.link] && !teacherData[k.link].missing ? teacherData[k.link] : null;
   const asg = t && Object.values(t.assignments || {}).filter(a => a.status === 'active').sort((a, b) => (a.due || '9').localeCompare(b.due || '9'))[0];
   const focus = asg ? `This week: ${asg.title}${asg.bpm ? ` at ${asg.bpm} bpm` : ''}.`
-    : practiced < 5 ? `This week: aim for ${plural(Math.min(7, practiced + 1), 'practice day')}${practiced ? '' : ' – even 10 minutes counts'}.`
+    : practiced < planned ? `This week: aim for ${plural(Math.min(planned, practiced + 1), 'practice day')}${practiced ? '' : ' – even 10 minutes counts'}.`
     : tracksPitch(k) && sc.tune != null && sc.tune < 0.8 ? 'This week: a few slow minutes with the tuner each day.'
     : sc.rhythm == null ? 'This week: try one piece with the metronome.' : 'Keep the streak going!';
   const nl = t && nextLesson(t);
@@ -1827,7 +1892,7 @@ function tickDays(k) {
   for (const days of Object.values(t?.progress || {})) for (const d of Object.keys(days)) out.add(d);
   return out;
 }
-const kidBadges = k => badgeLevels(badgeMetrics({ days: kidDays(k), goalMs: goalOf(k) * 60000, tickDays: tickDays(k) }), teacherOf(k)?.badgeRules || {}, { strings: tracksPitch(k) });
+const kidBadges = k => badgeLevels(badgeMetrics({ days: kidDays(k), goalFor: goalMsFor(k), tickDays: tickDays(k) }), teacherOf(k)?.badgeRules || {}, { strings: tracksPitch(k) });
 
 // Badge levels reached since we last looked. The very first time, it just records what's already earned.
 function newBadges(k) {
@@ -1842,7 +1907,7 @@ function newBadges(k) {
 function activeChallenges(k, t = teacherOf(k)) {
   if (!t) return [];
   const days = kidDays(k), ticks = tickDays(k), today0 = dayKey();
-  return Object.entries(t.challenges || {}).map(([id, c]) => ({ c: { ...c, id }, p: challengeProgress(c, days, goalOf(k) * 60000, ticks) }))
+  return Object.entries(t.challenges || {}).map(([id, c]) => ({ c: { ...c, id }, p: challengeProgress(c, days, goalMsFor(k), ticks) }))
     .filter(({ c }) => c.start <= today0 && (c.end >= today0 || (t.challengeDone?.[c.id] && daysUntil(t.challengeDone[c.id]) >= -2)))
     .sort((a, b) => a.c.end.localeCompare(b.c.end));
 }
