@@ -393,7 +393,7 @@ const FIREBASE = EMULATOR ? { apiKey: 'demo-key', authDomain: 'localhost', proje
 };
 const FB = 'https://www.gstatic.com/firebasejs/12.19.0';
 // The calendar & email service (worker/worker.js on Cloudflare). Empty until it's deployed.
-const WORKER_URL = EMULATOR ? 'http://127.0.0.1:8787' : '';
+const WORKER_URL = EMULATOR ? 'http://127.0.0.1:8787' : 'https://practice-timer.sergcast07.workers.dev';
 const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 // ---------- Helpers ----------

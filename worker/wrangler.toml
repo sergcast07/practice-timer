@@ -17,6 +17,6 @@ FROM_EMAIL = "Practice Timer <onboarding@resend.dev>"
 # KV stores which studios to email and which emails were already sent. Filled in by `wrangler kv namespace create`.
 [[kv_namespaces]]
 binding = "KV"
-id = "REPLACE_WITH_KV_ID"
+id = "f7220465059b4eb49e5f909b540100f0"
 
 # The RESEND_API_KEY secret is set separately: npx wrangler secret put RESEND_API_KEY
