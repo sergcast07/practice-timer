@@ -1,7 +1,7 @@
 // Allegrow – calendar feeds and teacher emails (runs free on Cloudflare Workers)
 //
 // It reads the same Firestore documents the apps use (readable only with their long random codes):
-//   feeds/{token}      a teacher's calendar/email settings + list of student codes (written by teacher.html)
+//   feeds/{token}      a teacher's calendar/email settings + list of student codes (written by studio.html)
 //   students/{code}    one student: weekly lesson slot, lesson changes, assignments, recitals, mirrored practice
 // and provides:
 //   GET  /cal/t/{token}.ics   live calendar of all the teacher's lessons and recitals
@@ -240,7 +240,7 @@ function nextLessonAfter(s, fromKey, days = 14) {
 // ============================================================================================
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 function layout(env, feed, heading, intro, body, why) {
-  const app = (env.APP_URL || '') + 'teacher.html';
+  const app = (env.APP_URL || '') + 'studio';
   return `<!doctype html><html><body style="margin:0;background:#f6f3ee;padding:24px 12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1e2a44">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center">
   <table role="presentation" width="100%" style="max-width:560px;background:#ffffff;border-radius:18px;padding:28px 26px" cellspacing="0" cellpadding="0"><tr><td>
@@ -528,7 +528,7 @@ async function familyParentEmails(env, family) {
 }
 
 function parentLayout(env, heading, intro, body, footer) {
-  const app = env.APP_URL || '';
+  const app = (env.APP_URL || '') + 'app';
   return `<!doctype html><html><body style="margin:0;background:#f6f3ee;padding:24px 12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1e2a44">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center">
   <table role="presentation" width="100%" style="max-width:560px;background:#ffffff;border-radius:18px;padding:28px 26px" cellspacing="0" cellpadding="0"><tr><td>

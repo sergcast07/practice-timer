@@ -1,0 +1,2651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script src="moved.js?v=1"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f3ee" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14171f" media="(prefers-color-scheme: dark)">
+<title>Allegrow</title>
+<meta name="description" content="A music practice timer that listens while you play, tracks progress, and celebrates practice.">
+<link rel="icon" href="brand/allegrow-icon.svg" type="image/svg+xml">
+<link rel="icon" href="brand/png/allegrow-icon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="brand/png/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Allegrow">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f6f3ee; --card: #ffffff; --ink: #1e2a44; --ink-2: #3d4760; --muted: #6e7385;
+    --line: #e9e3da; --track: #efeae2; --soft: #f8f5f0;
+    --brand: #1e2a44; --leaf: #23865f; --accent: #3b5bab; --good: #23865f; --warn: #c0612b; --danger: #b8402f;
+    --kid: var(--accent);
+    --shadow: 0 1px 2px rgba(30, 42, 68, .05), 0 6px 20px rgba(30, 42, 68, .06);
+    --radius: 20px;
+    --serif: 'Fraunces', Georgia, 'Times New Roman', serif;
+    --sans: 'Figtree', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #14171f; --card: #1d212b; --ink: #eef0f5; --ink-2: #c9cdd8; --muted: #9aa0ae;
+            --line: #2b303c; --track: #292e3a; --soft: #222733;
+            --brand: #eef0f5; --leaf: #4cc08d; --accent: #8aa4f0; --good: #4cc08d; --warn: #f08a55; --danger: #f07a66;
+            --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25); }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink);
+    font-family: var(--sans); font-size: 16px; line-height: 1.45;
+    display: flex; justify-content: center;
+    padding: max(20px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom));
+    -webkit-font-smoothing: antialiased;
+  }
+  main { width: 100%; max-width: 480px; }
+  .screen, .stack { display: flex; flex-direction: column; gap: 14px; }
+  h1, h2, .serif { font-family: var(--serif); font-weight: 600; letter-spacing: -0.01em; }
+  h1 { margin: 0; font-size: 30px; line-height: 1.15; }
+  h2 { margin: 0 0 14px; font-size: 19px; }
+  p { margin: 0; }
+  .card { background: var(--card); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }
+  .muted { color: var(--muted); }
+  .small { font-size: 13.5px; }
+  .ic { width: 20px; height: 20px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; }
+  .ic.sm { width: 16px; height: 16px; }
+  .ic.lg { width: 28px; height: 28px; }
+
+  /* Buttons */
+  button { font: inherit; font-weight: 600; border: 0; border-radius: 14px; cursor: pointer; color: var(--ink);
+           background: var(--soft); padding: 11px 16px; font-size: 15.5px; display: inline-flex; align-items: center;
+           justify-content: center; gap: 8px; transition: transform .08s, background .15s, opacity .15s; }
+  button:active { transform: scale(.97); }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid color-mix(in srgb, var(--kid) 45%, transparent); outline-offset: 2px; }
+  button.primary { background: var(--kid); color: #fff; font-size: 18px; padding: 16px; border-radius: 16px; width: 100%;
+                   box-shadow: 0 6px 16px color-mix(in srgb, var(--kid) 28%, transparent); }
+  button.secondary { background: var(--card); border: 1.5px solid var(--line); }
+  button.ghost { background: transparent; color: var(--ink-2); padding: 8px 10px; }
+  button.ghost:hover { background: var(--soft); }
+  button.danger { background: transparent; color: var(--danger); padding: 8px 10px; font-weight: 600; }
+  button.block { width: 100%; }
+
+  /* Header */
+  header { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; }
+  .brand { white-space: nowrap; display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; letter-spacing: .01em; color: var(--ink); }
+  .logo { width: 32px; height: 32px; border-radius: 9px; background: var(--brand); color: var(--bg); display: grid; place-items: center; }
+  img.logo { background: none; display: block; }
+  .wm { font-family: var(--serif); font-weight: 600; font-size: 19px; letter-spacing: -0.01em; }
+  .wm b { color: var(--leaf); font-weight: inherit; }
+  .installCard { display: flex; gap: 14px; align-items: flex-start; }
+  .installCard img { width: 44px; height: 44px; flex: none; }
+  .installCard .grow { flex: 1; min-width: 0; }
+  .installCard b { display: block; }
+  .installCard span { font-size: 13.5px; color: var(--muted); }
+  .logo .ic { width: 18px; height: 18px; stroke-width: 2.2; }
+  .intro { padding: 10px 2px 4px; }
+  .intro p { color: var(--muted); margin-top: 6px; }
+  .back { margin-left: -8px; }
+
+  /* Home */
+  .kids { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .tile { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; background: var(--card);
+          border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); font-weight: 500; }
+  .tile:hover { box-shadow: 0 1px 2px rgba(30,42,68,.06), 0 10px 26px rgba(30,42,68,.1); }
+  .avatar { flex: none; width: 52px; height: 52px; border-radius: 50%; background: var(--kid); color: #fff;
+            display: grid; place-items: center; font-size: 22px; font-weight: 700; font-family: var(--serif); }
+  .tile .info { flex: 1; min-width: 0; }
+  .tile .name { font-size: 19px; font-weight: 700; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+  .tile .sub { font-size: 14px; color: var(--muted); margin-top: 1px; }
+  .tile .go { color: var(--muted); }
+  .badge { white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; padding: 3px 8px 3px 6px;
+           border-radius: 999px; background: color-mix(in srgb, var(--kid) 12%, transparent); color: var(--kid); }
+  .badge.good { background: color-mix(in srgb, var(--good) 14%, transparent); color: var(--good); }
+  .badge .ic { width: 13px; height: 13px; stroke-width: 2.2; }
+  .bar { height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; margin-top: 10px; }
+  .bar > div { height: 100%; background: var(--kid); border-radius: 3px; }
+  .empty { text-align: center; padding: 32px 20px; display: flex; flex-direction: column; gap: 14px; align-items: center; }
+  #syncStatus { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--muted); min-height: 20px; margin: 0 auto; padding: 6px 12px; }
+  #syncStatus .ic { width: 16px; height: 16px; }
+
+  /* Settings: jump links, devices & sync */
+  .jump { display: flex; gap: 8px; flex-wrap: wrap; }
+  .jump a { font-size: 13.5px; font-weight: 600; color: var(--ink-2); text-decoration: none; background: var(--card); border: 1.5px solid var(--line); border-radius: 999px; padding: 6px 12px; }
+  .sectionLabel[id] { scroll-margin-top: 16px; }
+  .syncBlock { display: grid; gap: 6px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+  .btnRow { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+  .btnRow button { flex: 1 1 auto; padding: 10px 12px; font-size: 14.5px; }
+  .qrBox { display: grid; justify-items: center; gap: 6px; margin: 8px 0 4px; }
+  .qrBox #qr { width: 200px; background: #fff; border-radius: 12px; padding: 6px; }
+  .qrBox svg { display: block; width: 100%; height: auto; }
+
+  /* Tablets: more room – two columns while practicing, wider lists */
+  @media (min-width: 720px) {
+    body { padding-left: 28px; padding-right: 28px; }
+    main { max-width: 980px; }
+    #pin, #parent { width: 100%; max-width: 600px; margin: 0 auto; }
+    h1 { font-size: 34px; }
+    .kids { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .tile { padding: 20px; }
+    .tile .avatar { width: 64px; height: 64px; font-size: 26px; }
+    .tile .name { font-size: 21px; }
+    #home > .intro, #home > .recap, #home > .installCard, #home > #historyBtn, #home > #noKids { width: 100%; }
+    #home > #historyBtn { max-width: 420px; margin: 0 auto; }
+    #histList { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+    #practice:not([hidden]) { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 16px 22px; align-items: start; }
+    #practice > header { grid-column: 1 / -1; }
+    .pMain { position: sticky; top: 16px; }
+    .ring { width: min(340px, 100%); }
+    #time { font-size: 64px; }
+    .overlay .card { max-width: 460px; }
+  }
+  @media (min-width: 1100px) {
+    .kids { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+  .pMain, .pSide { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+
+  /* Practice */
+  .who { display: flex; align-items: center; gap: 12px; font-size: 21px; font-weight: 700; }
+  .who .avatar { width: 40px; height: 40px; font-size: 18px; }
+  .ring { position: relative; width: min(250px, 100%); aspect-ratio: 1; margin: 4px auto 0; }
+  .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .ring circle { fill: none; stroke-width: 9; }
+  .ring .track { stroke: var(--track); }
+  .ring .prog { stroke: var(--kid); stroke-linecap: round; transition: stroke-dashoffset .4s ease, stroke .3s; }
+  .ring.done .prog { stroke: var(--good); }
+  .center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+  #time { font-size: clamp(44px, 14vw, 58px); font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; line-height: 1; }
+  #ofGoal { font-size: 14px; color: var(--muted); margin-top: 6px; }
+  .statusRow { display: flex; justify-content: center; margin-top: 16px; }
+  .status { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 999px; background: var(--soft);
+            color: var(--ink-2); font-size: 14.5px; font-weight: 600; }
+  .status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .status.playing { background: color-mix(in srgb, var(--good) 13%, transparent); color: var(--good); }
+  .status.playing .dot { background: var(--good); animation: pulse 1.4s ease-in-out infinite; }
+  .status.talking { background: color-mix(in srgb, var(--warn) 13%, transparent); color: var(--warn); }
+  .status.talking .dot { background: var(--warn); }
+  .status.done { background: color-mix(in srgb, var(--good) 13%, transparent); color: var(--good); }
+  .status.done .dot { background: var(--good); }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--good) 22%, transparent); } }
+  #session { text-align: center; font-size: 13.5px; color: var(--muted); margin-top: 8px; min-height: 1.2em; font-variant-numeric: tabular-nums; }
+  .meter { height: 6px; background: var(--track); border-radius: 3px; position: relative; overflow: hidden; margin-top: 14px; }
+  .meter .level { height: 100%; width: 0; background: var(--muted); opacity: .5; transition: width .08s; }
+  .meter .level.on { background: var(--good); opacity: 1; }
+  .meter .mark { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink-2); opacity: .6; }
+
+  /* Steppers & fields */
+  .stepper { display: flex; align-items: center; gap: 8px; }
+  .stepper button:disabled { opacity: .35; cursor: default; transform: none; }
+  #goalNote:empty { display: none; }
+  .weekStrip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 12px; }
+  .weekStrip div { text-align: center; background: var(--soft); border-radius: 10px; padding: 6px 0; font-size: 12px; color: var(--muted); }
+  .weekStrip b { display: block; font-size: 14px; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .weekStrip .rest b { color: var(--muted); }
+  .weekStrip .today { background: color-mix(in srgb, var(--kid) 14%, var(--card)); box-shadow: inset 0 0 0 2px var(--kid); color: var(--kid); }
+  .planGrid { display: grid; gap: 6px; margin-top: 12px; }
+  .planRow { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; padding: 4px 0; font-weight: 600; }
+  .planRow small { font-weight: 500; color: var(--muted); }
+  .planRow .stepper .val { min-width: 64px; }
+  .presets { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .presets button { font-size: 12.5px; padding: 6px 10px; font-weight: 500; border-radius: 999px; }
+  .stepper button { flex: none; width: 42px; height: 42px; padding: 0; border-radius: 12px; }
+  .stepper .val { min-width: 70px; text-align: center; font-weight: 700; font-size: 17px; font-variant-numeric: tabular-nums; }
+  .stepper input[type=number] { flex: none; width: 72px; text-align: center; font: inherit; font-weight: 700; font-size: 17px; padding: 9px 4px; }
+  input[type=text], input[type=password], input[type=number], select {
+    font: inherit; font-size: 16px; padding: 10px 12px; border-radius: 12px; border: 1.5px solid var(--line);
+    background: var(--soft); color: var(--ink); width: 100%; min-width: 0; }
+  input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type=number] { -moz-appearance: textfield; }
+  select { appearance: none; -webkit-appearance: none; padding-right: 34px; cursor: pointer;
+           background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236e7385' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+           background-repeat: no-repeat; background-position: right 10px center; background-size: 16px; }
+  .field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted); min-width: 0; }
+  .rowBetween { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .label { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+  .label .ic { color: var(--muted); }
+
+  /* Switch */
+  .switch, input.toggle { appearance: none; -webkit-appearance: none; position: relative; flex: none; width: 46px; height: 28px;
+           border-radius: 999px; background: var(--track); border: 0; padding: 0; cursor: pointer; transition: background .2s; margin: 0; }
+  .switch::after, input.toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%;
+           background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .2s; }
+  .switch[aria-checked=true], input.toggle:checked { background: var(--kid); }
+  .switch[aria-checked=true]::after, input.toggle:checked::after { transform: translateX(18px); }
+  .switch:active { transform: none; }
+  .opt { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; font-size: 15px; }
+  .opt + .opt { margin-top: 12px; }
+
+  /* Tuner */
+  #tuner { margin-top: 16px; text-align: center; }
+  #tNote { font-family: var(--serif); font-size: 26px; font-weight: 600; min-height: 1.25em; line-height: 1.25; }
+  .needle { position: relative; height: 10px; background: var(--track); border-radius: 5px; margin: 8px auto 0; max-width: 260px; }
+  .needle::before { content: ''; position: absolute; left: 30%; width: 40%; top: 0; bottom: 0; background: var(--good); opacity: .2; border-radius: 5px; }
+  .needle::after { content: ''; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--muted); opacity: .6; }
+  #tNeedle { position: absolute; top: -4px; width: 8px; height: 18px; margin-left: -4px; border-radius: 4px; background: var(--muted); transition: left .1s; z-index: 1; }
+  #tNeedle.ok { background: var(--good); }
+  #tNeedle.off { background: var(--warn); }
+  .needleLbl { display: flex; justify-content: space-between; max-width: 260px; margin: 4px auto 0; font-size: 11.5px; color: var(--muted); }
+
+  /* Metronome */
+  .metroHead { display: flex; align-items: center; gap: 12px; }
+  .metroHead .label { flex: 1; }
+  #beatDot { width: 12px; height: 12px; border-radius: 50%; background: var(--track); flex: none; transition: background .05s; }
+  #beatDot.on { background: var(--kid); }
+  /* Visual beat: the timer card pulses, stronger on accented beats */
+  .card.beat { animation: beatFlash .22s ease-out; }
+  .card.beatAccent { animation: beatFlashAccent .3s ease-out; }
+  @keyframes beatFlash { from { box-shadow: inset 0 0 0 4px var(--kid), var(--shadow); background: color-mix(in srgb, var(--kid) 14%, var(--card)); } }
+  @keyframes beatFlashAccent { from { box-shadow: inset 0 0 0 7px var(--kid), var(--shadow); background: color-mix(in srgb, var(--kid) 28%, var(--card)); } }
+  @media (prefers-reduced-motion: reduce) { .card.beat, .card.beatAccent { animation-duration: .01s; } }
+  .metroBody { display: grid; gap: 12px; margin-top: 16px; }
+  .metroBody .stepper { justify-content: center; }
+  .volRow { display: flex; align-items: center; gap: 12px; }
+  .volRow input { flex: 1; accent-color: var(--kid); }
+  .volRow span { min-width: 64px; text-align: right; color: var(--ink-2); font-weight: 600; }
+  .metroOpts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  /* Summary */
+  .overlay { position: fixed; inset: 0; background: rgba(20, 23, 31, .5); display: flex; align-items: flex-start; justify-content: center;
+             padding: 16px; overflow-y: auto; z-index: 10; backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+  .overlay .card { margin: auto 0; width: 100%; max-width: 400px; padding: 22px 20px 18px; animation: pop .45s cubic-bezier(.2, 1.4, .4, 1) both; }
+  @keyframes pop { from { transform: translateY(16px) scale(.94); opacity: 0; } to { transform: none; opacity: 1; } }
+  .medal { width: 68px; height: 68px; margin: 0 auto 10px; border-radius: 50%; display: grid; place-items: center; color: var(--kid);
+           background: color-mix(in srgb, var(--kid) 13%, var(--card)); box-shadow: 0 0 0 6px color-mix(in srgb, var(--kid) 6%, transparent);
+           animation: medal .7s cubic-bezier(.2, 1.6, .4, 1) .15s both; }
+  .medal .ic { width: 36px; height: 36px; stroke-width: 1.7; }
+  @keyframes medal { from { transform: scale(.3) rotate(-20deg); opacity: 0; } to { transform: none; opacity: 1; } }
+  #sumTitle { text-align: center; font-size: 24px; margin-bottom: 4px; }
+  #sumSub { text-align: center; color: var(--muted); font-size: 14px; margin-bottom: 14px; }
+  .sumRow { display: flex; gap: 14px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); }
+  .sumRow .tileIc { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; flex: none;
+                    background: color-mix(in srgb, var(--kid) 11%, transparent); color: var(--kid); }
+  .sumRow b { font-size: 17px; display: block; }
+  .sumRow span { font-size: 13px; color: var(--muted); }
+  #ring.cheer { animation: cheer .8s ease-in-out 2; }
+  @keyframes cheer { 50% { transform: scale(1.06); } }
+  #confetti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 20; }
+  @media (prefers-reduced-motion: reduce) { .overlay .card, .medal, #ring.cheer, .status.playing .dot { animation: none; } }
+
+  /* History */
+  .histHead { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .histHead .avatar { width: 36px; height: 36px; font-size: 16px; }
+  .histHead b { font-size: 18px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
+  .stats div { background: var(--soft); border-radius: 14px; padding: 10px 6px; text-align: center; min-width: 0; }
+  .stats b { display: block; font-size: 17px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .stats span { font-size: 12px; color: var(--muted); }
+  .trend { display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 700; margin-left: 3px; vertical-align: 2px; }
+  .trend.up { color: var(--good); } .trend.down { color: var(--warn); }
+  .trend .ic { width: 12px; height: 12px; stroke-width: 2.6; }
+  .chart { position: relative; display: flex; align-items: flex-end; gap: 5px; height: 110px; margin-top: 16px; }
+  .chart .col { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
+  .chart .b { width: 100%; background: var(--kid); opacity: .35; border-radius: 5px 5px 2px 2px; min-height: 3px; }
+  .chart .b.met { opacity: 1; }
+  .chart .dayGoal { position: absolute; left: -2px; right: -2px; border-top: 2px solid var(--muted); opacity: .55; }
+  .chart .goalLine { position: absolute; left: 0; right: 0; border-top: 1.5px dashed var(--muted); opacity: .5; }
+  .days { display: flex; gap: 5px; margin-top: 6px; }
+  .days span { flex: 1; text-align: center; font-size: 11px; color: var(--muted); }
+  .footnote { font-size: 12.5px; color: var(--muted); margin-top: 12px; line-height: 1.5; }
+  .moveCard { display: grid; gap: 8px; border: 1.5px solid color-mix(in srgb, var(--leaf) 35%, transparent); }
+  .moveCard ol { margin: 0; padding-left: 20px; line-height: 1.6; }
+  #bringOver { text-align: center; color: var(--accent); font-weight: 600; text-decoration: none; }
+  .accountBlock { display: grid; gap: 8px; padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--line); }
+  .parentList .opt { font-size: 14.5px; }
+  .forgotBox { display: grid; gap: 8px; text-align: left; background: var(--card); border-radius: 14px; padding: 14px; box-shadow: var(--shadow); }
+  #pinForgot { align-self: center; }
+  .teacherBox { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--soft); border-radius: 14px; padding: 12px 14px; margin-top: 12px; }
+  .teacherBox .grow { flex: 1; min-width: 140px; display: grid; }
+  .btnPair { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btnPair button { padding: 9px 12px; font-size: 14.5px; }
+  button.dangerText { color: var(--danger); }
+  .footnote .how summary { cursor: pointer; color: var(--accent); font-weight: 600; margin-top: 6px; }
+  .footnote .how p { margin: 8px 0 0; }
+  .stats b .tword { font-size: 14px; white-space: normal; line-height: 1.25; } .tword.up { color: var(--good); } .tword.down { color: var(--warn); }
+
+  /* Settings */
+  .sectionLabel { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 8px 4px -2px; }
+  .row + .row { margin-top: 18px; }
+  label.lbl { display: flex; justify-content: space-between; font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+  label.lbl span { color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  .player { display: grid; grid-template-columns: 40px 1fr auto; gap: 10px 10px; align-items: center; }
+  .player .avatar { width: 40px; height: 40px; font-size: 17px; }
+  .player .more { grid-column: 2 / -1; display: grid; gap: 10px; }
+  .player + .player { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+  .addRow { display: flex; gap: 8px; margin-top: 18px; }
+  .addRow button { flex: none; }
+  .code { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 15.5px; background: var(--soft); border-radius: 12px;
+          padding: 12px; margin: 6px 0 12px; user-select: all; word-break: break-all; letter-spacing: .03em; }
+  #syncState { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+  .help { font-size: 13.5px; color: var(--muted); margin-top: 8px; }
+  .pinBox { max-width: 300px; margin: 48px auto 0; text-align: center; display: flex; flex-direction: column; gap: 12px; align-items: stretch; }
+  .pinBox .medal { --kid: var(--brand); }
+  .pinBox input { text-align: center; font-size: 26px; letter-spacing: 10px; padding: 12px; }
+  /* Practice logged by hand: drawn as "sketched" hatching instead of solid color */
+  .hatch { background: repeating-linear-gradient(135deg, var(--kid) 0 2.5px, transparent 2.5px 5.5px) !important; opacity: .8; }
+  .bar { display: flex; }
+  #manualNote { font-size: 12.5px; color: var(--muted); margin-top: 6px; display: flex; align-items: center; gap: 4px; }
+  #manualNote .ic { width: 13px; height: 13px; }
+  #manualNote:empty { display: none; }
+  .card.sketch { background: transparent; box-shadow: none; border: 1.5px dashed var(--line); }
+  .sketch .label { font-weight: 600; color: var(--ink-2); }
+  .mEntry { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--ink-2); padding: 8px 0 0; }
+  .mEntry .sw { width: 18px; height: 12px; border-radius: 3px; flex: none; }
+  .mEntry .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mEntry button { padding: 4px; }
+  .medal.hatched { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--kid) 22%, var(--card)) 0 4px, var(--card) 4px 8px); }
+  .fieldRow { display: grid; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted); text-align: left; margin-top: 12px; }
+  /* Badges */
+  .medalArt.locked { opacity: .8; }
+  .badgeEntry { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; font-weight: 500; padding: 16px 18px; }
+  .badgeEntry .mini { display: flex; }
+  .badgeEntry .mini svg + svg { margin-left: -12px; }
+  .badgeEntry .grow { flex: 1; min-width: 0; }
+  .badgeEntry b { display: block; font-size: 16px; }
+  .badgeEntry span { font-size: 13.5px; color: var(--muted); }
+  .badgeGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+  .badgeCard { background: var(--card); border-radius: 18px; padding: 16px 12px 14px; box-shadow: var(--shadow); text-align: center; display: grid; justify-items: center; gap: 4px; }
+  .badgeCard b { font-size: 14.5px; margin-top: 6px; }
+  .badgeCard .lvl { font-size: 12.5px; color: var(--ink-2); font-weight: 600; }
+  .badgeCard.locked b, .badgeCard.locked .lvl { color: var(--muted); }
+  .badgeCard .nxt { font-size: 11.5px; color: var(--muted); }
+  .bbar { width: 100%; height: 5px; background: var(--track); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+  .bbar div { height: 100%; background: var(--kid); border-radius: 3px; }
+  .challenge { padding: 12px 0; border-top: 1px solid var(--line); }
+  .challenge b { display: flex; justify-content: space-between; gap: 8px; font-size: 15px; }
+  .challenge b span { font-weight: 600; color: var(--muted); font-size: 13px; white-space: nowrap; }
+  .challenge .bbar { height: 7px; }
+  .challenge.done b span { color: var(--good); }
+  .challenge.done .bbar div { background: var(--good); }
+  .cheerNote { background: var(--soft); border-radius: 14px; padding: 14px 16px; font-size: 16px; line-height: 1.5; margin-top: 12px; text-align: left; }
+  .cheerNote .from { display: block; font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .teacherAwards { display: flex; gap: 10px; flex-wrap: wrap; }
+  .teacherAwards > div { display: grid; justify-items: center; gap: 2px; width: 88px; text-align: center; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+  .avatar { overflow: hidden; }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .photoRow { display: flex; align-items: center; gap: 10px; }
+  .photoRow .avatar { width: 44px; height: 44px; font-size: 18px; }
+  .consent { display: flex; gap: 10px; align-items: flex-start; text-align: left; font-size: 13.5px; line-height: 1.45; color: var(--ink-2);
+             background: var(--soft); border-radius: 12px; padding: 12px; margin-top: 12px; cursor: pointer; }
+  .consent input { width: 20px; height: 20px; flex: none; margin-top: 1px; accent-color: var(--accent); }
+  .betaChip { font-family: var(--sans); font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 2px 7px;
+              border-radius: 999px; background: color-mix(in srgb, var(--leaf) 16%, transparent); color: var(--leaf); margin-left: 6px; vertical-align: 3px; }
+  /* Weekly recap */
+  .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  .recap { display: grid; gap: 12px; border: 1.5px solid color-mix(in srgb, var(--accent) 22%, transparent); }
+  .recapHead { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .recapHead h2 { margin: 0; }
+  .recapHead button { margin: -6px -8px 0 0; }
+  .recapRow { display: flex; gap: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .recapRow .avatar { width: 36px; height: 36px; font-size: 15px; }
+  .recapRow b { font-size: 16px; }
+  .recapRow p { margin-top: 3px; font-size: 14.5px; }
+  .tInfo .grow { flex: 1; }
+  .calOpts { display: grid; gap: 8px; margin-top: 14px; }
+  .calOpts button, .calOpts a { justify-content: flex-start; text-decoration: none; }
+  .calOpts small { display: block; font-weight: 500; color: var(--muted); font-size: 12.5px; }
+  .calOpts .txt { text-align: left; }
+  /* Teacher connection */
+  .teacherLink { text-align: center; font-size: 13px; color: var(--muted); }
+  .teacherLink a { color: var(--muted); }
+  .tHead { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .aItem { padding: 12px 0; border-top: 1px solid var(--line); display: flex; gap: 12px; align-items: flex-start; }
+  .tHead + .aItem { border-top: 0; }
+  .aItem .grow { flex: 1; min-width: 0; }
+  .aItem b { display: block; font-size: 16px; }
+  .aItem .det { font-size: 14px; color: var(--ink-2); margin-top: 2px; white-space: pre-wrap; }
+  .aItem .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .chipBtn { font-size: 13px; padding: 5px 10px; border-radius: 999px; background: var(--soft); font-weight: 600; color: var(--ink-2);
+             display: inline-flex; align-items: center; gap: 5px; }
+  .chipBtn .ic { width: 14px; height: 14px; }
+  button.chipBtn { border: 1.5px solid color-mix(in srgb, var(--kid) 40%, transparent); color: var(--kid); background: transparent; }
+  .tick { flex: none; width: 40px; height: 40px; border-radius: 12px; border: 2px solid var(--line); background: var(--card); padding: 0; color: transparent; }
+  .tick.on { background: var(--good); border-color: var(--good); color: #fff; }
+  .tick .ic { stroke-width: 2.6; }
+  .tInfo { display: flex; gap: 10px; align-items: center; font-size: 14px; color: var(--ink-2); padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--line); }
+  .tInfo .ic { color: var(--kid); }
+  .tInfo + .tInfo { border-top: 0; padding-top: 8px; margin-top: 0; }
+  .tile .lessonLine { font-size: 13px; color: var(--muted); margin-top: 6px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .tile .lessonLine .ic { width: 14px; height: 14px; }
+  .pickList { display: grid; gap: 8px; margin-top: 14px; }
+  .pickList button { justify-content: flex-start; }
+  .pickList .avatar { width: 30px; height: 30px; font-size: 13px; }
+  #pinError { color: var(--danger); min-height: 1.2em; font-size: 14px; }
+</style>
+</head>
+<body>
+
+<!-- Icons (line style) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-note" viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4.5" y="11" width="15" height="10" rx="2.5"/><path d="M8 11V7.5a4 4 0 0 1 8 0V11"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="16" rx="2.5"/><path d="M16 3v4M8 3v4M3.5 10h17"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20h16"/><rect x="5.5" y="11" width="3" height="6" rx="1"/><rect x="10.5" y="6" width="3" height="11" rx="1"/><rect x="15.5" y="9" width="3" height="8" rx="1"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12.5-7.5z" fill="currentColor"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6.5" y="5" width="3.5" height="14" rx="1" fill="currentColor"/><rect x="14" y="5" width="3.5" height="14" rx="1" fill="currentColor"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 18.5h10.5a4 4 0 0 0 .6-7.96A6 6 0 0 0 6.6 9.5 4.5 4.5 0 0 0 7 18.5z"/></symbol>
+  <symbol id="i-cloudoff" viewBox="0 0 24 24"><path d="M7 18.5h10.5a4 4 0 0 0 .6-7.96A6 6 0 0 0 6.6 9.5 4.5 4.5 0 0 0 7 18.5z"/><path d="M4 4l16 16"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><path d="M4.5 12.5V19a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-6.5"/><path d="m16 6.5-4-4-4 4M12 2.5V15"/></symbol>
+  <symbol id="i-qr" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="6" height="6" rx="1"/><rect x="14.5" y="3.5" width="6" height="6" rx="1"/><rect x="3.5" y="14.5" width="6" height="6" rx="1"/><path d="M14.5 14.5h2.5v2.5h-2.5zM18.5 18.5h2v2h-2zM14.5 19.5h1M20.5 14.5v1.5"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="12" height="12" rx="2"/><path d="M15.5 8.5V5.5a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M18.5 11a6.5 6.5 0 0 1-13 0M12 17.5V21"/></symbol>
+  <symbol id="i-metronome" viewBox="0 0 24 24"><path d="M9.2 3h5.6l4 17.5H5.2z"/><path d="M5.8 17.5h12.4M12 15 16.5 6.5"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 9a6 6 0 0 1 12 0c0 6.5 2.5 8 2.5 8h-17S6 15.5 6 9z"/><path d="M10.3 20.5a2 2 0 0 0 3.4 0"/></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></symbol>
+  <symbol id="i-tune" viewBox="0 0 24 24"><path d="M3 12h3l2.5-6 4 12 3-9 2 3h3.5"/></symbol>
+  <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M8 21h8M12 16.5V21M7 3.5h10V9a5 5 0 0 1-10 0z"/><path d="M17 5h3v1.5A3.5 3.5 0 0 1 16.8 10M7 5H4v1.5A3.5 3.5 0 0 0 7.2 10"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"/></symbol>
+  <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4"/><path d="M5 4.5h12l-2.5 4 2.5 4H5"/></symbol>
+  <symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 21.5c3.9 0 6.5-2.7 6.5-6.4 0-3.9-2.8-5.9-4.2-9.1-1 2-2 3-3.5 3.6.2-2.2-.7-4.3-2.6-6.1.2 4-4.7 6.6-4.7 11.6 0 3.7 2.6 6.4 6.5 6.4z"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.2a4.3 4.3 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20z"/></symbol>
+  <symbol id="i-award" viewBox="0 0 24 24"><circle cx="12" cy="9" r="6"/><path d="m8.5 14 -1.5 7 5-2.5 5 2.5-1.5-7"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4"/></symbol>
+ <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21a2 2 0 0 1 2-2h13v2"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.2a6.5 6.5 0 0 1 3 5.8"/></symbol>
+</svg>
+
+<main>
+
+  <!-- HOME -->
+  <section class="screen" id="home">
+    <header>
+      <div class="brand"><img class="logo" src="brand/allegrow-icon.svg" alt=""><span class="wm">Alle<b>grow</b></span><span class="betaChip">Beta</span></div>
+      <button class="ghost" id="parentBtn"><svg class="ic sm"><use href="#i-lock"/></svg>Parents</button>
+    </header>
+    <div class="intro">
+      <h1>Who’s practicing?</h1>
+      <p>Tap your name to start.</p>
+    </div>
+    <div class="card moveCard" id="moveCard" hidden></div>
+    <div class="card recap" id="recap" hidden></div>
+    <div class="card installCard" id="installCard" hidden></div>
+    <div class="kids" id="kidList"></div>
+    <div class="card empty" id="noKids" hidden>
+      <svg class="ic lg muted"><use href="#i-users"/></svg>
+      <p class="muted">No players yet. A parent or teacher can add them in Settings.</p>
+      <button class="secondary" id="setupBtn">Add players</button>
+      <a class="ghost small" id="bringOver" href="https://sergcast07.github.io/practice-timer/app.html?export" hidden>Used Allegrow at its old address (sergcast07.github.io)? Bring your players over</a>
+      <button class="ghost" id="homeRestore"><svg class="ic sm"><use href="#i-user"/></svg>Used Allegrow before? Sign in to get your family back</button>
+    </div>
+    <button class="secondary block" id="historyBtn"><svg class="ic"><use href="#i-chart"/></svg>Practice history</button>
+    <button class="ghost" id="syncStatus" type="button"></button>
+    <p class="teacherLink">Are you a teacher? <a href="studio">Sign in to your studio</a></p>
+  </section>
+
+  <!-- PRACTICE -->
+  <section class="screen" id="practice" hidden>
+    <header>
+      <div class="who"><div class="avatar" id="pAvatar"></div><span id="pName"></span></div>
+      <button class="secondary" id="doneBtn"><svg class="ic sm"><use href="#i-check"/></svg>Done</button>
+    </header>
+    <div class="pMain">
+    <div class="card">
+      <div class="ring" id="ring">
+        <svg viewBox="0 0 120 120">
+          <defs><pattern id="hatchRing" patternUnits="userSpaceOnUse" width="4" height="4" patternTransform="rotate(45)"><rect width="2" height="4" style="fill:var(--kid)"/></pattern></defs>
+          <circle class="track" cx="60" cy="60" r="52"/>
+          <circle id="progManual" cx="60" cy="60" r="52" style="stroke:url(#hatchRing);opacity:.85"/>
+          <circle class="prog" id="prog" cx="60" cy="60" r="52"/>
+        </svg>
+        <div class="center">
+          <div id="time">0:00</div>
+          <div id="ofGoal"></div>
+          <div id="manualNote"></div>
+        </div>
+      </div>
+      <div class="statusRow"><div class="status" id="status"><span class="dot"></span><span id="statusText"></span></div></div>
+      <div id="session"></div>
+      <div id="tuner" hidden>
+        <div id="tNote">&nbsp;</div>
+        <div class="needle"><div id="tNeedle" style="left:50%"></div></div>
+        <div class="needleLbl"><span>Flat</span><span>In tune</span><span>Sharp</span></div>
+      </div>
+      <div class="meter"><div class="level"></div><div class="mark"></div></div>
+    </div>
+    <button class="primary" id="startBtn"></button>
+    </div>
+    <div class="pSide">
+    <div class="card" id="teacherCard" hidden></div>
+    <button class="card badgeEntry" id="badgeEntry"></button>
+    <div class="card">
+      <div class="metroHead">
+        <div class="label"><svg class="ic"><use href="#i-metronome"/></svg>Metronome</div>
+        <div id="beatDot"></div>
+        <button class="switch" id="metroBtn" role="switch" aria-checked="false" aria-label="Metronome"></button>
+      </div>
+      <div class="metroBody">
+        <div class="stepper">
+          <button id="bpmDown" aria-label="Slower"><svg class="ic"><use href="#i-minus"/></svg></button>
+          <input type="number" id="bpmVal" min="30" max="250" inputmode="numeric" aria-label="Beats per minute">
+          <span class="muted small">bpm</span>
+          <button id="bpmUp" aria-label="Faster"><svg class="ic"><use href="#i-plus"/></svg></button>
+        </div>
+        <label class="field">Tempo <select id="tempoMark" aria-label="Tempo marking"></select></label>
+        <div class="metroOpts">
+          <label class="field">Sound <select id="metroSound"></select></label>
+          <label class="field">Accent <select id="metroAccent">
+            <option value="0">None</option><option value="2">Every 2 beats</option><option value="3">Every 3 beats</option>
+            <option value="4">Every 4 beats</option><option value="6">Every 6 beats</option></select></label>
+        </div>
+        <label class="opt" style="font-size:14.5px">Flash on the beat <input type="checkbox" class="toggle" id="metroFlash"></label>
+        <label class="field">Volume <span class="volRow"><input type="range" id="metroVol" min="10" max="100" step="5" aria-label="Metronome volume"><span id="metroVolVal" class="num"></span></span></label>
+      </div>
+    </div>
+    <div class="card">
+      <div class="rowBetween">
+        <div class="label"><svg class="ic"><use href="#i-flag"/></svg><span id="goalLabel">Today’s goal</span></div>
+        <div class="stepper">
+          <button id="goalDown" aria-label="Lower goal"><svg class="ic"><use href="#i-minus"/></svg></button>
+          <span class="val" id="goalVal"></span>
+          <button id="goalUp" aria-label="Raise goal"><svg class="ic"><use href="#i-plus"/></svg></button>
+        </div>
+      </div>
+      <div class="weekStrip" id="weekStrip"></div>
+      <div class="rowBetween" style="margin-top:8px"><p class="muted small" id="goalNote"></p><button class="ghost small" id="editWeek">Edit week</button></div>
+    </div>
+    <div class="card sketch">
+      <div class="rowBetween">
+        <div class="label"><svg class="ic"><use href="#i-pencil"/></svg>Practiced without the app?</div>
+        <button class="secondary" id="manualBtn">Log it</button>
+      </div>
+      <div id="manualList"></div>
+    </div>
+    </div>
+  </section>
+
+  <!-- HISTORY -->
+  <section class="screen" id="badges" hidden>
+    <header><button class="ghost back" id="badgesBack"><svg class="ic"><use href="#i-back"/></svg>Back</button></header>
+    <div class="intro"><h1 id="bTitle"></h1><p id="bSub"></p></div>
+    <div id="bTeacher"></div>
+    <div class="badgeGrid" id="bGrid"></div>
+    <p class="muted small" style="text-align:center;margin-top:4px">Badges come from your own practice – every level shows what’s next.</p>
+  </section>
+
+  <section class="screen" id="history" hidden>
+    <header>
+      <button class="ghost back" data-home><svg class="ic"><use href="#i-back"/></svg>Back</button>
+    </header>
+    <div class="intro"><h1>Practice history</h1><p>Time, focus, tuning and rhythm for each player.</p></div>
+    <div id="histList" class="stack"></div>
+  </section>
+
+  <!-- PIN -->
+  <section class="screen" id="pin" hidden>
+    <header><button class="ghost back" data-home><svg class="ic"><use href="#i-back"/></svg>Back</button></header>
+    <div class="pinBox">
+      <div class="medal"><svg class="ic"><use href="#i-lock"/></svg></div>
+      <h1 id="pinTitle" style="font-size:24px"></h1>
+      <input type="password" id="pinInput" inputmode="numeric" maxlength="8" autocomplete="off" aria-label="PIN">
+      <input type="password" id="pinConfirm" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="Repeat PIN" aria-label="Repeat PIN">
+      <div id="pinError"></div>
+      <button class="primary" id="pinOk" style="--kid:var(--brand);color:var(--bg)">Continue</button>
+      <button class="ghost" id="pinForgot" type="button">Forgot the PIN?</button>
+      <div id="forgotBox" class="forgotBox" hidden></div>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="screen" id="parent" hidden>
+    <header>
+      <button class="ghost back" data-home><svg class="ic"><use href="#i-back"/></svg>Done</button>
+    </header>
+    <div class="intro"><h1>Settings</h1><p>For parents and teachers.</p></div>
+    <div class="jump"><a href="#syncCard">Devices &amp; sync</a><a href="#playersCard">Players</a><a href="#micCard">Microphone</a></div>
+
+    <div class="sectionLabel" id="syncCard">Devices &amp; sync</div>
+    <div class="card">
+      <div id="accountBlock" class="accountBlock"></div>
+      <div id="syncOff">
+        <p class="muted small">Everything is saved on this device only. Turn on sync to share players and practice history across all your phones and tablets.</p>
+        <button class="secondary block" id="createFamilyBtn" style="margin-top:14px"><svg class="ic"><use href="#i-cloud"/></svg>Turn on sync</button>
+      </div>
+      <div id="syncOn">
+        <div id="syncState"></div>
+        <div class="syncBlock">
+          <b>Add another device</b>
+          <p class="muted small">On the other phone or tablet, scan this code with the camera, or open the link you send it.</p>
+          <div class="qrBox" id="qrBox" hidden><div id="qr"></div><div class="small muted">Scan with the other device’s camera</div></div>
+          <div class="btnRow">
+            <button class="secondary" id="qrBtn"><svg class="ic sm"><use href="#i-qr"/></svg>Show QR code</button>
+            <button class="secondary" id="shareBtn"><svg class="ic sm"><use href="#i-share"/></svg>Send link</button>
+            <button class="secondary" id="copyCodeBtn"><svg class="ic sm"><use href="#i-copy"/></svg>Copy code</button>
+          </div>
+          <div class="help" style="margin-top:8px">Family code</div><div id="familyCode" class="code"></div>
+          <div class="help">Anyone with this code can see and change your practice data, so share it only with family.</div>
+        </div>
+      </div>
+      <div class="syncBlock" id="joinBlock">
+        <b id="joinTitle">Already using Allegrow on another device?</b>
+        <p class="muted small" id="joinHelp">Scan its QR code with this device’s camera, or enter its family code here.</p>
+        <div class="addRow" style="margin-top:8px">
+          <input type="text" id="joinCode" placeholder="Family code, e.g. abcde-fghjk-…" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Family code">
+          <button class="secondary" id="joinBtn">Connect</button>
+        </div>
+        <div id="joinError" class="small" style="color:var(--danger);margin-top:6px"></div>
+        <button class="ghost" id="restoreBtn" type="button" style="justify-self:start;margin-left:-10px"><svg class="ic sm"><use href="#i-user"/></svg>Or sign in with your parent account</button>
+      </div>
+      <button class="danger" id="leaveBtn" style="margin-top:10px;margin-left:-10px">Stop syncing on this device</button>
+    </div>
+
+    <div class="sectionLabel" id="playersCard">Players</div>
+    <div class="card">
+      <div id="players"></div>
+      <div class="addRow">
+        <input type="text" id="newName" placeholder="Add a player’s name" maxlength="20" aria-label="New player name">
+        <button class="secondary" id="addBtn"><svg class="ic sm"><use href="#i-plus"/></svg>Add</button>
+      </div>
+      <p class="muted small" style="margin-top:10px">Use a first name or nickname. Practice stays on this device unless you turn on sync or connect a teacher – see the <a href="privacy">privacy policy</a>.</p>
+    </div>
+
+    <div class="sectionLabel" id="micCard">Microphone</div>
+    <div class="card">
+      <div class="row">
+        <label class="opt">Only count music, not talking <input type="checkbox" class="toggle" id="musicOnly"></label>
+        <div class="help" id="detectorNote"></div>
+      </div>
+      <div class="row">
+        <label class="lbl" for="sens">Sensitivity <span id="sensVal"></span></label>
+        <input type="range" id="sens" min="1" max="100">
+      </div>
+      <div class="row">
+        <label class="lbl" for="grace">Keep running during pauses <span id="graceVal"></span></label>
+        <input type="range" id="grace" min="0" max="10" step="0.5">
+      </div>
+      <div class="row">
+        <button class="secondary block" id="testBtn"></button>
+        <div id="testArea" hidden>
+          <div class="meter"><div class="level"></div><div class="mark"></div></div>
+          <div class="help">Play something: the bar should pass the line. When the room is quiet, it should stay below it.</div>
+          <div id="testStatus" style="margin-top:10px;font-weight:600"></div>
+          <div class="help" id="hears"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sectionLabel">Help us improve</div>
+    <div class="card rowBetween">
+      <div class="label"><svg class="ic"><use href="#i-heart"/></svg>Allegrow is in beta</div>
+      <button class="secondary" id="feedbackBtn">Send feedback</button>
+    </div>
+
+    <div class="sectionLabel">Security</div>
+    <div class="card rowBetween">
+      <div class="label"><svg class="ic"><use href="#i-lock"/></svg>Settings PIN</div>
+      <button class="secondary" id="changePinBtn">Change PIN</button>
+    </div>
+    <p class="muted small" style="text-align:center"><a href="./?about">About Allegrow</a> · <a href="privacy">Privacy policy</a> · <a href="terms">Terms</a></p>
+  </section>
+
+</main>
+
+<div class="overlay" id="linkDlg" hidden><div class="card" id="linkCard" role="dialog" aria-modal="true"></div></div>
+<canvas id="confetti" hidden></canvas>
+<div class="overlay" id="summary" hidden>
+  <div class="card" role="dialog" aria-labelledby="sumTitle">
+    <div class="medal" id="sumBadge"></div>
+    <h2 id="sumTitle"></h2>
+    <div id="sumSub"></div>
+    <div id="sumRows"></div>
+    <button class="primary" id="sumOk" style="margin-top:14px">Done</button>
+  </div>
+</div>
+
+<script src="badges.js?v=7"></script>
+<script src="signin.js?v=1"></script>
+<script>
+const $ = id => document.getElementById(id);
+const CIRC = 2 * Math.PI * 52;
+$('prog').style.strokeDasharray = CIRC;
+// Instruments (badges.js): the lowest note we listen for, per instrument. Piano, guitar and drums aren't checked for tuning.
+const hasPitch = k => !!instrumentLow(k?.instrument);          // instrument we can hear pitch on
+// Practice insights: a connected teacher chooses whether focus, tuning and rhythm show as scores, trends only, or not at all
+const insOf = (k, m) => insightMode(teacherOf(k)?.insights, m);
+const tracksPitch = k => hasPitch(k) && k.tuning !== false && insOf(k, 'tune') !== 'off';   // …and the parent (and teacher) want tuning shown
+const COLORS = ['#cf5c3c', '#1f8a7e', '#6a55c8', '#2f6bcc', '#b3821c', '#c2457a'];
+const OLD_COLORS = ['#e0653a', '#2a9d8f', '#7b5cd6', '#2f7ed8', '#d4a017', '#d6457a'];   // earlier palette → map to the refined one
+const kidColor = k => OLD_COLORS.includes(k.color) ? COLORS[OLD_COLORS.indexOf(k.color)] : k.color;
+// Practice plan: minutes for each day of the week (0 = rest day). A parent's plan wins; otherwise a
+// connected teacher's; otherwise the child sets their own. Over a parent/teacher plan the child can raise
+// any day (kid.raise) but never go below it.
+function planFloor(k) {
+  if (k.parentPlan) return { plan: planOf(k.parentPlan), by: 'a parent' };
+  if (k.parentGoal) return { plan: planOf(null, k.parentGoal), by: 'a parent' };        // older single-number setting
+  const t = k.link && teacherData[k.link];
+  if (t && !t.missing && (t.plan || t.target)) return { plan: planOf(t.plan, t.target), by: t.teacherName };
+  return null;
+}
+const ownPlan = k => planOf(k.plan, k.goal || 20);
+function planFor(k) {                                   // the plan in effect, Sunday first
+  const f = planFloor(k);
+  return f ? f.plan.map((n, i) => Math.max(n, k.raise?.[i] || 0)) : ownPlan(k);
+}
+const goalOf = (k, d = new Date()) => planFor(k)[d.getDay()];                 // minutes for that day; 0 = rest day
+const goalMsFor = k => key => goalOf(k, parseDay(key)) * 60000;
+const icon = (name, cls = '') => `<svg class="ic ${cls}" aria-hidden="true"><use href="#i-${name}"/></svg>`;
+
+// ---------- Storage ----------
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+let kids = store.get('pt-kids', []);            // [{id, name, color, goal (minutes)}]
+let log = store.get('pt-log', {});              // {kidId: {'YYYY-MM-DD': ms}}
+let manual = store.get('pt-manual', {});        // practice logged by hand: {kidId: {entryId: {day, ms, note, at}}}
+let stats = store.get('pt-stats', {});          // {kidId: {'YYYY-MM-DD': {active, breaks, longest, notes, inTune, beats, steady}}}
+let settings = Object.assign(
+  { sens: +store.get('sens', 60), grace: +store.get('grace', 3), musicOnly: store.get('musicOnly', true), pin: null },
+  store.get('pt-settings', {}));
+function saveKids() { store.set('pt-kids', kids); pushRemote({ kids }); }
+function saveLog() { store.set('pt-log', log); }
+function saveSettings() { store.set('pt-settings', settings); pushRemote({ settings }); }
+
+// ---------- Cloud sync (Firebase Firestore) ----------
+// Each family is one document, families/{family code}. The long random code is the key:
+// the database rules refuse to list families or accept short codes, so only devices that know it can get in.
+// ?emulator on localhost talks to the local Firebase emulator instead of the real project (for testing)
+const EMULATOR = ['localhost', '127.0.0.1'].includes(location.hostname) && new URLSearchParams(location.search).has('emulator');
+const FIREBASE = EMULATOR ? { apiKey: 'demo-key', projectId: 'demo-practice' } : {
+  apiKey: 'AIzaSyAUn6GqVxRR-m9i5kjTH9dY7-nGWCo1374',
+  authDomain: 'music-practice-tracker-d77f7.firebaseapp.com',
+  projectId: 'music-practice-tracker-d77f7',
+  storageBucket: 'music-practice-tracker-d77f7.firebasestorage.app',
+  messagingSenderId: '933602552014',
+  appId: '1:933602552014:web:1b19df5cc27f55fc58c89f'
+};
+const FB = 'https://www.gstatic.com/firebasejs/12.19.0';
+let family = store.get('pt-family', null);
+let F, db, ref, unsubscribe, syncState = 'local';
+let familyParents = {};                          // parent accounts linked to this family: {uid: {email, name, at}}
+let pend = store.get('pt-pend', {});              // practice time not yet sent: {kidId: {day: ms}}
+let pendStats = store.get('pt-pendstats', {});    // quality stats not yet sent, same shape as `stats`
+let pendingFields = {}, fieldTimer, lastFlush = 0;
+
+async function loadFirebase() {
+  if (F) return;
+  const [{ initializeApp }, firestore] = await Promise.all([import(FB + '/firebase-app.js'), import(FB + '/firebase-firestore.js')]);
+  const app = initializeApp(FIREBASE);
+  try {   // offline cache: practice still counts with no internet and syncs later
+    db = firestore.initializeFirestore(app, { localCache: firestore.persistentLocalCache({ tabManager: firestore.persistentMultipleTabManager() }) });
+  } catch { db = firestore.getFirestore(app); }
+  if (EMULATOR) firestore.connectFirestoreEmulator(db, '127.0.0.1', 8080);
+  F = firestore;
+}
+
+async function connect() {
+  setSync('connecting');
+  try { await loadFirebase(); } catch (e) { console.error(e); return setSync('error'); }
+  unsubscribe?.();
+  ref = F.doc(db, 'families', family);
+  unsubscribe = F.onSnapshot(ref, { includeMetadataChanges: true }, onRemote, e => { console.error(e); setSync('error'); });
+  flushPractice(); flushFields();
+}
+
+function onRemote(snap) {
+  if (!snap.exists()) return setSync(snap.metadata.fromCache ? 'connecting' : 'missing');
+  const d = snap.data();
+  // Don't let an older server copy overwrite a change still waiting to be sent
+  if (!pendingFields.kids) kids = d.kids || [];
+  if (!pendingFields.settings) settings = Object.assign(settings, d.settings || {});
+  familyParents = d.parents || {};
+  upgradePin();
+  log = d.log || {};
+  stats = d.stats || {};
+  manual = d.manual || {}; store.set('pt-manual', manual);
+  store.set('pt-kids', kids); store.set('pt-log', log); store.set('pt-settings', settings); store.set('pt-stats', stats);
+  if (kid) {
+    kid = kids.find(k => k.id === kid.id) || null;
+    if (!kid && screen === 'practice') return show('home');
+  }
+  setSync(snap.metadata.hasPendingWrites ? 'saving' : snap.metadata.fromCache ? 'offline' : 'synced');
+  watchTeachers();
+  if (screen === 'home') renderHome();
+  else if (screen === 'history') renderHistory();
+  else if (screen === 'practice' && !listening) renderPractice();
+  else if (screen === 'parent' && document.activeElement?.tagName !== 'INPUT') renderParent();
+}
+
+function pushRemote(fields) {
+  if (!family) return;
+  Object.assign(pendingFields, fields);
+  clearTimeout(fieldTimer);
+  fieldTimer = setTimeout(flushFields, 700);     // wait for sliders/typing to settle
+}
+function flushFields() {
+  clearTimeout(fieldTimer);
+  if (!ref || !Object.keys(pendingFields).length) return;
+  const f = pendingFields; pendingFields = {};
+  F.updateDoc(ref, f).catch(e => { console.error(e); setSync('error'); });
+}
+// Practice time is sent as increments, so two kids practicing on two devices at once both add up correctly
+function flushPractice() {
+  if (!ref) return;
+  const upd = {};
+  for (const id in pend) for (const day in pend[id]) upd[`log.${id}.${day}`] = F.increment(Math.round(pend[id][day]));
+  for (const id in pendStats) for (const day in pendStats[id]) for (const f in pendStats[id][day]) {
+    const v = pendStats[id][day][f];
+    upd[`stats.${id}.${day}.${f}`] = f === 'longest' ? Math.round(Math.max(v, stats[id]?.[day]?.longest || 0)) : F.increment(Math.round(v));
+  }
+  pend = {}; store.set('pt-pend', pend);
+  pendStats = {}; store.set('pt-pendstats', pendStats);
+  if (Object.keys(upd).length) F.updateDoc(ref, upd).catch(e => { console.error(e); setSync('error'); });
+}
+
+// ---------- Parent account (optional Google sign-in) ----------
+// Signing in links a parent to the family: parents/{uid} = { family, email, name } (only they can read it), and the family
+// record lists its parents. Then a parent can reset a forgotten PIN by signing in, and get the family back on a new device.
+let A, auth;
+async function loadAuth() {
+  await loadFirebase();
+  if (A) return;
+  A = await import(FB + '/firebase-auth.js');
+  auth = A.getAuth();
+  if (EMULATOR) A.connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+  await auth.authStateReady();
+}
+// Google, Microsoft, Yahoo or email + password (signin.js). Resolves with the user, or null if they closed it.
+async function parentSignIn(intro = '') {
+  await loadAuth();
+  return signInDialog({ A, auth, verify: true, title: 'Parent sign-in', intro });
+}
+// The email service (worker) – a signed-in parent proves who they are with their sign-in token
+async function parentApi(path, data = {}) {
+  const u = auth.currentUser, was = u.emailVerified;
+  if (!was) await u.reload();                    // they may have clicked the verification link since
+  const idToken = await u.getIdToken(!was && u.emailVerified);
+  const r = await fetch(`${WORKER_URL}/parents/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idToken, tz: Intl.DateTimeFormat().resolvedOptions().timeZone, ...data }) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || 'Something went wrong. Please try again.');
+  return j;
+}
+const parentRecord = async uid => { const snap = await F.getDoc(F.doc(db, 'parents', uid)); return snap.exists() ? snap.data() : null; };
+async function linkParent(u) {
+  const me = { email: u.email || '', name: u.displayName || '', at: new Date().toISOString() };
+  await F.setDoc(F.doc(db, 'parents', u.uid), { family, ...me });
+  await F.updateDoc(ref, { ['parents.' + u.uid]: me });
+  familyParents[u.uid] = me;
+  parentApi('link').catch(console.error);        // lets the email service send this parent PIN codes and summaries
+}
+// From Settings: add a parent account to this family (turning on sync first if needed)
+async function addParentAccount() {
+  const u = await parentSignIn('So you can reset the parent PIN if you forget it, and get your family back on a new device.');
+  if (!u) return;
+  const rec = await parentRecord(u.uid).catch(() => null);
+  if (rec && rec.family !== family) {
+    const other = await F.getDoc(F.doc(db, 'families', rec.family)).catch(() => null);
+    if (other?.exists()) {
+      const names = (other.data().kids || []).map(k => k.name).join(', ') || 'no players yet';
+      if (confirm(`${u.email} already belongs to another family on Allegrow (${names}).\n\nOK: switch this device to that family.\nCancel: keep this device's family and move your account to it.`))
+        return joinFamily(rec.family).then(renderParent);
+    }
+  }
+  try {
+    if (!family) await createFamily();
+    await linkParent(u);
+  } catch (e) { console.error(e); alert('Couldn’t link your account right now. Check the internet connection and try again.'); }
+  renderParent();
+}
+// From a new device: sign in and bring the family back
+async function restoreWithAccount() {
+  const u = await parentSignIn('Use the same sign-in as on your other device.');
+  if (!u) return;
+  const rec = await parentRecord(u.uid).catch(() => null);
+  if (!rec) return alert(`No family is linked to ${u.email} yet.\n\nOn a device that already has your players, open Parents → Settings → Devices & sync and add a parent account there first.`);
+  await joinFamily(rec.family);
+  if (family === rec.family) show('home');
+}
+async function removeParentAccount(uid) {
+  if (!confirm('Remove this parent account from the family? You can add it again any time.')) return;
+  try {
+    await F.updateDoc(ref, { ['parents.' + uid]: F.deleteField() });
+    if (auth?.currentUser?.uid === uid) { await parentApi('unlink').catch(() => {}); await F.deleteDoc(F.doc(db, 'parents', uid)).catch(() => {}); await A.signOut(auth); }
+  } catch (e) { console.error(e); }
+  delete familyParents[uid]; renderParent();
+}
+
+function familyCode() {
+  const abc = 'abcdefghjkmnpqrstuvwxyz23456789', r = crypto.getRandomValues(new Uint8Array(25));
+  return [...r].map(x => abc[x % abc.length]).join('').match(/.{5}/g).join('-');
+}
+async function createFamily() {
+  setSync('connecting');
+  try { await loadFirebase(); } catch (e) { console.error(e); return setSync('error'); }
+  family = familyCode();
+  const saved = F.setDoc(F.doc(db, 'families', family), { kids, log, stats, manual, settings, created: F.serverTimestamp() })
+    .catch(e => { console.error(e); setSync('error'); });
+  store.set('pt-family', family);
+  await connect(); renderParent();
+  return saved;                                  // resolves once the server has it (someone linking an account waits for this)
+}
+async function joinFamily(code) {
+  code = code.trim().toLowerCase().replace(/\s+/g, '');
+  const fail = msg => screen === 'parent' ? ($('joinError').textContent = msg) : alert(msg);
+  $('joinError').textContent = '';
+  if (code.length < 20) return fail('That code is too short. Check it and try again.');
+  try {
+    await loadFirebase();
+    const snap = await F.getDoc(F.doc(db, 'families', code));
+    if (!snap.exists()) return fail('No family found with that code.');
+  } catch (e) { console.error(e); return fail('Couldn’t reach the server. Check the internet connection.'); }
+  if (code === family) return fail('This device is already using that family code.');
+  if (family ? !confirm('Switch this device to the other family account? It will show that account’s players and history instead. Your current account stays safe on your other devices, and you can switch back with its code.')
+      : kids.length && !confirm('Replace the players and history on this device with your family’s shared ones?')) return;
+  if (family) { flushPractice(); flushFields(); }
+  family = code; store.set('pt-family', family);
+  pend = {}; store.set('pt-pend', pend);
+  pendStats = {}; store.set('pt-pendstats', pendStats);
+  await connect();
+  if (screen === 'parent') renderParent();
+}
+function leaveFamily() {
+  if (!confirm('Stop syncing on this device? It keeps a copy of the current players and history, but won’t see new practice from other devices.')) return;
+  flushPractice(); flushFields();
+  unsubscribe?.(); unsubscribe = ref = null;
+  family = null; store.set('pt-family', null);
+  setSync('local'); renderParent();
+}
+
+function setSync(state) {
+  syncState = state;
+  const [ic, text] = {
+    local: ['', ''], connecting: ['cloud', 'Connecting…'], synced: ['cloud', 'Synced'], saving: ['cloud', 'Saving…'],
+    offline: ['cloudoff', 'Offline – will sync when back online'], error: ['alert', 'Sync problem – practice is still saved on this device'],
+    missing: ['alert', 'Family not found – check the family code in Settings']
+  }[state];
+  const html = text ? `${icon(ic, 'sm')}<span>${text}</span>` : '';
+  // On the home screen this line doubles as the way into Devices & sync
+  $('syncStatus').innerHTML = state === 'local' ? `${icon('cloud', 'sm')}<span>Use Allegrow on more than one device?</span>`
+    : state === 'synced' ? `${html}<span class="muted">·</span><span style="text-decoration:underline">Add a device</span>` : html;
+  $('syncState').innerHTML = html;
+}
+
+// ---------- Dates & formatting ----------
+const pad = n => String(n).padStart(2, '0');
+const dayKey = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+function lastDays(n) {            // oldest → today
+  const t = new Date(), out = [];
+  for (let i = n - 1; i >= 0; i--) out.push(new Date(t.getFullYear(), t.getMonth(), t.getDate() - i));
+  return out;
+}
+// Recorded = heard by the app; manual = logged by hand. Totals, goals and streaks count both.
+const recordedOn = (kid, d = new Date()) => ((log[kid.id] || {})[dayKey(d)] || 0) + ((pend[kid.id] || {})[dayKey(d)] || 0);
+const manualOn = (kid, d = new Date()) => { const k = dayKey(d); return Object.values(manual[kid.id] || {}).reduce((a, e) => a + (e.day === k ? e.ms : 0), 0); };
+const msOn = (kid, d = new Date()) => recordedOn(kid, d) + manualOn(kid, d);
+// Quality stats for one day, including anything not yet synced
+function statsOn(kid, d = new Date()) {
+  const k = dayKey(d), r = stats[kid.id]?.[k] || {}, p = pendStats[kid.id]?.[k] || {}, out = { ...r };
+  for (const f in p) out[f] = f === 'longest' ? Math.max(r[f] || 0, p[f]) : (r[f] || 0) + p[f];
+  return out;
+}
+// Totals over several days. Focus only counts days that have "active" time (i.e. since this feature existed).
+function statsOver(kid, days) {
+  const t = { active: 0, played: 0, notes: 0, inTune: 0, beats: 0, steady: 0 };
+  for (const d of days) {
+    const s = statsOn(kid, d);
+    if (s.active) { t.active += s.active; t.played += Math.min(recordedOn(kid, d), s.active); }
+    t.notes += s.notes || 0; t.inTune += s.inTune || 0; t.beats += s.beats || 0; t.steady += s.steady || 0;
+  }
+  return {
+    focus: t.active >= 60000 ? t.played / t.active : null,
+    tune: t.notes >= 10 ? t.inTune / t.notes : null,
+    rhythm: t.beats >= 8 ? t.steady / t.beats : null,
+    notes: t.notes, beats: t.beats
+  };
+}
+function addStat(field, n) {
+  if (!kid) return;
+  const day = dayKey(), target = family ? pendStats : stats;
+  const d = ((target[kid.id] ??= {})[day] ??= {});
+  d[field] = field === 'longest' ? Math.max(d[field] || 0, n) : (d[field] || 0) + n;
+  store.set(family ? 'pt-pendstats' : 'pt-stats', target);
+}
+const pct = x => x === null ? '–' : Math.round(x * 100) + '%';
+
+function clock(ms) {
+  const s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, ss = s % 60;
+  return h ? `${h}:${pad(m)}:${pad(ss)}` : `${m}:${pad(ss)}`;
+}
+function mins(ms) {
+  const m = Math.floor(ms / 60000);
+  return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m} min`;
+}
+function streak(kid) {            // practice days in a row (today may still be in progress; planned rest days don't break it)
+  const days = lastDays(366).reverse();
+  let n = 0;
+  for (let i = 0; i < days.length; i++) {
+    if (msOn(kid, days[i]) >= 60000) n++;
+    else if (i > 0 && goalOf(kid, days[i]) > 0) break;
+  }
+  return n;
+}
+const esc = s => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const face = k => safePhoto(k.photo) ? `<img src="${k.photo}" alt="">` : initial(k);
+const initial = k => esc([...k.name.trim()][0]?.toUpperCase() || '?');
+
+// ---------- Navigation ----------
+let screen = 'home';
+function show(name) {
+  if (listening) stopAudio();
+  screen = name;
+  for (const s of document.querySelectorAll('.screen')) s.hidden = s.id !== name;
+  ({ home: renderHome, history: renderHistory, parent: renderParent, practice: () => { renderPractice(); renderTeacherCard(); renderManualList(); renderBadgeEntry(); setTimeout(showNextCheer, 400); }, badges: renderBadges }[name] || (() => {}))();
+  window.scrollTo(0, 0);
+  if (name === 'parent' && afterPin) { $(afterPin).scrollIntoView({ block: 'start' }); afterPin = null; }
+  if (name === 'home') afterPin = null;
+}
+document.querySelectorAll('[data-home]').forEach(b => b.onclick = () => show('home'));
+
+// ---------- Home ----------
+// ---------- The move to allegrowmusic.com (September 2026, see moved.js) ----------
+function renderMove() {
+  const card = $('moveCard'), NEW = 'https://allegrowmusic.com/app';
+  if (window.ALLEGROW_OLD_HOME) {             // the home-screen app installed from the old address
+    card.hidden = false;
+    card.innerHTML = `<b>Allegrow has a new home: allegrowmusic.com</b>
+      <p class="small muted">This app keeps working, but it won’t get updates. Moving takes a minute:</p>
+      <ol class="small">${family ? `<li>Your family code is <b class="code" style="display:inline;padding:1px 6px">${esc(family)}</b> <button class="ghost small" id="mvCopy">Copy</button></li>`
+        : `<li>First turn on sync (Parents → Settings → Devices &amp; sync) so your players and history can come along.</li>`}
+        <li>Open <b>allegrowmusic.com/app</b> in your browser and add it to your home screen (Share → Add to Home Screen).</li>
+        <li>In the new app, go to Parents → Settings → Devices &amp; sync and enter your family code${Object.keys(familyParents).length ? ' (or sign in as a parent)' : ''}.</li>
+        <li>Then delete this old icon.</li></ol>
+      <a class="secondary block" href="${NEW}" target="_blank" rel="noopener" style="text-decoration:none;display:flex;justify-content:center;padding:11px;border-radius:14px;border:1.5px solid var(--line);font-weight:600;color:var(--ink)">Open allegrowmusic.com</a>`;
+    $('mvCopy')?.addEventListener('click', async e => { try { await navigator.clipboard.writeText(family); e.target.textContent = 'Copied'; } catch {} });
+    return;
+  }
+  const inAt = store.get('pt-moved-in', null);
+  if (inAt && !store.get('pt-moved-seen', false)) {   // just arrived from the old address
+    card.hidden = false;
+    card.innerHTML = `<div class="rowBetween"><b>Welcome to Allegrow’s new home</b><button class="ghost icon" id="mvOk" aria-label="Dismiss">${icon('x')}</button></div>
+      <p class="small muted">Your players and practice history came with you. Allegrow now lives at <b>allegrowmusic.com</b>.
+      If it was on your home screen, add it again from here (Share → Add to Home Screen) and delete the old icon.</p>`;
+    $('mvOk').onclick = () => { store.set('pt-moved-seen', true); card.hidden = true; };
+    return;
+  }
+  card.hidden = true;
+}
+
+function renderHome() {
+  renderMove();
+  $('bringOver').hidden = /github\.io$/.test(location.hostname) || kids.length > 0;
+  renderRecap();
+  renderInstall();
+  $('noKids').hidden = kids.length > 0;
+  $('historyBtn').hidden = kids.length === 0;
+  $('kidList').innerHTML = kids.map(k => {
+    const today = msOn(k), g = goalOf(k) * 60000, frac = g ? Math.min(today / g, 1) : (today ? 1 : 0), st = streak(k);
+    return `<button class="tile" data-kid="${k.id}" style="--kid:${kidColor(k)}">
+      <div class="avatar">${face(k)}</div>
+      <div class="info">
+        <div class="name">${esc(k.name)}
+          ${g && frac >= 1 ? `<span class="badge good">${icon('check')}Done</span>` : ''}
+          ${st > 1 ? `<span class="badge">${icon('flame')}${st} days</span>` : ''}</div>
+        <div class="sub">${g ? `${mins(today)} of ${goalOf(k)} min today` : `Rest day${today ? ` · ${mins(today)} bonus practice` : ''}`}</div>
+        ${(t => {
+          if (!t || t.missing) return '';
+          const nl = nextLesson(t), ev = upcomingEvents(t).find(e => daysUntil(e.date) <= 30);
+          return nl || ev ? `<div class="lessonLine">${nl ? `${icon('calendar')}Lesson ${lessonLabel(nl)}` : ''}${ev ? `<span class="badge">${icon('trophy')}${esc(ev.title)} ${countdown(ev.date)}</span>` : ''}</div>` : '';
+        })(k.link && teacherData[k.link])}
+        ${(() => { const r = g ? Math.min(recordedOn(k) / g, 1) : (recordedOn(k) ? 1 : 0);
+          return `<div class="bar"><div style="width:${r * 100}%"></div><div class="hatch" style="width:${(frac - r) * 100}%"></div></div>`; })()}
+      </div>${icon('chev', 'go')}</button>`;
+  }).join('');
+  document.querySelectorAll('[data-kid]').forEach(b => b.onclick = () => { kid = kids.find(k => k.id === b.dataset.kid); sessionMs = 0; session = newSession(); show('practice'); });
+}
+$('parentBtn').onclick = $('setupBtn').onclick = () => askPin();
+$('historyBtn').onclick = () => show('history');
+
+// ---------- Practice ----------
+let kid = null, sessionMs = 0, celebrated = false, session = null;
+let metroOn = store.get('pt-metro', false);
+const newSession = () => ({ active: 0, breaks: 0, longest: 0, stretch: 0, wasPlaying: false, notes: 0, inTune: 0, beats: 0, steady: 0, devs: [], early: [] });
+
+function renderPractice(playing, talking) {
+  if (!kid) return;
+  document.body.style.setProperty('--kid', kidColor(kid));
+  $('pAvatar').innerHTML = face(kid);
+  $('pName').textContent = kid.name;
+  const today = msOn(kid), goal = goalOf(kid) * 60000, frac = goal ? Math.min(today / goal, 1) : (today ? 1 : 0);
+  $('time').textContent = clock(today);
+  $('ofGoal').textContent = goal ? `of ${goalOf(kid)} min today` : 'Rest day – practice is a bonus';
+  const recFrac = goal ? Math.min(recordedOn(kid) / goal, 1) : (recordedOn(kid) ? 1 : 0), manLen = CIRC * (frac - recFrac), man = manualOn(kid);
+  $('prog').style.strokeDashoffset = CIRC * (1 - recFrac);
+  $('progManual').style.strokeDasharray = `${manLen} ${CIRC}`;
+  $('progManual').style.strokeDashoffset = -CIRC * recFrac;
+  $('manualNote').innerHTML = man ? `${icon('pencil')}${mins(man)} logged by hand` : '';
+  $('ring').classList.toggle('done', goal > 0 && frac >= 1);
+  const floor = planFloor(kid), dow = new Date().getDay(), plan = planFor(kid);
+  $('goalLabel').textContent = `${new Date().toLocaleDateString(undefined, { weekday: 'long' })}’s goal`;
+  $('goalVal').textContent = plan[dow] ? plan[dow] + ' min' : 'Rest';
+  $('goalDown').disabled = plan[dow] <= (floor ? floor.plan[dow] : 0);
+  $('weekStrip').innerHTML = PLAN_ORDER.map(i => `<div class="${i === dow ? 'today' : ''} ${plan[i] ? '' : 'rest'}"><span>${PLAN_DAYS[i][0]}</span><b>${plan[i] || '–'}</b></div>`).join('');
+  $('goalNote').textContent = `Plan: ${planText(plan)}${floor ? ` · set by ${floor.by}` : ''}`;
+  $('session').textContent = sessionMs ? `This session: ${clock(sessionMs)}` : '';
+  const met = goal > 0 && frac >= 1;
+  const [text, kind] =
+    !listening ? (met ? ['Goal reached today', 'done'] : ['Press Start, then play', ''])
+    : playing ? (met ? ['Goal met – keep going!', 'playing'] : ['Playing', 'playing'])
+    : talking ? ['Talking isn’t counted', 'talking']
+    : musicOnly() && classifierState === 'loading' ? ['Getting ready…', '']
+    : ['Listening for music…', ''];
+  $('statusText').textContent = text;
+  $('status').className = 'status ' + kind;
+  $('startBtn').innerHTML = listening ? `${icon('pause')}Pause` : `${icon('play')}Start`;
+  $('tuner').hidden = !(listening && tracksPitch(kid));
+  $('badgeEntry').hidden = listening;
+  $('metroBtn').setAttribute('aria-checked', metroOn);
+  if (document.activeElement !== $('bpmVal')) $('bpmVal').value = kid.bpm || 80;
+  if (!$('metroSound').options.length)
+    $('metroSound').innerHTML = Object.entries(METRO_SOUNDS).map(([v, m]) => `<option value="${v}">${m.label}</option>`).join('');
+  $('metroSound').value = kid.metroSound || 'loud';
+  if (!$('tempoMark').options.length)
+    $('tempoMark').innerHTML = '<option value="">Choose a tempo…</option>' + TEMPOS.map(([n, lo, hi]) => `<option value="${n}">${n} (${lo}–${hi})</option>`).join('');
+  $('tempoMark').value = tempoFor(kid.bpm || 80);
+  $('metroFlash').checked = metroFlash;
+  $('metroVol').value = metroVol; $('metroVolVal').textContent = metroVol >= 90 ? 'Max' : metroVol + '%';
+  $('metroAccent').value = kid.accent || 0;
+}
+$('startBtn').onclick = () => listening ? (stopAudio(), renderPractice(), renderBadgeEntry()) : startAudio('practice');
+$('doneBtn').onclick = () => {
+  const k = kid, s = session, played = sessionMs;
+  show('home');                      // stops the mic and finishes this session's stats
+  if (s && played >= 30000) showSummary(k, s, played);
+};
+$('metroBtn').onclick = () => {
+  metroOn = !metroOn; store.set('pt-metro', metroOn);
+  metroOn ? metroStart() : metroStop();
+  renderPractice();
+};
+function setBpm(v) {
+  if (Number.isFinite(v) && v > 0) { kid.bpm = Math.round(Math.max(30, Math.min(250, v))); saveKids(); }   // ignore non-numbers
+  if (metro.timer) { metroStop(); metroStart(); }
+  renderPractice();
+}
+$('bpmVal').onchange = () => { setBpm(+$('bpmVal').value); $('bpmVal').blur(); };
+$('bpmVal').onkeydown = e => { if (e.key === 'Enter') $('bpmVal').onchange(); };
+$('metroSound').onchange = () => { kid.metroSound = $('metroSound').value; saveKids(); previewSound(); };
+$('tempoMark').onchange = () => { const t = TEMPOS.find(x => x[0] === $('tempoMark').value); if (t) setBpm(t[3]); };
+$('metroVol').oninput = () => {
+  metroVol = +$('metroVol').value; store.set('pt-metro-vol2', metroVol);
+  $('metroVolVal').textContent = metroVol >= 90 ? 'Max' : metroVol + '%';
+};
+$('metroVol').onchange = () => previewSound();
+$('metroFlash').onchange = () => { metroFlash = $('metroFlash').checked; store.set('pt-metro-flash', metroFlash); };
+$('metroAccent').onchange = () => { kid.accent = +$('metroAccent').value; saveKids(); };
+function changeBpm(d) {
+  kid.bpm = Math.max(30, Math.min(250, (kid.bpm || 80) + d)); saveKids();
+  if (metro.timer) { metroStop(); metroStart(); }
+  renderPractice();
+}
+$('bpmUp').onclick = () => changeBpm(5);
+$('bpmDown').onclick = () => changeBpm(-5);
+// The stepper changes today's weekday in the plan (e.g. every Monday). Over a teacher/parent plan it can only go up.
+function changeGoal(d) {
+  const dow = new Date().getDay(), floor = planFloor(kid), v = Math.max(floor ? floor.plan[dow] : 0, Math.min(180, goalOf(kid) + d));
+  if (floor) { kid.raise = kid.raise || Array(7).fill(0); kid.raise[dow] = v; } else { kid.plan = ownPlan(kid); kid.plan[dow] = v; }
+  saveKids(); renderPractice();
+}
+$('goalUp').onclick = () => changeGoal(5);
+$('editWeek').onclick = () => planDialog(kid, 'child');
+
+// Week plan editor. mode 'parent': sets the parent's plan (overrides the teacher's).
+// mode 'child': the child's own plan – or, over a teacher/parent plan, raises days above it.
+function planDialog(k, mode) {
+  const floor = mode === 'child' ? planFloor(k) : null, t = k.link && teacherData[k.link] && !teacherData[k.link].missing ? teacherData[k.link] : null;
+  const teacherPlan = t && (t.plan || t.target) ? planOf(t.plan, t.target) : null;
+  const mins0 = floor ? floor.plan : Array(7).fill(0);
+  let plan = [...planFor(k)];                          // start from the plan in effect today
+  const card = $('linkCard');
+  card.style.setProperty('--kid', kidColor(k));
+  const draw = () => {
+    card.innerHTML = `<h2 style="text-align:center">${mode === 'parent' ? `${esc(k.name)}’s practice plan` : 'Your practice week'}</h2>
+      <p class="muted small" style="text-align:center">${mode === 'parent' ? `Minutes for each day. Your plan replaces ${teacherPlan ? 'the teacher’s' : 'the one ' + esc(k.name) + ' chooses'}; ${esc(k.name)} can add more but not less.`
+        : floor ? `Set by ${esc(floor.by)}. You can add more to any day, but not less.` : 'Pick how long to practice each day. Set a day to Rest for a day off.'}</p>
+      ${floor ? '' : `<div class="presets">${PLAN_PRESETS.map(([n], i) => `<button class="secondary" data-preset="${i}">${n}</button>`).join('')}</div>`}
+      <div class="planGrid">${PLAN_ORDER.map(i => `<div class="planRow"><span>${new Date(2024, 0, 7 + i).toLocaleDateString(undefined, { weekday: 'long' })}${floor && floor.plan[i] ? `<br><small>at least ${floor.plan[i]} min</small>` : ''}</span>
+        <div class="stepper"><button data-d="${i}" data-step="-5" aria-label="Less" ${plan[i] <= mins0[i] ? 'disabled' : ''}>${icon('minus')}</button><span class="val">${plan[i] ? plan[i] + ' min' : 'Rest'}</span><button data-d="${i}" data-step="5" aria-label="More">${icon('plus')}</button></div></div>`).join('')}</div>
+      <p class="muted small" style="text-align:center;margin-top:8px">${planText(plan)} · ${mins(planTotal(plan) * 60000)} a week</p>
+      <div class="pickList" style="margin-top:8px">
+        <button class="primary" id="plSave" style="--kid:var(--brand);color:var(--bg);justify-content:center">Save</button>
+        ${mode === 'parent' && (k.parentPlan || k.parentGoal) ? `<button class="secondary block" id="plClear" style="justify-content:center">${teacherPlan ? 'Use the teacher’s plan' : `Let ${esc(k.name)} choose`}</button>` : ''}
+        <button class="ghost block" id="plCancel" style="justify-content:center">Cancel</button></div>`;
+    card.querySelectorAll('[data-step]').forEach(b => b.onclick = () => { const i = +b.dataset.d; plan[i] = Math.max(mins0[i], Math.min(180, plan[i] + +b.dataset.step)); draw(); });
+    card.querySelectorAll('[data-preset]').forEach(b => b.onclick = () => { plan = [...PLAN_PRESETS[+b.dataset.preset][1]]; draw(); });
+    card.querySelector('#plCancel').onclick = () => { $('linkDlg').hidden = true; };
+    card.querySelector('#plClear')?.addEventListener('click', () => { k.parentPlan = null; k.parentGoal = null; done(); });
+    card.querySelector('#plSave').onclick = () => {
+      if (mode === 'parent') { k.parentPlan = plan; k.parentGoal = null; }
+      else if (floor) k.raise = plan.map((n, i) => n > floor.plan[i] ? n : 0);
+      else { k.plan = plan; }
+      done();
+    };
+  };
+  const done = () => { saveKids(); $('linkDlg').hidden = true; if (screen === 'parent') renderParent(); else { renderPractice(); renderBadgeEntry(); } pushTeacher(k); };
+  draw();
+  $('linkDlg').hidden = false;
+}
+
+// ---------- Practice logged by hand ----------
+// For practice the app didn't hear. It counts toward goals and streaks, but is always drawn "sketched"
+// (hatched) rather than solid, never gets focus/tuning/rhythm scores, and never sets off the celebration.
+const MANUAL_DAY_MAX = 180;
+function addManual(k, day, ms, note) {
+  const id = Date.now().toString(36), e = { day, ms, note, at: new Date().toISOString() };
+  (manual[k.id] ??= {})[id] = e; store.set('pt-manual', manual);
+  if (family && ref) F.updateDoc(ref, { [`manual.${k.id}.${id}`]: e }).catch(e => console.error(e));
+  pushTeacher(k);
+}
+function removeManual(k, id) {
+  delete manual[k.id]?.[id]; store.set('pt-manual', manual);
+  if (family && ref) F.updateDoc(ref, { [`manual.${k.id}.${id}`]: F.deleteField() }).catch(e => console.error(e));
+  pushTeacher(k);
+}
+function renderManualList() {
+  if (!kid) return;
+  const since = dayKey(lastDays(7)[0]);
+  const list = Object.entries(manual[kid.id] || {}).filter(([, e]) => e.day >= since).sort((a, b) => b[1].day.localeCompare(a[1].day) || b[1].at.localeCompare(a[1].at));
+  $('manualList').innerHTML = list.map(([id, e]) => {
+    const d = parseDay(e.day), when = e.day === dayKey() ? 'Today' : daysUntil(e.day) === -1 ? 'Yesterday' : d.toLocaleDateString(undefined, { weekday: 'short' });
+    return `<div class="mEntry"><span class="sw hatch"></span><span class="grow">${when} · ${mins(e.ms)}${e.note ? ' · ' + esc(e.note) : ''}</span>
+      <button class="ghost icon" data-unlog="${id}" aria-label="Remove this entry">${icon('x', 'sm')}</button></div>`;
+  }).join('');
+  $('manualList').querySelectorAll('[data-unlog]').forEach(b => b.onclick = () => {
+    if (!confirm('Remove this entry?')) return;
+    removeManual(kid, b.dataset.unlog); renderPractice(); renderManualList();
+  });
+}
+function manualDialog() {
+  const k = kid, days = lastDays(7).reverse();
+  let minsVal = 15;
+  const card = $('linkCard');
+  card.style.setProperty('--kid', kidColor(k));
+  card.innerHTML = `<div class="medal hatched">${icon('pencil')}</div>
+    <h2 style="text-align:center">Log practice by hand</h2>
+    <p class="muted" style="text-align:center">For practice the app didn’t hear. It counts toward ${esc(k.name)}’s goal, and shows as sketched lines instead of solid color.</p>
+    <label class="fieldRow">When
+      <select id="mDay">${days.map((d, i) => `<option value="${dayKey(d)}">${i === 0 ? 'Today' : i === 1 ? 'Yesterday' : d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short' })}</option>`).join('')}</select></label>
+    <div class="fieldRow">How long
+      <div class="stepper" style="justify-content:center"><button id="mLess" aria-label="Less">${icon('minus')}</button><span class="val" id="mMins"></span><button id="mMore" aria-label="More">${icon('plus')}</button></div></div>
+    <label class="fieldRow">What did you practice? <span style="font-weight:500">(optional)</span>
+      <input type="text" id="mNote" maxlength="60" placeholder="e.g. Scales at school"></label>
+    <p class="small" id="mErr" style="color:var(--danger);min-height:1.2em;margin-top:8px;text-align:center"></p>
+    <div class="pickList" style="margin-top:4px">
+      <button class="primary" id="mAdd" style="--kid:var(--brand);color:var(--bg);justify-content:center">Add to ${esc(k.name)}’s practice</button>
+      <button class="ghost block" id="mCancel" style="justify-content:center">Cancel</button></div>`;
+  const show = () => { card.querySelector('#mMins').textContent = mins(minsVal * 60000); card.querySelector('#mLess').disabled = minsVal <= 5; };
+  show();
+  card.querySelector('#mLess').onclick = () => { minsVal = Math.max(5, minsVal - 5); show(); };
+  card.querySelector('#mMore').onclick = () => { minsVal = Math.min(MANUAL_DAY_MAX, minsVal + 5); show(); };
+  card.querySelector('#mCancel').onclick = () => { $('linkDlg').hidden = true; };
+  card.querySelector('#mAdd').onclick = () => {
+    const day = card.querySelector('#mDay').value, already = manualOn(k, parseDay(day));
+    if (already + minsVal * 60000 > MANUAL_DAY_MAX * 60000)
+      return (card.querySelector('#mErr').textContent = `That’s more than ${MANUAL_DAY_MAX / 60} hours by hand for one day.`);
+    addManual(k, day, minsVal * 60000, card.querySelector('#mNote').value.trim());
+    $('linkDlg').hidden = true;
+    renderPractice(); renderManualList(); renderBadgeEntry();
+    const fresh = newBadges(k), doneC = finishedChallenges(k);
+    if (fresh.length || doneC.length) badgeDialog(fresh, doneC);
+  };
+  $('linkDlg').hidden = false;
+}
+$('manualBtn').onclick = manualDialog;
+
+// Player photos: shrunk to a 128 px square in the browser before saving (see makePhoto in badges.js)
+function pickPhoto(k) {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*';
+  input.onchange = async () => {
+    const file = input.files[0]; if (!file) return;
+    try { k.photo = await makePhoto(file); saveKids(); pushTeacher(k); renderParent(); }
+    catch (e) { console.error(e); alert('Couldn’t use that picture. Try a different photo.'); }
+  };
+  input.click();
+}
+
+// Feedback from parents goes to the Allegrow team (read only by admins – see firestore.rules)
+$('feedbackBtn').onclick = () => {
+  const card = $('linkCard');
+  card.innerHTML = `<div class="medal" style="--kid:var(--leaf)">${icon('heart')}</div>
+    <h2 style="text-align:center">Send feedback</h2>
+    <p class="muted" style="text-align:center">What’s working, what’s confusing, what your kids love or don’t – it all helps.</p>
+    <label class="fieldRow">Your feedback <textarea id="fbMsg" maxlength="4000" style="min-height:120px;font:inherit;padding:10px 12px;border-radius:12px;border:1.5px solid var(--line);background:var(--soft);color:var(--ink)"></textarea></label>
+    <label class="fieldRow">Email, if you’d like a reply (optional) <input type="text" id="fbEmail" inputmode="email" maxlength="120"></label>
+    <p class="small" id="fbErr" style="color:var(--danger);min-height:1.2em;text-align:center"></p>
+    <div class="pickList"><button class="primary" id="fbSend" style="--kid:var(--brand);color:var(--bg);justify-content:center">Send</button>
+      <button class="ghost block" id="fbCancel" style="justify-content:center">Cancel</button></div>`;
+  $('linkDlg').hidden = false;
+  card.querySelector('#fbCancel').onclick = () => { $('linkDlg').hidden = true; };
+  card.querySelector('#fbSend').onclick = async () => {
+    const message = card.querySelector('#fbMsg').value.trim(); if (!message) return (card.querySelector('#fbErr').textContent = 'Write a few words first.');
+    card.querySelector('#fbSend').disabled = true;
+    try {
+      await loadFirebase();
+      await F.addDoc(F.collection(db, 'feedback'), { role: 'parent', from: '', message, page: 'family app', contact: card.querySelector('#fbEmail').value.trim(), at: new Date().toISOString() });
+      card.innerHTML = `<div class="medal" style="--kid:var(--leaf)">${icon('check')}</div><h2 style="text-align:center">Thank you!</h2>
+        <p class="muted" style="text-align:center">Your feedback was sent.</p><div class="pickList"><button class="primary" id="fbDone" style="--kid:var(--brand);color:var(--bg);justify-content:center">Done</button></div>`;
+      card.querySelector('#fbDone').onclick = () => { $('linkDlg').hidden = true; };
+    } catch (e) { console.error(e); card.querySelector('#fbErr').textContent = 'Couldn’t send – check the internet connection.'; card.querySelector('#fbSend').disabled = false; }
+  };
+};
+function badgeDialog(fresh, doneC) {
+  const card = $('linkCard'), b = fresh[0];
+  card.innerHTML = `<div style="display:grid;justify-items:center">${b ? medalSvg(b.icon, BADGE_TIERS[b.tier].color, { size: 96 }) : medalSvg('flag', BADGE_TIERS[3].color, { size: 96 })}</div>
+    <h2 style="text-align:center;margin-top:10px">${b ? `New badge: ${esc(b.name)}` : 'Challenge complete!'}</h2>
+    <p class="muted" style="text-align:center">${[...fresh.map(x => `${BADGE_TIERS[x.tier].name} · ${x.unit(x.tiers[x.tier])}`), ...doneC.map(c => esc(challengeTitle(c)))].join('<br>')}</p>
+    <div class="pickList" style="margin-top:14px"><button class="primary" id="bdOk" style="--kid:var(--brand);color:var(--bg);justify-content:center">Nice!</button></div>`;
+  $('linkDlg').hidden = false; confetti(140, kidColor(kid));
+  $('bdOk').onclick = () => { $('linkDlg').hidden = true; renderTeacherCard(); };
+}
+$('goalDown').onclick = () => changeGoal(-5);
+
+function addPractice(ms) {
+  const k = dayKey();
+  const before = msOn(kid);
+  if (family) {        // queue it; flushPractice() sends it every few seconds
+    pend[kid.id] = pend[kid.id] || {};
+    pend[kid.id][k] = (pend[kid.id][k] || 0) + ms;
+    store.set('pt-pend', pend);
+  } else {
+    log[kid.id] = log[kid.id] || {};
+    log[kid.id][k] = before + ms;
+    saveLog();
+  }
+  sessionMs += ms;
+  if (new Date().getHours() < 8) addStat('early', ms);          // for the Early bird badge
+  const goal = goalOf(kid) * 60000;
+  if (goal && before < goal && before + ms >= goal) {
+    celebrate(kid);
+    $('ring').classList.remove('cheer'); void $('ring').offsetWidth; $('ring').classList.add('cheer');
+  }
+}
+
+// ---------- End-of-session summary ----------
+function showSummary(k, s, played) {
+  const focus = s.active ? Math.min(played / s.active, 1) : null;
+  const today = msOn(k), goal = goalOf(k) * 60000;
+  const fm = insOf(k, 'focus'), rm = insOf(k, 'rhythm'), breaks = `${s.breaks} ${s.breaks === 1 ? 'break' : 'breaks'}`;
+  const rows = [['clock', clock(played) + ' played', `Microphone was on for ${clock(s.active)}`]];
+  // "Trends only" shows no percentages here – the trend is on the History screen
+  if (fm === 'show') rows.push(['target', pct(focus) + ' focus', `Longest stretch ${clock(s.longest)} · ${breaks}`]);
+  if (fm === 'trend') rows.push(['target', `Longest stretch ${clock(s.longest)}`, breaks]);
+  if (tracksPitch(k) && insOf(k, 'tune') === 'show' && s.notes >= 10) rows.push(['tune', pct(s.inTune / s.notes) + ' in tune', `${s.notes} notes checked`]);
+  if (rm === 'show' && s.beats >= 8) rows.push(['metronome', pct(s.steady / s.beats) + ' steady rhythm', `${s.beats} notes with the metronome`]);
+  rows.push(!goal ? ['star', 'Bonus practice on a rest day', `${mins(today)} practiced today`]
+    : today >= goal ? ['check', 'Today’s goal reached', `${mins(today)} practiced today`] : ['flag', `${mins(goal - today)} to go`, `toward today’s ${goalOf(k)} min goal`]);
+  const won = goal > 0 && today >= goal, great = fm !== 'off' && focus >= 0.8;
+  $('summary').querySelector('.card').style.setProperty('--kid', kidColor(k));
+  $('sumBadge').innerHTML = icon(won ? 'trophy' : great ? 'star' : 'spark');
+  $('sumTitle').textContent = won ? `Goal reached, ${k.name}!` : great ? `Great focus, ${k.name}!` : `Nice work, ${k.name}!`;
+  $('sumSub').textContent = won ? 'That’s today’s practice done.' : 'Every minute counts.';
+  const fresh = newBadges(k), doneC = finishedChallenges(k);
+  $('sumRows').innerHTML = [
+    ...fresh.map(b => `<div class="sumRow">${medalSvg(b.icon, BADGE_TIERS[b.tier].color, { size: 40 })}<div><b>New badge: ${esc(b.name)}</b><span>${BADGE_TIERS[b.tier].name} · ${b.unit(b.tiers[b.tier])}</span></div></div>`),
+    ...doneC.map(c => `<div class="sumRow">${medalSvg(c.icon || 'star', BADGE_TIERS[2].color, { size: 40 })}<div><b>Challenge complete!</b><span>${esc(challengeTitle(c))}</span></div></div>`),
+    ...rows.map(([ic, big, small]) => `<div class="sumRow"><div class="tileIc">${icon(ic)}</div><div><b>${big}</b><span>${small}</span></div></div>`)
+  ].join('');
+  if (fresh.length || doneC.length) { $('sumBadge').innerHTML = icon('award'); $('sumSub').textContent = fresh.length ? 'You earned something new today.' : $('sumSub').textContent; }
+  $('summary').hidden = false;
+  confetti(won ? 220 : 130, kidColor(k));
+}
+$('sumOk').onclick = () => { $('summary').hidden = true; };
+
+function trend(a, b) {
+  if (a === null || b === null) return '';
+  const d = Math.round((a - b) * 100);
+  return d ? `<span class="trend ${d > 0 ? 'up' : 'down'}">${icon(d > 0 ? 'up' : 'down')}${Math.abs(d)}</span>` : '';
+}
+
+// ---------- History ----------
+const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+function renderHistory() {
+  const days = lastDays(14);
+  $('histList').innerHTML = kids.map(k => {
+    const vals = days.map(d => msOn(k, d)), goals = days.map(d => goalOf(k, d) * 60000);
+    const top = Math.max(...goals, ...vals, 60000) * 1.1;
+    const week = lastDays(7).reduce((a, d) => a + msOn(k, d), 0);
+    const month = lastDays(30).reduce((a, d) => a + msOn(k, d), 0);
+    const daysPracticed = lastDays(30).filter(d => msOn(k, d) >= 60000).length;
+    return `<div class="card" style="--kid:${kidColor(k)}">
+      <div class="histHead"><div class="avatar">${face(k)}</div><b>${esc(k.name)}</b></div>
+      <div class="stats">
+        <div><b>${mins(week)}</b><span>last 7 days</span></div>
+        <div><b>${mins(month)}</b><span>last 30 days</span></div>
+        <div><b>${daysPracticed}</b><span>days in last 30</span></div>
+      </div>
+      ${(() => {
+        const cur = statsOver(k, lastDays(7)), prev = statsOver(k, lastDays(14).slice(0, 7));
+        const on = INSIGHT_ORDER.filter(m => insOf(k, m) !== 'off' && (m !== 'tune' || tracksPitch(k)));
+        if (!on.length) return '';
+        return `<div class="stats">${on.map(m => { const w = insOf(k, m) === 'trend' && trendWord(cur[m], prev[m]);
+          return `<div><b>${insOf(k, m) === 'trend' ? (w ? `<span class="tword ${w.cls}">${w.text}</span>` : '–') : pct(cur[m]) + trend(cur[m], prev[m])}</b><span>${INSIGHTS[m].unit}</span></div>`; }).join('')}
+        </div>`;
+      })()}
+      <div class="chart">
+        ${vals.map((v, i) => { const m = manualOn(k, days[i]), g = goals[i]; return `<div class="col" style="position:relative" title="${days[i].toDateString()}: ${mins(v)}${m ? ` (${mins(m)} by hand)` : ''}${g ? ` · goal ${mins(g)}` : ' · rest day'}">
+          ${g ? `<div class="dayGoal" style="bottom:${g / top * 100}%"></div>` : ''}
+          ${m ? `<div class="b hatch" style="height:${m / top * 100}%;border-radius:4px 4px 0 0;min-height:0"></div>` : ''}<div class="b ${g && v >= g ? 'met' : ''}" style="height:${(v - m) / top * 100}%;${m ? 'border-radius:0' : ''}"></div></div>`; }).join('')}
+      </div>
+      <div class="days">${days.map((d, i) => `<span>${i === days.length - 1 ? 'Today' : DOW[d.getDay()]}</span>`).join('')}</div>
+      <div class="footnote">Last two weeks. Dashes mark each day’s goal (plan: ${planText(planFor(k))}); solid bars met it; striped parts were logged by hand.
+        ${(on => on.length ? `${(t => t.charAt(0).toUpperCase() + t.slice(1))(on.map(m => INSIGHTS[m].label.toLowerCase()).join(', ').replace(/, ([^,]*)$/, ' and $1'))} ${on.length === 1 ? 'covers' : 'cover'} the last 7 days, compared with the week before.
+          <details class="how"><summary>How ${on.length === 1 ? 'it’s' : 'they’re'} measured</summary>${on.map(m => `<p><b>${INSIGHTS[m].label}.</b> ${INSIGHTS[m].how.join(' ')} <i>${INSIGHTS[m].limits}</i></p>`).join('')}</details>` : '')
+          (INSIGHT_ORDER.filter(m => insOf(k, m) !== 'off' && (m !== 'tune' || tracksPitch(k))))}</div>
+    </div>`;
+  }).join('') || '<div class="card empty muted">No players yet.</div>';
+}
+
+// ---------- Parent PIN ----------
+let pinMode = 'enter';   // enter | create
+// The PIN only keeps children out of Settings. It's stored scrambled (PBKDF2), not as the digits themselves.
+const hasPin = () => !!(settings.pinHash || settings.pin);
+async function pinHashOf(pin, salt) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: new TextEncoder().encode(salt), iterations: 100000 }, key, 256);
+  return [...new Uint8Array(bits)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+async function setPin(pin, extra = {}) {
+  const salt = [...crypto.getRandomValues(new Uint8Array(12))].map(b => b.toString(16).padStart(2, '0')).join('');
+  Object.assign(settings, { pinHash: await pinHashOf(pin, salt), pinSalt: salt, pin: null }, extra);
+  saveSettings();
+}
+const checkPin = async p => settings.pinHash ? await pinHashOf(p, settings.pinSalt) === settings.pinHash : p === settings.pin;
+// Older versions kept the digits: scramble them the first time this version sees them
+const upgradePin = () => { if (settings.pin && !settings.pinHash) setPin(settings.pin).catch(console.error); };
+
+let pinReset = null;     // who is resetting a forgotten PIN (shown in Settings afterwards)
+function askPin(forceCreate) {
+  pinMode = forceCreate || !hasPin() ? 'create' : 'enter';
+  if (!forceCreate) pinReset = null;
+  $('forgotBox').hidden = true;
+  $('pinTitle').textContent = pinMode === 'create' ? 'Create a parent PIN' : 'Parent PIN';
+  $('pinConfirm').hidden = pinMode !== 'create';
+  $('pinForgot').hidden = pinMode === 'create';
+  $('pinTitle').textContent = pinReset ? 'Choose a new parent PIN' : $('pinTitle').textContent;
+  $('pinInput').value = $('pinConfirm').value = '';
+  $('pinError').textContent = '';
+  show('pin');
+  $('pinInput').focus();
+}
+$('pinOk').onclick = async () => {
+  const p = $('pinInput').value.trim();
+  if (pinMode === 'create') {
+    if (!/^\d{4,8}$/.test(p)) return $('pinError').textContent = 'Use 4 to 8 digits.';
+    if (p !== $('pinConfirm').value.trim()) return $('pinError').textContent = 'The PINs don’t match.';
+    await setPin(p, pinReset ? { pinResetAt: new Date().toISOString(), pinResetBy: pinReset } : {});
+    pinReset = null; show('parent');
+  } else if (await checkPin(p)) show('parent');
+  else { $('pinError').textContent = 'Wrong PIN.'; $('pinInput').value = ''; }
+};
+// Forgot the PIN: a parent account on this family signs in; without one, a question for grown-ups
+const NUM_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+$('pinForgot').onclick = () => {
+  const box = $('forgotBox'), parents = Object.values(familyParents);
+  box.hidden = false;
+  if (family && parents.length) {
+    box.innerHTML = `<p class="small">We’ll email a 6-digit code to this family’s parent ${parents.length === 1 ? 'account' : 'accounts'} (${parents.map(x => esc(x.email)).join(', ')}).</p>
+      <button class="secondary block" id="fgEmail">Email me a reset code</button>
+      <div class="addRow" id="fgCodeRow" hidden><input type="text" id="fgCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code" aria-label="Code from the email"><button class="secondary" id="fgVerify">Continue</button></div>
+      <p class="small" id="fgErr" style="color:var(--danger)"></p>
+      <button class="ghost small" id="fgSignIn">Or sign in with the parent account</button>`;
+    $('fgEmail').onclick = async () => {
+      $('fgEmail').disabled = true; $('fgErr').textContent = '';
+      try {
+        const r = await fetch(`${WORKER_URL}/parents/pin-code`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ family }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.error || 'Couldn’t send the code. Please try again.');
+        $('fgEmail').textContent = `Code sent to ${j.to.join(', ')}`; $('fgCodeRow').hidden = false; $('fgCode').focus();
+      } catch (e) { $('fgErr').textContent = e.message; $('fgEmail').disabled = false; }
+    };
+    $('fgVerify').onclick = async () => {
+      try {
+        const r = await fetch(`${WORKER_URL}/parents/pin-verify`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ family, code: $('fgCode').value.trim() }) });
+        const j = await r.json().catch(() => ({}));
+        if (!j.ok) return ($('fgErr').textContent = j.error || 'That code isn’t right.');
+        pinReset = 'an emailed code'; askPin(true);
+      } catch { $('fgErr').textContent = 'Couldn’t check the code. Check the internet connection.'; }
+    };
+    $('fgCode').onkeydown = e => { if (e.key === 'Enter') $('fgVerify').click(); };
+    $('fgSignIn').onclick = async () => {
+      try {
+        const u = await parentSignIn('Sign in with the parent account linked to this family.');
+        if (!u) return;
+        if (!familyParents[u.uid]) return ($('fgErr').textContent = `${u.email} isn’t a parent account for this family.`);
+        pinReset = u.email; askPin(true);
+      } catch (e) { if (e?.code !== 'auth/popup-closed-by-user') $('fgErr').textContent = 'Sign-in didn’t work. Please try again.'; }
+    };
+    return;
+  }
+  const a = 6 + Math.floor(Math.random() * 4), b = 3 + Math.floor(Math.random() * 7);
+  box.innerHTML = `<p class="small">For grown-ups: what is <b>${NUM_WORDS[a]} times ${NUM_WORDS[b]}</b>?</p>
+    <div class="addRow"><input type="text" id="fgAns" inputmode="numeric" maxlength="3" aria-label="Answer"><button class="secondary" id="fgOk">Reset PIN</button></div>
+    <p class="small" id="fgErr" style="color:var(--danger)"></p>
+    <p class="muted small">Players and practice history aren’t affected. Tip: add a parent account in Settings → Devices &amp; sync, so next time you can reset it by signing in.</p>`;
+  $('fgAns').focus();
+  $('fgOk').onclick = () => {
+    if (+$('fgAns').value.trim() !== a * b) { $('pinForgot').onclick(); $('fgErr').textContent = 'That’s not it – here’s a new one.'; return; }
+    pinReset = 'a grown-up check'; askPin(true);
+  };
+  $('fgAns').onkeydown = e => { if (e.key === 'Enter') $('fgOk').click(); };
+};
+[$('pinInput'), $('pinConfirm')].forEach(i => i.onkeydown = e => { if (e.key === 'Enter') $('pinOk').click(); });
+$('changePinBtn').onclick = () => askPin(true);
+
+// Parent accounts on this family, in Devices & sync
+function renderAccount() {
+  const list = Object.entries(familyParents), me = auth?.currentUser?.uid;
+  if (list.length && !A) loadAuth().then(renderAccount).catch(console.error);   // to know who's signed in here
+  const mine = me && familyParents[me];
+  // Once per visit, check the email service's copy (e.g. they unsubscribed from an email) and keep the switch honest
+  if (mine && !renderAccount.checked) {
+    renderAccount.checked = true;
+    parentApi('link').then(r => { if (!!r.weekly !== !!mine.weekly) { mine.weekly = r.weekly; F.updateDoc(ref, { [`parents.${me}.weekly`]: r.weekly }).catch(() => {}); } renderAccount(); })
+      .catch(() => renderAccount());              // (also refreshes the "confirm your email" note)
+  }
+  $('accountBlock').innerHTML = `<b>Parent account</b>
+    ${list.length ? `<div class="parentList">${list.map(([uid, p]) => `<div class="opt"><span>${icon('user', 'sm')} ${esc(p.email || p.name)}${uid === me ? ' <span class="muted small">(signed in here)</span>' : ''}</span>
+      <button class="ghost small" data-unparent="${uid}">Remove</button></div>`).join('')}</div>
+      ${mine ? `<label class="opt">Weekly summary email<br><small class="muted">Sunday evenings: each child’s practice time and what their teacher sent</small>
+          <input type="checkbox" class="toggle" id="weeklyToggle" ${mine.weekly ? 'checked' : ''}></label>
+        <div class="rowBetween"><button class="ghost small" id="testSummary" style="margin-left:-10px">Send me a test</button><span class="small muted" id="summaryMsg"></span></div>` : ''}
+      <p class="muted small">Forgot the PIN? We’ll email a reset code to ${list.length === 1 ? 'this address' : 'these addresses'}. On a new device, signing in brings your family back.</p>
+      <button class="secondary" id="addParent" style="justify-self:start">${icon('plus', 'sm')}Add another parent</button>`
+    : `<p class="muted small">Optional. Sign in (Google, email and more) so you can reset the parent PIN if you forget it, and get your family back on a new device.${family ? '' : ' This also turns on sync.'}</p>
+      <button class="secondary block" id="addParent">${icon('user', 'sm')}Sign in as a parent</button>`}
+    ${mine && auth.currentUser && !auth.currentUser.emailVerified ? `<p class="small" style="color:var(--warn)">Check your inbox to confirm ${esc(auth.currentUser.email)} – PIN codes and summaries can only be emailed once it’s confirmed.
+      <button class="ghost small" id="resendVerify" style="padding:2px 4px">Send the link again</button></p>` : ''}
+    ${settings.pinResetAt ? `<p class="muted small">The PIN was last reset ${new Date(settings.pinResetAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} by ${esc(settings.pinResetBy || 'a parent')}.</p>` : ''}`;
+  $('addParent').onclick = addParentAccount;
+  $('resendVerify')?.addEventListener('click', async e => { try { await A.sendEmailVerification(auth.currentUser); e.target.textContent = 'Sent – check your inbox'; } catch { e.target.textContent = 'Couldn’t send – try again later'; } });
+  const msg = t => { const el = $('summaryMsg'); if (el) el.textContent = t; };
+  $('weeklyToggle')?.addEventListener('change', async e => {
+    const on = e.target.checked;
+    try { await parentApi('prefs', { weekly: on }); await F.updateDoc(ref, { [`parents.${me}.weekly`]: on }); familyParents[me].weekly = on; msg(on ? 'On – first one this Sunday' : 'Off'); }
+    catch (err) { e.target.checked = !on; msg(err.message); }
+  });
+  $('testSummary')?.addEventListener('click', async () => {
+    msg('Sending…');
+    try { const r = await parentApi('test'); msg(`Sent to ${r.to}`); } catch (err) { msg(err.message); }
+  });
+  $('accountBlock').querySelectorAll('[data-unparent]').forEach(b => b.onclick = () => removeParentAccount(b.dataset.unparent));
+}
+
+// ---------- Parent settings ----------
+function renderParent() {
+  document.body.style.setProperty('--kid', 'var(--accent)');
+  $('players').innerHTML = kids.map(k => `
+    <div class="player" style="--kid:${kidColor(k)}">
+      <div class="avatar">${face(k)}</div>
+      <input type="text" value="${esc(k.name)}" data-rename="${k.id}" maxlength="20" aria-label="Name">
+      <button class="danger" data-remove="${k.id}">Remove</button>
+      <div class="more">
+        <select data-instr="${k.id}" aria-label="Instrument">${instrumentOptions(k.instrument || '', 'Choose instrument…')}</select>
+        <input type="text" data-instr-other="${k.id}" maxlength="30" placeholder="Type the instrument, e.g. Harp" aria-label="Instrument name"
+          value="${k.instrument && !INSTRUMENTS[k.instrument] && k.instrument !== 'other' ? esc(k.instrument) : ''}" ${k.instrument && !INSTRUMENTS[k.instrument] ? '' : 'hidden'}>
+        ${hasPitch(k) ? insOf(k, 'tune') === 'off' ? `<div class="opt"><span>Tuner and in-tune score<br><small class="muted">Turned off by ${esc(teacherOf(k).teacherName || 'the teacher')}</small></span></div>`
+          : `<label class="opt">Tuner and in-tune score <input type="checkbox" class="toggle" data-tuning="${k.id}" ${k.tuning !== false ? 'checked' : ''}></label>` : ''}
+        <div class="opt"><span>Practice plan<br><small class="muted">${esc(planText(planFor(k)))}${(f => f ? ` · ${f.by === 'a parent' ? 'set by you' : 'set by ' + esc(f.by)}` : ' · child chooses')(planFloor(k))}</small></span>
+          <button class="secondary" data-plan="${k.id}">Edit</button></div>
+        <div class="opt"><span>Photo<br><small class="muted">A small picture so ${k.link ? 'the teacher' : 'a teacher'} can tell who’s who</small></span>
+          <span style="display:flex;gap:6px"><button class="secondary" data-photo="${k.id}">${k.photo ? 'Change' : 'Add'}</button>${k.photo ? `<button class="ghost" data-unphoto="${k.id}">Remove</button>` : ''}</span></div>
+        <label class="opt">Chime at goal <input type="checkbox" class="toggle" data-chime="${k.id}" ${k.chime !== false ? 'checked' : ''}></label>
+        ${k.link ? (t => `<div class="teacherBox"><div class="grow"><span class="muted small">Teacher</span>
+            <b>${t?.missing ? 'Connection removed by the teacher' : t ? esc(t.teacherName) : 'Connected to a teacher'}</b>${t && !t.missing ? `<span class="muted small">${esc(t.studioName || '')}</span>` : ''}</div>
+          <div class="btnPair">${t?.missing ? '' : `<button class="secondary" data-switch="${k.id}">Switch teacher</button>`}
+            <button class="secondary dangerText" data-unlink="${k.id}">${t?.missing ? 'Remove' : 'Disconnect'}</button></div></div>`)(teacherData[k.link])
+          : `<button class="secondary" data-link="${k.id}">${icon('link', 'sm')}Connect to teacher</button>`}
+      </div>
+    </div>`).join('') || '<div class="muted">Add each child who practices.</div>';
+  document.querySelectorAll('[data-rename]').forEach(i => i.onchange = () => {
+    const k = kids.find(k => k.id === i.dataset.rename);
+    if (i.value.trim()) { k.name = i.value.trim(); saveKids(); }
+    renderParent();
+  });
+  document.querySelectorAll('[data-tuning]').forEach(c => c.onchange = () => {
+    kids.find(k => k.id === c.dataset.tuning).tuning = c.checked; saveKids();
+  });
+  // A teacher's invite: the link they sent (…#link=code) or just the code
+  const askInvite = (k, msg) => { const v = prompt(msg); const code = v && (v.match(/link=([a-z0-9-]{20,})/i)?.[1] || v); if (code) startLink(code, k); };
+  document.querySelectorAll('[data-link]').forEach(b => b.onclick = () => askInvite(kids.find(k => k.id === b.dataset.link), 'Paste the invite link or code your teacher sent you:'));
+  document.querySelectorAll('[data-switch]').forEach(b => b.onclick = () => askInvite(kids.find(k => k.id === b.dataset.switch),
+    'Moving to a new teacher? Paste the invite link or code from your new teacher:'));
+  document.querySelectorAll('[data-unlink]').forEach(b => b.onclick = () => unlink(kids.find(k => k.id === b.dataset.unlink)));
+  document.querySelectorAll('[data-photo]').forEach(b => b.onclick = () => pickPhoto(kids.find(k => k.id === b.dataset.photo)));
+  document.querySelectorAll('[data-unphoto]').forEach(b => b.onclick = () => {
+    const k = kids.find(k => k.id === b.dataset.unphoto);
+    if (!confirm(`Remove ${k.name}’s photo?`)) return;
+    k.photo = null; saveKids(); pushTeacher(k); renderParent();
+  });
+  document.querySelectorAll('[data-plan]').forEach(b => b.onclick = () => planDialog(kids.find(k => k.id === b.dataset.plan), 'parent'));
+  document.querySelectorAll('[data-chime]').forEach(c => c.onchange = () => {
+    kids.find(k => k.id === c.dataset.chime).chime = c.checked; saveKids();
+  });
+  document.querySelectorAll('[data-instr]').forEach(sel => sel.onchange = () => {
+    if (sel.value === '__other') { const t = document.querySelector(`[data-instr-other="${sel.dataset.instr}"]`); t.hidden = false; t.focus(); return; }
+    kids.find(k => k.id === sel.dataset.instr).instrument = sel.value; saveKids(); renderParent();
+  });
+  document.querySelectorAll('[data-instr-other]').forEach(t => t.onchange = () => {
+    const v = instrumentFrom(t.value); if (!v) return;
+    kids.find(k => k.id === t.dataset.instrOther).instrument = v; saveKids(); renderParent();
+  });
+  document.querySelectorAll('[data-remove]').forEach(b => b.onclick = () => {
+    const k = kids.find(k => k.id === b.dataset.remove);
+    if (!confirm(`Remove ${k.name} and all of their practice history?`)) return;
+    kids = kids.filter(x => x !== k); delete log[k.id]; delete pend[k.id]; delete stats[k.id]; delete pendStats[k.id]; delete manual[k.id];
+    saveKids(); saveLog(); store.set('pt-stats', stats); store.set('pt-manual', manual);
+    if (ref) F.updateDoc(ref, { ['log.' + k.id]: F.deleteField(), ['stats.' + k.id]: F.deleteField(), ['manual.' + k.id]: F.deleteField() }).catch(console.error);
+    renderParent();
+  });
+  $('syncOff').hidden = !!family;
+  $('syncOn').hidden = !family;
+  $('leaveBtn').hidden = !family;
+  renderAccount();
+  $('joinTitle').textContent = family ? 'Bring in a different family account' : 'Already using Allegrow on another device?';
+  $('joinHelp').textContent = family ? 'Has your family already set up Allegrow somewhere else? Enter that family code to switch this device over to it.'
+    : 'Scan its QR code with this device’s camera, or enter its family code here.';
+  $('familyCode').textContent = family || '';
+  $('musicOnly').checked = settings.musicOnly;
+  $('sens').value = settings.sens;
+  $('grace').value = settings.grace;
+  $('sensVal').textContent = settings.sens;
+  $('graceVal').textContent = settings.grace + ' s';
+  $('testBtn').innerHTML = listening ? `${icon('stop')}Stop test` : `${icon('mic')}Test microphone`;
+  $('testArea').hidden = !listening;
+  renderDetector();
+}
+function newKid(name, instrument = '') {
+  const used = kids.map(kidColor);
+  const k = { id: Date.now().toString(36), name, goal: 20, bpm: 80, instrument, chime: true,
+              color: COLORS.find(c => !used.includes(c)) || COLORS[kids.length % COLORS.length] };
+  kids.push(k); saveKids();
+  return k;
+}
+$('addBtn').onclick = () => {
+  const name = $('newName').value.trim();
+  if (!name) return;
+  newKid(name); $('newName').value = ''; renderParent();
+};
+$('createFamilyBtn').onclick = createFamily;
+$('joinBtn').onclick = () => joinFamily($('joinCode').value);
+$('restoreBtn').onclick = $('homeRestore').onclick = restoreWithAccount;
+$('joinCode').onkeydown = e => { if (e.key === 'Enter') $('joinBtn').click(); };
+$('leaveBtn').onclick = leaveFamily;
+const joinUrl = () => location.origin + location.pathname + '#join=' + family;
+$('shareBtn').onclick = async () => {
+  const url = joinUrl();
+  try {
+    if (navigator.share) return await navigator.share({ title: 'Allegrow', text: 'Open this to connect this device to our family’s Allegrow:', url });
+    await navigator.clipboard.writeText(url);
+    $('shareBtn').innerHTML = `${icon('check', 'sm')}Link copied`;
+  } catch {}
+};
+$('copyCodeBtn').onclick = async () => {
+  try { await navigator.clipboard.writeText(family); $('copyCodeBtn').innerHTML = `${icon('check', 'sm')}Code copied`; } catch { prompt('Family code:', family); }
+};
+// QR code of the join link (a small free library, loaded only when asked for)
+$('qrBtn').onclick = async () => {
+  if (!$('qrBox').hidden) { $('qrBox').hidden = true; $('qrBtn').innerHTML = `${icon('qr', 'sm')}Show QR code`; return; }
+  try {
+    if (!window.qrcode) await new Promise((ok, bad) => { const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js'; sc.onload = ok; sc.onerror = bad; document.head.append(sc); });
+    const qr = qrcode(0, 'M'); qr.addData(joinUrl()); qr.make();
+    $('qr').innerHTML = qr.createSvgTag({ cellSize: 6, margin: 3, scalable: true });
+    $('qrBox').hidden = false; $('qrBtn').innerHTML = `${icon('qr', 'sm')}Hide QR code`;
+  } catch (e) { console.error(e); alert('Couldn’t make the QR code – check the internet connection, or use Send link instead.'); }
+};
+// Home screen sync line → straight to Devices & sync (after the parent PIN)
+let afterPin = null;
+$('syncStatus').onclick = () => { afterPin = 'syncCard'; askPin(); };
+$('newName').onkeydown = e => { if (e.key === 'Enter') $('addBtn').click(); };
+$('sens').oninput = () => { settings.sens = +$('sens').value; saveSettings(); $('sensVal').textContent = settings.sens; updateMarks(); };
+$('grace').oninput = () => { settings.grace = +$('grace').value; saveSettings(); $('graceVal').textContent = settings.grace + ' s'; };
+$('musicOnly').onchange = () => { settings.musicOnly = $('musicOnly').checked; saveSettings(); if (settings.musicOnly) loadClassifier(); renderDetector(); };
+$('testBtn').onclick = async () => { listening ? stopAudio() : await startAudio('test'); renderParent(); };
+
+function renderTest(playing, talking) {
+  const t = $('testStatus');
+  t.className = playing ? 'playing' : talking ? 'talking' : '';
+  t.textContent = playing ? 'This would count as practice' : talking ? 'Talking – would not count' : 'Not counting';
+}
+
+// ---------- Music vs. talking detection (Google's YAMNet sound classifier, runs on-device) ----------
+const MP = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-audio@1.0.1';
+const MODEL = 'https://storage.googleapis.com/mediapipe-models/audio_classifier/yamnet/float32/1/yamnet.tflite';
+// YAMNet class indices: 0–4 are speech (Speech, Child speech, Conversation, Narration, Babbling);
+// 132–276 are music (Music, Musical instrument, Piano, Violin, Cello, … and music genres).
+const isSpeech = i => i <= 4;
+const isMusic = i => i >= 132 && i <= 276;
+const isSinging = name => /sing|choir|humming|yodel|chant/i.test(name || '');   // counts as music for Voice students
+const MUSIC_MIN = 0.15;        // music score needed to count
+const SPEECH_RATIO = 2;        // …unless speech is this many times stronger than music
+
+let classifier = null, classifierState = 'idle';   // idle | loading | ready | failed
+let processor, ring, ringPos = 0, lastClassify = 0;
+let lastMusicAt = -Infinity, lastSpeechAt = -Infinity;
+const musicOnly = () => settings.musicOnly;
+
+async function loadClassifier() {
+  if (classifierState !== 'idle' && classifierState !== 'failed') return;
+  classifierState = 'loading'; renderDetector();
+  try {
+    const { AudioClassifier, FilesetResolver } = await import(MP + '/audio_bundle.mjs');
+    const fileset = await FilesetResolver.forAudioTasks(MP + '/wasm');
+    classifier = await AudioClassifier.createFromOptions(fileset, { baseOptions: { modelAssetPath: MODEL } });
+    classifierState = 'ready';
+  } catch (e) {
+    console.error(e);
+    classifierState = 'failed';
+  }
+  renderDetector();
+}
+
+function renderDetector() {
+  $('detectorNote').textContent = !musicOnly() ? 'Any sound louder than the orange line counts.'
+    : { loading: 'Loading music detector… (first time only, about 10 MB)',
+        ready: 'Talking and other noises won’t count. Singing counts only for players whose instrument is Voice.',
+        failed: 'Couldn’t load the music detector, so any loud sound counts for now. Check your internet connection and reload.',
+        idle: '' }[classifierState];
+  if (!musicOnly() || classifierState !== 'ready') $('hears').textContent = '';
+}
+
+// Returns the most recent 1 second of audio from the ring buffer, oldest sample first.
+function lastSecond() {
+  const out = new Float32Array(ring.length);
+  out.set(ring.subarray(ringPos));
+  out.set(ring.subarray(0, ringPos), ring.length - ringPos);
+  return out;
+}
+
+function classify(now) {
+  const result = classifier.classify(lastSecond(), audioCtx.sampleRate);
+  // Model reads 0.975 s windows; the first one covers our clip (any later one is mostly padding)
+  const cats = result[0]?.classifications[0]?.categories || [];
+  let music = 0, speech = 0, top = null;
+  const singer = kid?.instrument === 'voice';
+  for (const c of cats) {
+    if (isMusic(c.index) || (singer && isSinging(c.categoryName))) music = Math.max(music, c.score);
+    if (isSpeech(c.index)) speech = Math.max(speech, c.score);
+    if (!top || c.score > top.score) top = c;
+  }
+  const heardMusic = music >= MUSIC_MIN && speech < music * SPEECH_RATIO;
+  if (heardMusic) lastMusicAt = now;
+  // Talking ends the pause allowance right away, so chatting after playing isn't counted
+  if (!heardMusic && speech >= 0.3) { lastSpeechAt = now; lastSoundAt = -Infinity; }
+  $('hears').textContent = top ? `Hears: ${top.categoryName} (${Math.round(top.score * 100)}%)` : '';
+}
+
+// ---------- Practice analysis: tuning, rhythm, focus (all on-device, free) ----------
+const IN_TUNE_CENTS = 20;     // a note counts as in tune within ±20 cents (1/5 of a semitone)
+const NOTE_NAMES = ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'];
+const median = a => { const b = [...a].sort((x, y) => x - y), m = b.length >> 1; return b.length % 2 ? b[m] : (b[m - 1] + b[m]) / 2; };
+
+// Pitch of a single note using the YIN algorithm. Returns Hz, or null when there's no clear pitch.
+function yin(x, sr, minF) {
+  const maxTau = Math.floor(sr / minF), minTau = Math.floor(sr / 2700), W = x.length - maxTau;
+  const d = new Float32Array(maxTau + 2);
+  for (let tau = 1; tau <= maxTau + 1; tau++) {
+    let sum = 0;
+    for (let i = 0; i < W; i++) { const v = x[i] - x[i + tau]; sum += v * v; }
+    d[tau] = sum;
+  }
+  let running = 0;
+  for (let tau = 1; tau <= maxTau + 1; tau++) { running += d[tau]; d[tau] = running ? d[tau] * tau / running : 1; }
+  let tau = minTau;
+  while (tau <= maxTau && d[tau] >= 0.15) tau++;
+  if (tau > maxTau) return null;
+  while (tau < maxTau && d[tau + 1] < d[tau]) tau++;
+  const a = d[tau - 1], b = d[tau], c = d[tau + 1], den = a - 2 * b + c;
+  return sr / (tau + (den ? (a - c) / (2 * den) : 0));
+}
+
+// Last n samples of the rolling buffer, ending `back` samples ago
+function recent(n, back = 0) {
+  const out = new Float32Array(n), L = ring.length;
+  const start = ((ringPos - back - n) % L + L) % L;
+  for (let i = 0; i < n; i++) out[i] = ring[(start + i) % L];
+  return out;
+}
+
+// Group pitch readings (20 per second) into notes, and score each note's tuning
+let curNote = null, lastPitchAt = 0;
+// f: pitch in Hz or null · now: page clock · t: audio-clock time of this reading · hop: seconds between readings
+function pitchFrame(f, now, t, hop = 0.05) {
+  if (!f) return endNote();
+  const m = 69 + 12 * Math.log2(f / 440), midi = Math.round(m), cents = (m - midi) * 100;
+  lastPitchAt = now;
+  $('tNote').textContent = NOTE_NAMES[midi % 12] + (Math.floor(midi / 12) - 1);
+  const rel = cents - tuningRef();
+  $('tNeedle').style.left = (50 + Math.max(-50, Math.min(50, rel))) + '%';
+  $('tNeedle').className = Math.abs(rel) <= IN_TUNE_CENTS ? 'ok' : 'off';
+  if (curNote && curNote.midi === midi) {
+    curNote.cents.push(cents);
+    // A new pitch that holds for 2 readings is a note start – this catches smooth (legato) bow changes
+    if (curNote.cents.length === 2 && metro.timer && musicNowFlag) addOnset(curNote.t, false);
+  } else { endNote(); curNote = { midi, cents: [cents], t, hop }; }
+}
+// Tuning is judged against the instrument's own tuning (the typical offset of recent notes),
+// so a violin whose strings are a little sharp doesn't make every note look out of tune.
+function tuningRef() {
+  const d = session?.devs || [];
+  return d.length >= 8 ? Math.max(-40, Math.min(40, median(d))) : 0;
+}
+function scoreNote(c) {
+  session.notes++; addStat('notes', 1);
+  if (Math.abs(c - tuningRef()) <= IN_TUNE_CENTS) { session.inTune++; addStat('inTune', 1); }
+}
+function endNote(final) {
+  const n = curNote; curNote = null;
+  if (n && n.cents.length * n.hop >= 0.15 && session && tracksPitch(kid)) {   // shorter than 0.15 s: too short to judge
+    const c = median(n.cents.slice(1));                    // skip the first reading: note starts are often unsteady
+    session.devs.push(c); if (session.devs.length > 60) session.devs.shift();
+    if (session.devs.length < 8) session.early.push(c);    // wait until we know the instrument's tuning
+    else { for (const e of session.early.splice(0)) scoreNote(e); scoreNote(c); }
+  }
+  if (final && session?.early.length) {                    // short session: score with what we have
+    const ref = median(session.devs);
+    for (const e of session.early.splice(0)) { session.notes++; addStat('notes', 1); if (Math.abs(e - ref) <= IN_TUNE_CENTS) { session.inTune++; addStat('inTune', 1); } }
+  }
+}
+
+// Read pitch on a steady grid of audio positions (every 50 ms, or 25 ms with the metronome on for
+// sharper note-start timing), covering all audio received since the last call exactly once.
+let nextPitchAt = 0;
+function pitchStep(now) {
+  const sr = audioCtx.sampleRate, minF = instrumentLow(kid.instrument), n = Math.round(sr * 0.025) + Math.floor(sr / minF) + 2;
+  const hop = metro.timer ? 0.025 : 0.05, step = Math.round(sr * hop);
+  const oldest = Math.max(n, sampleCount - Math.floor(sr / 2));
+  if (nextPitchAt < oldest) nextPitchAt = oldest;          // fell behind (e.g. tab was hidden): skip ahead
+  for (; nextPitchAt <= sampleCount; nextPitchAt += step) {
+    const t = t0 + (nextPitchAt - n / 2) / sr;             // audio-clock time at the middle of the window
+    pitchFrame(musicNowFlag ? yin(recent(n, sampleCount - nextPitchAt), sr, minF) : null, now, t, hop);
+  }
+}
+
+// Note starts (onsets), for rhythm. Uses a low-pass copy of the sound: a steep (8th-order Butterworth)
+// filter at 1.4 kHz, so the metronome (3.5 kHz and up, even at full volume) isn't mistaken for a note.
+const HOP = 256, ONSET_DB = 9;
+let lp, hopE, hopN, hopDb, lpHist, lastOnset, sampleCount, t0, musicNowFlag = false;
+function lowpassStages(sr, fc) {
+  return [0.5098, 0.6013, 0.9000, 2.5629].map(Q => {
+    const w = 2 * Math.PI * fc / sr, cs = Math.cos(w), al = Math.sin(w) / (2 * Q), a0 = 1 + al;
+    return { b0: (1 - cs) / 2 / a0, b1: (1 - cs) / a0, b2: (1 - cs) / 2 / a0, a1: -2 * cs / a0, a2: (1 - al) / a0, z1: 0, z2: 0 };
+  });
+}
+function resetAnalysis(sr) {
+  lp = lowpassStages(sr, 1400);
+  hopE = hopN = sampleCount = 0; hopDb = []; lpHist = []; lastOnset = -1e9; t0 = null;
+  curNote = null; lastPitchAt = 0; nextPitchAt = 0;
+}
+function analyseSamples(data) {
+  if (t0 === null) t0 = audioCtx.currentTime - data.length / audioCtx.sampleRate;
+  for (let i = 0; i < data.length; i++) {
+    let y = data[i];
+    for (const f of lp) { const x = y; y = f.b0 * x + f.z1; f.z1 = f.b1 * x - f.a1 * y + f.z2; f.z2 = f.b2 * x - f.a2 * y; }
+    hopE += y * y;
+    if (++hopN === HOP) { onHop(sampleCount + i, hopE / HOP); hopE = hopN = 0; }
+  }
+  sampleCount += data.length;
+}
+function onHop(idx, e) {
+  const db = 10 * Math.log10(e + 1e-12), sr = audioCtx.sampleRate;
+  lpHist.push(e); if (lpHist.length > 19) lpHist.shift();                    // last ~100 ms
+  const prev = hopDb.length ? Math.min(...hopDb) : db;
+  hopDb.push(db); if (hopDb.length > 6) hopDb.shift();
+  // A note start must be a sharp jump *and* reach the loudness line (the same one that runs the timer),
+  // which keeps faint leftovers of the metronome's click from counting as notes
+  const floorDb = threshold() * 60 - 60;
+  if (db > floorDb && db - prev > ONSET_DB && idx - lastOnset > 0.09 * sr) {
+    lastOnset = idx;
+    if (metro.timer && musicNowFlag) addOnset(t0 + idx / sr, true);
+  }
+}
+// Note starts come from two detectors (loudness jumps, and pitch changes on string instruments).
+// Merge them: one note start per 70 ms, preferring the loudness one because its timing is sharper.
+function addOnset(t, precise) {
+  const near = metro.onsets.findIndex(x => Math.abs(x.t - t) < 0.07);
+  if (near < 0) metro.onsets.push({ t, precise });
+  else if (precise && !metro.onsets[near].precise) metro.onsets[near] = { t, precise };
+}
+// Loudness of the low-pass copy, on the same 0..1 scale as the meter (used while the metronome is clicking)
+const lowLevel = () => {
+  const e = lpHist.length ? lpHist.reduce((a, b) => a + b, 0) / lpHist.length : 0;
+  return Math.max(0, Math.min(1, (10 * Math.log10(e + 1e-16) + 60) / 60));
+};
+
+// Metronome, scheduled on the audio clock so clicks are exactly in time
+const metro = { timer: null, next: 0, anchor: 0, period: 0, onsets: [], count: 0 };
+// Metronome sounds. All are kept high-pitched (4 kHz and up) on purpose: the app filters out
+// sound above ~1.5 kHz when listening for notes, so the metronome never counts as practice.
+// 3.5–5 kHz is where phone speakers are loudest and ears most sensitive, while staying well above
+// the ~1.5 kHz cut-off the note detector listens below. Square waves sound fuller than pure tones.
+const METRO_SOUNDS = {
+  // One full-strength square wave near 3.2 kHz (where hearing is most sensitive), held for most of 120 ms.
+  // A single tone keeps it clean: mixing tones through anything non-linear creates low 'difference' tones the note detector would hear.
+  loud:  { label: 'Loud – best with instruments', wave: 'square', tones: [3200], accent: [4000], decay: 0.12, hold: 0.8, peak: [0.97, 0.97] },
+  click: { label: 'Click', wave: 'square', tones: [3800], accent: [4800], decay: 0.07, hold: true, peak: [0.8, 0.97] },
+  beep:  { label: 'Beep', wave: 'square', tones: [3500], accent: [4400], decay: 0.09, hold: true, peak: [0.8, 0.97] },
+  tick:  { label: 'Tick (soft)', noise: true, cut: 3500, decay: 0.03, peak: [0.4, 0.55] },
+  bell:  { label: 'Bell (soft)', tones: [3600, 5200, 7100], accent: [4300, 6200, 8400], decay: 0.25, peak: [0.75, 0.95] }
+};
+// Italian tempo markings (common metronome ranges); choosing one sets a typical bpm for it
+const TEMPOS = [['Grave', 30, 44, 40], ['Largo', 45, 59, 50], ['Larghetto', 60, 65, 63], ['Adagio', 66, 75, 70], ['Andante', 76, 97, 88],
+                ['Moderato', 98, 111, 104], ['Allegretto', 112, 119, 116], ['Allegro', 120, 155, 132], ['Vivace', 156, 175, 164],
+                ['Presto', 176, 199, 184], ['Prestissimo', 200, 250, 208]];
+const tempoFor = bpm => TEMPOS.find(([, lo, hi]) => bpm >= lo && bpm <= hi)?.[0] || '';
+let metroVol = store.get('pt-metro-vol2', 100);
+let metroFlash = store.get('pt-metro-flash', true);
+// Every click goes through a loudness stage: volume, then a fast limiter so the top of the slider
+// is loud without harsh clipping (phones turn down playback while the microphone is on).
+function metroOut(ctx) {
+  if (!ctx.__metroOut) {
+    const gain = ctx.createGain(), limiter = ctx.createDynamicsCompressor();
+    // Each sound already reaches almost full scale by itself; the limiter is only a safety net against clipping
+    limiter.threshold.value = -0.5; limiter.knee.value = 0; limiter.ratio.value = 20; limiter.attack.value = 0.001; limiter.release.value = 0.05;
+    const trim = ctx.createGain(); trim.gain.value = 1;
+    gain.connect(limiter); limiter.connect(trim); trim.connect(ctx.destination);
+    ctx.__metroOut = gain;
+  }
+  ctx.__metroOut.gain.value = (metroVol / 100) ** 2;                  // 100% = full scale, as loud as the phone can play
+  return ctx.__metroOut;
+}
+function playMetroSound(ctx, t, name, accent) {
+  const m = METRO_SOUNDS[name] || METRO_SOUNDS.loud, g = ctx.createGain(), peak = m.peak[accent ? 1 : 0];
+  g.connect(metroOut(ctx));
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(peak, t + 0.004);      // soft-ish attack: a sharper one leaks into low pitches
+  if (m.hold) g.gain.setValueAtTime(peak, t + m.decay * (m.hold === true ? 0.5 : m.hold));
+  g.gain.exponentialRampToValueAtTime(0.0001, t + m.decay);
+  if (m.noise) {           // filtered noise burst, high-passed twice at 5 kHz
+    const b = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * m.decay), ctx.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource(); src.buffer = b;
+    let node = src;
+    for (let k = 0; k < 2; k++) { const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = accent ? m.cut * 1.3 : m.cut; node.connect(f); node = f; }
+    node.connect(g); src.start(t); src.stop(t + m.decay + 0.01);
+  } else {
+    const tones = accent ? m.accent : m.tones, w = i => m.even ? 1 : 1 / (i + 1), norm = tones.reduce((a, _, i) => a + w(i), 0);
+    tones.forEach((f, i) => {
+      const o = ctx.createOscillator(), og = ctx.createGain(); o.type = m.wave || 'sine'; o.frequency.value = f; og.gain.value = w(i) / norm;
+      o.connect(og); og.connect(g); o.start(t); o.stop(t + m.decay + 0.01);
+    });
+  }
+}
+function previewSound() {
+  try {
+    const ctx = listening ? audioCtx : new AudioContext();
+    playMetroSound(ctx, ctx.currentTime + 0.02, kid.metroSound || 'loud', false);
+    playMetroSound(ctx, ctx.currentTime + 0.4, kid.metroSound || 'loud', true);
+  } catch {}
+}
+function metroStart() {
+  if (!metroOn || !listening || mode !== 'practice' || metro.timer) return;
+  metro.period = 60 / (kid.bpm || 80);
+  metro.next = metro.anchor = audioCtx.currentTime + 0.15;
+  metro.onsets = []; metro.count = 0;
+  metro.timer = setInterval(metroSchedule, 25);
+  metroSchedule();
+}
+function metroSchedule() {
+  while (metro.next < audioCtx.currentTime + 0.12) {
+    const t = metro.next, accent = kid.accent > 0 && metro.count % kid.accent === 0;
+    playMetroSound(audioCtx, t, kid.metroSound || 'loud', accent);
+    metro.count++;
+    setTimeout(() => {
+      $('beatDot').classList.add('on'); setTimeout(() => $('beatDot').classList.remove('on'), 100);
+      if (metroFlash) { const c = $('ring').closest('.card'); c.classList.remove('beat', 'beatAccent'); void c.offsetWidth; c.classList.add(accent ? 'beatAccent' : 'beat'); }
+    }, Math.max(0, (t - audioCtx.currentTime) * 1000));
+    metro.next += metro.period;
+  }
+}
+function metroStop() {
+  if (!metro.timer) return;
+  clearInterval(metro.timer); metro.timer = null;
+  scoreRhythm();
+}
+// How evenly notes land on the metronome's grid (8th notes, so quarter and eighth notes both fit).
+// Any constant delay (mic/speaker latency, or always playing slightly early) is removed by
+// lining up with the average position, so this measures steadiness.
+function scoreRhythm() {
+  const on = metro.onsets; metro.onsets = [];
+  if (on.length < 8 || !session) return;
+  const P = metro.period / 2, tol = Math.min(0.05, P * 0.2);
+  const ph = on.map(o => (o.t - metro.anchor) / P * 2 * Math.PI);
+  const mean = Math.atan2(ph.reduce((a, x) => a + Math.sin(x), 0), ph.reduce((a, x) => a + Math.cos(x), 0));
+  const steady = ph.filter(x => Math.abs(Math.atan2(Math.sin(x - mean), Math.cos(x - mean))) / (2 * Math.PI) * P <= tol).length;
+  session.beats += on.length; session.steady += steady;
+  addStat('beats', on.length); addStat('steady', steady);
+}
+
+function endStretch() {
+  if (!session || !session.stretch) return;
+  session.longest = Math.max(session.longest, session.stretch);
+  addStat('longest', session.stretch);
+  session.stretch = 0;
+}
+
+// ---------- Teacher connection ----------
+// A teacher (studio.html) creates students/{code} and sends the family an invite link (#link=code).
+// Linking a player here shares that player's practice with the teacher, and shows the teacher's
+// assignments, next lesson and upcoming recitals/exams in the app. Only that one player is shared.
+let teacherData = {}, teacherUnsubs = {}, lastTeacherPush = 0;
+const parseDay = k => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); };
+const daysUntil = k => Math.round((parseDay(k) - parseDay(dayKey())) / 864e5);
+const countdown = k => { const n = daysUntil(k); return n === 0 ? 'today' : n === 1 ? 'tomorrow' : `in ${n} days`; };
+const firstWord = s => (s || '').trim().split(/\s+/)[0];
+
+async function watchTeachers() {
+  const want = new Set(kids.filter(k => k.link).map(k => k.link));
+  for (const sid of Object.keys(teacherUnsubs)) if (!want.has(sid)) { teacherUnsubs[sid](); delete teacherUnsubs[sid]; delete teacherData[sid]; }
+  if (!want.size) return;
+  try { await loadFirebase(); } catch (e) { console.error(e); return; }
+  for (const sid of want) if (!teacherUnsubs[sid])
+    teacherUnsubs[sid] = F.onSnapshot(F.doc(db, 'students', sid), snap => {
+      teacherData[sid] = snap.exists() ? snap.data() : { missing: true };
+      if (screen === 'home') renderHome();
+      else if (screen === 'practice') { renderTeacherCard(); if (!listening) { renderBadgeEntry(); showNextCheer(); } }
+      else if (screen === 'badges') renderBadges();
+      else if (screen === 'parent' && document.activeElement?.tagName !== 'INPUT') renderParent();
+    }, e => console.error(e));
+}
+
+// Share the last 60 days of this player's practice with their teacher
+function pushTeacher(k) {
+  if (!k?.link || !db || !F || teacherData[k.link]?.missing) return;
+  const log60 = {}, stats60 = {}, manual60 = {};
+  for (const d of lastDays(60)) {
+    const key = dayKey(d), ms = recordedOn(k, d), man = manualOn(k, d), st = statsOn(k, d);
+    if (ms) log60[key] = Math.round(ms);
+    if (man) manual60[key] = Math.round(man);
+    if (Object.keys(st).length) stats60[key] = Object.fromEntries(Object.entries(st).map(([f, v]) => [f, Math.round(v)]));
+  }
+  F.updateDoc(F.doc(db, 'students', k.link), { practice: { log: log60, manual: manual60, stats: stats60, goal: goalOf(k), plan: planFor(k), updated: Date.now() }, kidName: k.name,
+      ...((safePhoto(k.photo) || null) !== (teacherData[k.link]?.photo || null) ? { photo: safePhoto(k.photo) || null } : {}),
+      badges: Object.fromEntries(kidBadges(k).filter(b => b.tier >= 0).map(b => [b.id, { tier: b.tier, label: `${b.name} – ${BADGE_TIERS[b.tier].name} (${b.unit(b.tiers[b.tier])})`, date: badgeSeen[k.id]?.[b.id]?.date || dayKey() }])) })
+    .catch(e => console.error(e));
+}
+
+async function startLink(code, forKid) {
+  code = code.trim().toLowerCase().replace(/\s+/g, '');
+  let t = null;
+  try {
+    if (code.length >= 20) { await loadFirebase(); const snap = await F.getDoc(F.doc(db, 'students', code)); t = snap.exists() ? snap.data() : null; }
+  } catch (e) { console.error(e); return alert('Couldn’t reach the server. Check the internet connection and try again.'); }
+  if (!t) return alert('That teacher invite isn’t valid. Please check the link or code with your teacher.');
+  // A parent must agree before a child's practice is shared with a teacher (recorded on the student record)
+  const card = $('linkCard'), choices = forKid ? [forKid] : kids;
+  const old = forKid?.link && forKid.link !== code ? teacherData[forKid.link] : null;
+  card.innerHTML = `<div class="medal" style="--kid:var(--accent)">${icon('users')}</div>
+    <h2 style="text-align:center">Connect to ${esc(t.teacherName)}</h2>
+    <p class="muted" style="text-align:center">${esc(t.studioName)} invited <b>${esc(t.name)}</b>.${forKid ? '' : ' Which player is this?'}</p>
+    ${old && !old.missing ? `<p class="small" style="text-align:center;margin-top:8px">This replaces ${esc(forKid.name)}’s connection to <b>${esc(old.teacherName)}</b>, who will stop seeing new practice.</p>
+      <label class="consent"><input type="checkbox" id="lkWipe"><span>Also remove the practice history, badges and photo already shared with ${esc(old.teacherName)}.</span></label>` : ''}
+    <label class="consent"><input type="checkbox" id="lkConsent"><span>I’m this child’s parent or guardian. I agree to share their practice time, practice scores, badges and photo (if I add one) with
+      ${esc(t.teacherName)}, and to receive their assignments and lesson times, as described in the <a href="privacy" target="_blank" rel="noopener">privacy policy</a>.
+      Sound is never recorded or sent anywhere.</span></label>
+    <p class="small" id="lkErr" style="color:var(--danger);min-height:1.2em;text-align:center"></p>
+    <div class="pickList">
+      ${choices.map(k => `<button class="secondary block" data-pick="${k.id}"><div class="avatar" style="--kid:${kidColor(k)}">${face(k)}</div>${forKid ? `Connect ${esc(k.name)}` : esc(k.name)}${k.link === code ? '<span class="muted small">(already connected)</span>' : ''}</button>`).join('')}
+      ${forKid ? '' : `<button class="secondary block" data-pick="new">${icon('plus', 'sm')}Add ${esc(firstWord(t.name))} as a new player</button>`}
+      <button class="ghost block" data-pick="cancel">Not now</button>
+    </div>
+    <p class="muted small" style="margin-top:12px;text-align:center">Only this player’s practice is shared with the teacher. You can disconnect any time in Parent settings.</p>`;
+  $('linkDlg').hidden = false;
+  card.querySelectorAll('[data-pick]').forEach(b => b.onclick = async () => {
+    if (b.dataset.pick !== 'cancel' && !$('lkConsent').checked) return ($('lkErr').textContent = 'Please tick the box to agree first.');
+    $('linkDlg').hidden = true;
+    if (b.dataset.pick === 'cancel') return;
+    const wipe = !!$('lkWipe')?.checked;
+    $('linkDlg').hidden = true;
+    const k = kids.find(x => x.id === b.dataset.pick) || newKid(firstWord(t.name), t.instrument || '');
+    if (k.link && k.link !== code) await releaseTeacher(k.link, wipe);          // moving from another teacher
+    await finishLink(k, code, t);
+  });
+}
+async function finishLink(k, code, t) {
+  for (const other of kids) if (other !== k && other.link === code) other.link = null;   // one player per invite
+  k.link = code;
+  if (!k.instrument && t.instrument) k.instrument = t.instrument;
+  saveKids();
+  try { await F.updateDoc(F.doc(db, 'students', code), { linkedAt: new Date().toISOString(), kidName: k.name, consent: { by: 'parent', at: new Date().toISOString(), version: 1 } }); } catch (e) { console.error(e); }
+  await watchTeachers();
+  pushTeacher(k);
+  const card = $('linkCard');
+  card.innerHTML = `<div class="medal" style="--kid:var(--good)">${icon('check')}</div>
+    <h2 style="text-align:center">${esc(k.name)} is connected</h2>
+    <p class="muted" style="text-align:center">${esc(t.teacherName)} can now see ${esc(k.name)}’s practice, and ${esc(k.name)} will see assignments and lesson times on the practice screen.</p>
+    <button class="primary" id="linkOk" style="margin-top:14px;--kid:var(--brand);color:var(--bg)">Done</button>`;
+  $('linkDlg').hidden = false;
+  $('linkOk').onclick = () => { $('linkDlg').hidden = true; show(screen === 'parent' ? 'parent' : 'home'); };
+}
+// Tell the old teacher's record the family has left; optionally take back what was shared with them
+async function releaseTeacher(sid, wipe) {
+  if (teacherData[sid]?.missing) return;
+  try {
+    await loadFirebase();
+    // Recorded as the parent withdrawing consent, so the teacher can see the family left (and when)
+    await F.updateDoc(F.doc(db, 'students', sid), { linkedAt: null, consent: { by: 'parent', withdrawnAt: new Date().toISOString(), removedData: !!wipe, version: 1 },
+      ...(wipe ? { practice: null, badges: null, photo: null } : {}) });
+  } catch (e) { console.error(e); }
+}
+function unlink(k) {
+  const t = teacherData[k.link], card = $('linkCard');
+  if (t?.missing) { k.link = null; saveKids(); watchTeachers(); return renderParent(); }
+  const who = t ? esc(t.teacherName) : 'the teacher';
+  card.innerHTML = `<div class="medal" style="--kid:var(--muted)">${icon('link')}</div>
+    <h2 style="text-align:center">Disconnect ${esc(k.name)} from ${who}?</h2>
+    <ul class="small muted" style="margin:4px 0 0;padding-left:18px;line-height:1.55">
+      <li>${who} stops seeing ${esc(k.name)}’s new practice.</li>
+      <li>${esc(k.name)} stops seeing their assignments, lesson times and badges from ${who}.</li>
+      <li>Practice history stays on this device, and you can connect to a new teacher any time.</li></ul>
+    <label class="consent"><input type="checkbox" id="ulWipe"><span>Also remove the practice history, badges and photo already shared with ${who}.</span></label>
+    <div class="pickList" style="margin-top:12px">
+      <button class="secondary block dangerText" id="ulGo">Disconnect</button>
+      <button class="ghost block" id="ulNo">Cancel</button></div>`;
+  $('linkDlg').hidden = false;
+  $('ulNo').onclick = () => { $('linkDlg').hidden = true; };
+  $('ulGo').onclick = async () => {
+    const sid = k.link, wipe = $('ulWipe').checked;
+    $('linkDlg').hidden = true;
+    k.link = null; saveKids();
+    await releaseTeacher(sid, wipe);
+    watchTeachers(); renderParent();
+  };
+}
+
+// Next lesson from the weekly slot plus any changes the teacher made (canceled / moved / extra)
+function nextLesson(t) {
+  const ch = t.lessonChanges || {}, now = new Date();
+  for (let i = 0; i < 60; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i), k = dayKey(d), c = ch[k], slot = slotOn(t, k);
+    let time = null, len = slot?.length || 30;
+    if (c?.status === 'extra') time = c.time;
+    else if (slot && !(c && ['cancelled', 'moved'].includes(c.status))) time = slot.time;
+    if (!time) continue;
+    const [h, m] = time.split(':').map(Number), when = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m);
+    if (when.getTime() + len * 60000 > now.getTime()) return when;
+  }
+  return null;
+}
+function lessonLabel(when) {
+  const k = dayKey(when), day = k === dayKey() ? 'today' : daysUntil(k) === 1 ? 'tomorrow' : when.toLocaleDateString(undefined, { weekday: 'long' });
+  return `${day} at ${when.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
+}
+const upcomingEvents = t => Object.values(t.upcoming || {}).filter(e => e.date >= dayKey()).sort((a, b) => a.date.localeCompare(b.date));
+
+function renderTeacherCard() {
+  const card = $('teacherCard'), t = kid?.link && teacherData[kid.link];
+  if (!t || t.missing) { card.hidden = true; return; }
+  card.hidden = false;
+  const today0 = dayKey(), acts = Object.values(t.assignments || {}).filter(a => a.status === 'active').sort((a, b) => (a.created || '').localeCompare(b.created || ''));
+  const nl = nextLesson(t), evs = upcomingEvents(t).slice(0, 2);
+  card.innerHTML = `<div class="tHead"><div class="label">${icon('book')}From ${esc(t.teacherName)}</div></div>
+    ${acts.length ? acts.map(a => { const done = t.progress?.[a.id]?.[today0]; return `<div class="aItem">
+      <button class="tick ${done ? 'on' : ''}" data-tick="${a.id}" aria-pressed="${!!done}" aria-label="Practiced ${esc(a.title)} today">${icon('check')}</button>
+      <div class="grow"><b>${esc(a.title)}</b>${a.details ? `<div class="det">${esc(a.details)}</div>` : ''}
+        <div class="chips">${a.bpm ? `<button class="chipBtn" data-bpm="${a.bpm}" title="Set the metronome to ${a.bpm} bpm">${icon('metronome')}${a.bpm} bpm</button>` : ''}
+          ${a.minutes ? `<span class="chipBtn">${icon('clock')}${a.minutes} min a day</span>` : ''}
+          ${a.due ? `<span class="chipBtn">Due ${parseDay(a.due).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}</span>` : ''}</div></div></div>`; }).join('')
+      : '<p class="muted small" style="padding:4px 0 2px">No assignments right now.</p>'}
+    ${nl ? `<div class="tInfo">${icon('calendar')}<span class="grow">Next lesson ${lessonLabel(nl)}</span><button class="ghost small" data-cal style="padding:4px 6px">Add to calendar</button></div>` : ''}
+    ${evs.map(e => `<div class="tInfo">${icon('trophy')}<span>${esc(e.title)}${e.piece ? ' · ' + esc(e.piece) : ''} · <b>${countdown(e.date)}</b></span></div>`).join('')}
+    ${activeChallenges(kid, t).map(({ c, p }) => `<div class="challenge ${p.done ? 'done' : ''}"><b>${esc(challengeTitle(c))}<span>${p.done ? 'Done!' : `${Math.min(p.value, c.target)} of ${c.target}`}</span></b>
+      <div class="bbar"><div style="width:${Math.min(p.value / c.target, 1) * 100}%"></div></div>
+      <div class="muted small" style="margin-top:4px">Challenge from ${esc(t.teacherName)} · ${p.done ? 'nice work!' : c.end === dayKey() ? 'ends today' : 'ends ' + parseDay(c.end).toLocaleDateString(undefined, { weekday: 'long' })}</div></div>`).join('')}`;
+  card.querySelectorAll('[data-tick]').forEach(b => b.onclick = () => {
+    const on = !b.classList.contains('on'); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on);
+    F.updateDoc(F.doc(db, 'students', kid.link), { [`progress.${b.dataset.tick}.${today0}`]: on ? true : F.deleteField() }).catch(e => console.error(e));
+  });
+  card.querySelectorAll('[data-bpm]').forEach(b => b.onclick = () => { setBpm(+b.dataset.bpm); if (!metroOn) $('metroBtn').click(); });
+  card.querySelector('[data-cal]')?.addEventListener('click', () => calendarDialog(kid));
+}
+
+// ---------- Calendar ----------
+// Set once the calendar/email service (Cloudflare Worker) is deployed; enables live-updating calendar subscriptions.
+const WORKER_URL = EMULATOR ? 'http://127.0.0.1:8787' : 'https://practice-timer.sergcast07.workers.dev';
+const icsEsc = s => String(s ?? '').replace(/\\/g, '\\\\').replace(/\r?\n/g, '\\n').replace(/([,;])/g, '\\$1');
+const icsTime = d => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
+const icsFold = line => { const out = []; while (line.length > 74) { out.push(line.slice(0, 74)); line = ' ' + line.slice(74); } out.push(line); return out.join('\r\n'); };
+function buildIcs(calName, evs) {
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Allegrow//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:' + icsEsc(calName)];
+  for (const e of evs) {
+    L.push('BEGIN:VEVENT', 'UID:' + e.uid, 'DTSTAMP:' + stamp, 'DTSTART:' + icsTime(e.start),
+           'DTEND:' + icsTime(new Date(e.start.getTime() + e.minutes * 60000)), 'SUMMARY:' + icsEsc(e.title));
+    if (e.rrule) L.push('RRULE:' + e.rrule);
+    for (const x of e.exdates || []) L.push('EXDATE:' + icsTime(x));
+    if (e.location) L.push('LOCATION:' + icsEsc(e.location));
+    if (e.desc) L.push('DESCRIPTION:' + icsEsc(e.desc));
+    L.push('END:VEVENT');
+  }
+  L.push('END:VCALENDAR');
+  return L.map(icsFold).join('\r\n') + '\r\n';
+}
+function downloadFile(name, text, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+const at = (key, time) => { const [h, m] = (time || '12:00').split(':').map(Number), d = parseDay(key); return new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m); };
+
+// This player's lessons and recitals, as calendar events (a weekly repeating lesson, minus canceled/moved dates)
+function lessonCalendar(k, t) {
+  const evs = [], ch = t.lessonChanges || {}, len = lessonSlots(t)[0]?.length || 30;
+  const title = `${instrumentLabel(k.instrument, 'Music')} lesson – ${k.name}`, desc = `With ${t.teacherName}, ${t.studioName}`;
+  lessonSlots(t).forEach((L, n) => {                   // one repeating event per lesson time, ending on its end date
+    if (L.end && L.end < dayKey()) return;
+    const from = L.start && L.start > dayKey() ? parseDay(L.start) : parseDay(dayKey());
+    while (from.getDay() !== +L.day) from.setDate(from.getDate() + 1);
+    if (L.end && dayKey(from) > L.end) return;
+    const start = at(dayKey(from), L.time);
+    const exdates = Object.keys(ch).filter(key => parseDay(key).getDay() === +L.day && at(key, L.time) >= start && (!L.end || key <= L.end)).map(key => at(key, L.time));
+    const until = L.end ? `;UNTIL=${L.end.replace(/-/g, '')}T235959` : '';
+    evs.push({ uid: `lesson-${k.link}-${n}-${L.start || ''}@practice-timer`, start, minutes: L.length || 30, title, desc, rrule: 'FREQ=WEEKLY' + until, exdates });
+  });
+  for (const [key, c] of Object.entries(ch)) if (c.status === 'extra' && key >= dayKey())
+    evs.push({ uid: `extra-${k.link}-${key}@practice-timer`, start: at(key, c.time), minutes: len, title, desc });
+  for (const [id, e] of Object.entries(t.upcoming || {})) if (e.date >= dayKey())
+    evs.push({ uid: `event-${id}-${k.link}@practice-timer`, start: at(e.date, e.time), minutes: 90, title: `${e.title} – ${k.name}`,
+               location: e.location, desc: [e.piece && 'Piece: ' + e.piece, desc].filter(Boolean).join('\n') });
+  return evs;
+}
+function googleCalUrl(ev) {
+  const p = new URLSearchParams({ action: 'TEMPLATE', text: ev.title, dates: `${icsTime(ev.start)}/${icsTime(new Date(ev.start.getTime() + ev.minutes * 60000))}`,
+                                  details: ev.desc || '', ctz: Intl.DateTimeFormat().resolvedOptions().timeZone });
+  if (ev.rrule) p.set('recur', 'RRULE:' + ev.rrule);
+  return 'https://calendar.google.com/calendar/render?' + p;
+}
+function calendarDialog(k) {
+  const t = teacherData[k.link]; if (!t || t.missing) return;
+  const evs = lessonCalendar(k, t), weekly = evs.find(e => e.rrule), live = WORKER_URL && `${WORKER_URL.replace(/^https?:/, 'webcal:')}/cal/s/${k.link}.ics`;
+  const card = $('linkCard');
+  card.innerHTML = `<div class="medal" style="--kid:${kidColor(k)}">${icon('calendar')}</div>
+    <h2 style="text-align:center">Add ${esc(k.name)}’s lessons to your calendar</h2>
+    <div class="calOpts">
+      ${live ? `<a class="primary" href="${live}" style="--kid:var(--brand);color:var(--bg);font-size:16px;padding:14px">${icon('refresh')}<span class="txt">Subscribe<small style="color:inherit;opacity:.8">Updates automatically when lessons move or are canceled</small></span></a>
+        <button class="secondary block" data-copy>${icon('link', 'sm')}<span class="txt">Copy subscription link<small>For Google Calendar: Other calendars → From URL</small></span></button>` : ''}
+      <button class="secondary block" data-ics>${icon('download', 'sm')}<span class="txt">Apple or Outlook calendar<small>Lessons${Object.keys(t.upcoming || {}).length ? ' and performances' : ''} as they stand today</small></span></button>
+      ${weekly ? `<a class="secondary block" style="display:inline-flex;gap:8px;align-items:center;padding:11px 16px;border-radius:14px;font-weight:600;color:var(--ink)" href="${googleCalUrl(weekly)}" target="_blank" rel="noopener">${icon('calendar', 'sm')}<span class="txt">Google Calendar<small>Adds the weekly lesson</small></span></a>` : ''}
+      <button class="ghost block" data-close>Close</button>
+    </div>
+    ${live ? '' : '<p class="muted small" style="margin-top:10px;text-align:center">These add a copy. If a lesson is moved or canceled later, the app will have the latest time.</p>'}`;
+  $('linkDlg').hidden = false;
+  card.querySelector('[data-close]').onclick = () => { $('linkDlg').hidden = true; };
+  card.querySelector('[data-ics]').onclick = () => downloadFile(`${k.name} lessons.ics`, buildIcs(`${k.name} – music lessons`, evs), 'text/calendar');
+  card.querySelector('[data-copy]')?.addEventListener('click', async e => {
+    try { await navigator.clipboard.writeText(live.replace(/^webcal:/, 'https:')); e.currentTarget.querySelector('.txt').firstChild.textContent = 'Link copied'; } catch { prompt('Copy this link:', live.replace(/^webcal:/, 'https:')); }
+  });
+}
+
+// ---------- Weekly recap (shown once a week on the home screen) ----------
+// One specific win and one small next step per child. Never lists what was missed.
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+function recapWeek() {                               // the 7 days ending on the most recent Sunday (today, if it's Sunday)
+  const t = new Date(), end = new Date(t.getFullYear(), t.getMonth(), t.getDate() - t.getDay());
+  const days = n => Array.from({ length: 7 }, (_, i) => new Date(end.getFullYear(), end.getMonth(), end.getDate() - 7 * n - 6 + i));
+  return { key: dayKey(end), days: days(0), prev: days(1), before: [1, 2, 3, 4].flatMap(days) };
+}
+function kidRecap(k, w) {
+  const sum = ds => ds.reduce((a, d) => a + msOn(k, d), 0), cur = sum(w.days), prev = sum(w.prev);
+  const practiced = w.days.filter(d => msOn(k, d) >= 60000).length, goalDays = w.days.filter(d => goalOf(k, d) > 0 && msOn(k, d) >= goalOf(k, d) * 60000).length;
+  const planned = planDayCount(planFor(k));
+  const sc = statsOver(k, w.days), sp = statsOver(k, w.prev);
+  const longest = Math.max(0, ...w.days.map(d => statsOn(k, d).longest || 0)), best = Math.max(0, ...w.before.map(d => statsOn(k, d).longest || 0));
+  const wins = [];
+  if (practiced >= 3 && practiced >= Math.min(5, planned))
+    wins.push([90, practiced > planned ? `Practiced ${practiced} days – more than planned!` : practiced === planned ? `Practiced on every planned day (${planned}) – brilliant consistency.` : `Practiced ${practiced} of ${planned} planned days – great consistency.`]);
+  const num = m => insOf(k, m) === 'show';                     // "Trends only": say it improved, without the numbers
+  if (tracksPitch(k) && sc.tune != null && sp.tune != null && sc.tune - sp.tune >= 0.05) wins.push([80, num('tune') ? `Tuning improved from ${pct(sp.tune)} to ${pct(sc.tune)}.` : 'Tuning is improving.']);
+  if (insOf(k, 'rhythm') !== 'off' && sc.rhythm != null && sp.rhythm != null && sc.rhythm - sp.rhythm >= 0.05) wins.push([75, num('rhythm') ? `Steadier rhythm: ${pct(sp.rhythm)} → ${pct(sc.rhythm)}.` : 'Rhythm is getting steadier.']);
+  if (insOf(k, 'focus') !== 'off' && longest >= 5 * 60000 && longest > best) wins.push([70, `Longest focused stretch yet: ${mins(longest)}.`]);
+  if (goalDays >= 3) wins.push([60, `Reached the day’s goal ${goalDays} times.`]);
+  if (prev > 0 && cur > prev + 10 * 60000) wins.push([55, `${mins(cur - prev)} more practice than the week before.`]);
+  if (cur > 0) wins.push([10, `${mins(cur)} of practice this week – every minute counts.`]);
+  else wins.push([0, 'A new week is a fresh start.']);
+  const t = k.link && teacherData[k.link] && !teacherData[k.link].missing ? teacherData[k.link] : null;
+  const asg = t && Object.values(t.assignments || {}).filter(a => a.status === 'active').sort((a, b) => (a.due || '9').localeCompare(b.due || '9'))[0];
+  const focus = asg ? `This week: ${asg.title}${asg.bpm ? ` at ${asg.bpm} bpm` : ''}.`
+    : practiced < planned ? `This week: aim for ${plural(Math.min(planned, practiced + 1), 'practice day')}${practiced ? '' : ' – even 10 minutes counts'}.`
+    : tracksPitch(k) && sc.tune != null && sc.tune < 0.8 ? 'This week: a few slow minutes with the tuner each day.'
+    : sc.rhythm == null ? 'This week: try one piece with the metronome.' : 'Keep the streak going!';
+  const nl = t && nextLesson(t);
+  return { win: wins.sort((a, b) => b[0] - a[0])[0][1], focus, next: nl ? `Next lesson ${lessonLabel(nl)}.` : '', minutes: cur };
+}
+function renderRecap() {
+  const el = $('recap'), w = recapWeek();
+  const anything = kids.some(k => [...w.days, ...w.prev].some(d => msOn(k, d) > 0));
+  if (!kids.length || !anything || store.get('pt-recap-seen') === w.key) { el.hidden = true; return; }
+  const range = `${w.days[0].toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} – ${w.days[6].toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`;
+  el.hidden = false;
+  el.innerHTML = `<div class="recapHead"><div><div class="eyebrow">Your week in music</div><h2>${range}</h2></div>
+      <button class="ghost icon" data-recap-close aria-label="Dismiss">${icon('x')}</button></div>
+    ${kids.map(k => { const r = kidRecap(k, w); return `<div class="recapRow" style="--kid:${kidColor(k)}"><div class="avatar">${face(k)}</div>
+      <div><b>${esc(k.name)}</b> <span class="muted small">· ${mins(r.minutes)}</span><p>${esc(r.win)}</p><p class="muted">${esc(r.focus)} ${esc(r.next)}</p></div></div>`; }).join('')}
+    <button class="secondary block" data-recap-close>Got it</button>`;
+  el.querySelectorAll('[data-recap-close]').forEach(b => b.onclick = () => { store.set('pt-recap-seen', w.key); el.hidden = true; });
+}
+
+// ---------- Badges, stars and challenges ----------
+// Badges are earned automatically from practice (badges.js). Teachers can send stars/notes, award their own
+// badges, and set challenges; those arrive through the connected student record (teacherData).
+let badgeSeen = store.get('pt-badge-seen', {});          // {kidId: {badgeId: {tier, date}}} – levels already celebrated
+function kidDays(k) {
+  const keys = new Set([...Object.keys(log[k.id] || {}), ...Object.keys(pend[k.id] || {}), ...Object.keys(stats[k.id] || {}),
+                        ...Object.keys(pendStats[k.id] || {}), ...Object.values(manual[k.id] || {}).map(e => e.day)]);
+  return [...keys].map(key => { const d = parseDay(key); return { key, ms: msOn(k, d), stats: statsOn(k, d) }; });
+}
+const teacherOf = k => k?.link && teacherData[k.link] && !teacherData[k.link].missing ? teacherData[k.link] : null;
+function tickDays(k) {
+  const out = new Set(), t = teacherOf(k);
+  for (const days of Object.values(t?.progress || {})) for (const d of Object.keys(days)) out.add(d);
+  return out;
+}
+const kidBadges = k => badgeLevels(badgeMetrics({ days: kidDays(k), goalFor: goalMsFor(k), tickDays: tickDays(k) }), teacherOf(k)?.badgeRules || {}, { strings: tracksPitch(k), off: INSIGHT_ORDER.filter(m => insOf(k, m) === 'off') }, teacherOf(k)?.badgeSet);
+
+// Badge levels reached since we last looked. The very first time, it just records what's already earned.
+function newBadges(k) {
+  const first = !badgeSeen[k.id], seen = (badgeSeen[k.id] ??= {}), out = [];
+  for (const b of kidBadges(k)) {
+    if (b.tier > (seen[b.id]?.tier ?? -1)) { seen[b.id] = { tier: b.tier, date: dayKey() }; if (!first) out.push(b); }
+  }
+  store.set('pt-badge-seen', badgeSeen);
+  if (out.length) pushTeacher(k);
+  return out;
+}
+function activeChallenges(k, t = teacherOf(k)) {
+  if (!t) return [];
+  const days = kidDays(k), ticks = tickDays(k), today0 = dayKey();
+  return Object.entries(t.challenges || {}).map(([id, c]) => ({ c: { ...c, id }, p: challengeProgress(c, days, goalMsFor(k), ticks) }))
+    .filter(({ c }) => c.start <= today0 && (c.end >= today0 || (t.challengeDone?.[c.id] && daysUntil(t.challengeDone[c.id]) >= -2)))
+    .sort((a, b) => a.c.end.localeCompare(b.c.end));
+}
+// Challenges that were just completed: record them for the teacher and return them for celebrating
+function finishedChallenges(k) {
+  const t = teacherOf(k); if (!t) return [];
+  const out = activeChallenges(k, t).filter(({ c, p }) => p.done && !t.challengeDone?.[c.id]).map(({ c }) => c);
+  for (const c of out) {
+    (t.challengeDone ??= {})[c.id] = dayKey();
+    if (F && db) F.updateDoc(F.doc(db, 'students', k.link), { [`challengeDone.${c.id}`]: dayKey() }).catch(e => console.error(e));
+  }
+  return out;
+}
+
+function renderBadgeEntry() {
+  const el = $('badgeEntry');
+  if (!kid || listening) { el.hidden = true; return; }
+  const bs = kidBadges(kid), earned = bs.filter(b => b.tier >= 0).sort((a, b) => b.tier - a.tier);
+  if (!bs.length && !Object.keys(teacherOf(kid)?.cheers || {}).length) { el.hidden = true; return; }   // teacher switched badges off
+  el.hidden = false;
+  const close = bs.filter(b => b.next != null).map(b => ({ b, f: (b.value - b.prev) / (b.next - b.prev) })).sort((a, b) => b.f - a.f)[0];
+  el.innerHTML = `<div class="mini">${(earned.length ? earned.slice(0, 3) : bs.slice(0, 3)).map(b => medalSvg(b.icon, BADGE_TIERS[Math.max(b.tier, 0)].color, { size: 38, locked: b.tier < 0 })).join('')}</div>
+    <div class="grow"><b>${earned.length ? `${earned.length} ${earned.length === 1 ? 'badge' : 'badges'}` : 'Badges'}</b>
+      <span>${close ? `Next: ${esc(close.b.name)} – ${close.b.unit(close.b.next)}` : 'All badges at the top level!'}</span></div>${icon('chev', 'go')}`;
+  el.onclick = () => show('badges');
+}
+function renderBadges() {
+  const k = kid; if (!k) return show('home');
+  document.body.style.setProperty('--kid', kidColor(k));
+  const bs = kidBadges(k), earned = bs.filter(b => b.tier >= 0).length, t = teacherOf(k);
+  $('bTitle').textContent = `${k.name}’s badges`;
+  $('bSub').textContent = !bs.length ? 'Stars and badges from your teacher show up here.' : earned ? `${earned} of ${bs.length} earned so far.` : 'Your first badge is one practice away.';
+  const awards = Object.entries(t?.cheers || {}).filter(([, c]) => c.kind === 'badge').sort((a, b) => b[1].date.localeCompare(a[1].date));
+  const stars = Object.values(t?.cheers || {}).filter(c => c.kind === 'star').length;
+  const doneCh = Object.entries(t?.challenges || {}).filter(([id]) => t.challengeDone?.[id]);
+  $('bTeacher').innerHTML = t && (awards.length || stars || doneCh.length) ? `<div class="card"><h2 style="margin-bottom:12px">From ${esc(t.teacherName)}</h2>
+    <div class="teacherAwards">
+      ${stars ? `<div>${medalSvg('star', BADGE_TIERS[2].color, { size: 56 })}${stars} ${stars === 1 ? 'star' : 'stars'}</div>` : ''}
+      ${awards.map(([, a]) => `<div>${medalSvg(a.icon || 'award', BADGE_TIERS[4].color, { size: 56 })}${esc(a.title)}</div>`).join('')}
+      ${doneCh.map(([, c]) => `<div>${medalSvg(c.icon || 'flag', BADGE_TIERS[3].color, { size: 56 })}${esc(challengeTitle(c))}</div>`).join('')}
+    </div></div>` : '';
+  $('bGrid').innerHTML = bs.map(b => {
+    const locked = b.tier < 0, color = BADGE_TIERS[Math.max(b.tier, 0)].color, nextTier = BADGE_TIERS[b.tier + 1];
+    const f = b.next != null ? Math.max(0, Math.min(1, (b.value - b.prev) / (b.next - b.prev))) : 1;
+    return `<div class="badgeCard ${locked ? 'locked' : ''}" title="${esc(b.about)}">
+      ${medalSvg(b.icon, color, { locked, size: 64 })}
+      <b>${esc(b.name)}</b>
+      <span class="lvl">${locked ? 'Not yet' : `${BADGE_TIERS[b.tier].name} · ${b.unit(b.tiers[b.tier])}`}</span>
+      ${b.next != null ? `<div class="bbar"><div style="width:${f * 100}%"></div></div><span class="nxt">${nextTier.name}: ${b.unit(b.next)}</span>` : '<span class="nxt">Top level!</span>'}
+    </div>`;
+  }).join('');
+}
+$('badgesBack').onclick = () => show('practice');
+
+// Stars, notes and badges the teacher sent, shown one at a time the next time the child opens their practice screen
+function showNextCheer() {
+  if (screen !== 'practice' || listening || !$('linkDlg').hidden || !$('summary').hidden) return;
+  const t = teacherOf(kid); if (!t) return;
+  const [id, c] = Object.entries(t.cheers || {}).filter(([id]) => !t.cheersSeen?.[id]).sort((a, b) => a[1].date.localeCompare(b[1].date))[0] || [];
+  if (!id) return;
+  const isBadge = c.kind === 'badge', card = $('linkCard');
+  card.style.setProperty('--kid', kidColor(kid));
+  card.innerHTML = `<div style="display:grid;justify-items:center">${medalSvg(isBadge ? (c.icon || 'award') : 'star', isBadge ? BADGE_TIERS[4].color : BADGE_TIERS[2].color, { size: 96 })}</div>
+    <h2 style="text-align:center;margin-top:10px">${isBadge ? esc(c.title) : `${esc(t.teacherName)} sent you a star!`}</h2>
+    ${isBadge ? `<p class="muted" style="text-align:center">A badge from ${esc(t.teacherName)}</p>` : ''}
+    ${c.note ? `<div class="cheerNote">“${esc(c.note)}”<span class="from">– ${esc(t.teacherName)}</span></div>` : ''}
+    <div class="pickList" style="margin-top:16px"><button class="primary" id="cheerOk" style="--kid:var(--brand);color:var(--bg);justify-content:center">Thank you!</button></div>`;
+  $('linkDlg').hidden = false;
+  confetti(isBadge ? 160 : 90, kidColor(kid));
+  $('cheerOk').onclick = () => {
+    $('linkDlg').hidden = true;
+    (t.cheersSeen ??= {})[id] = dayKey();
+    if (F && db) F.updateDoc(F.doc(db, 'students', kid.link), { [`cheersSeen.${id}`]: dayKey() }).catch(e => console.error(e));
+    setTimeout(showNextCheer, 600);
+  };
+}
+
+// ---------- Install to the home screen ----------
+// Chrome/Edge/Android offer a real install prompt; iPhone/iPad need Share → Add to Home Screen.
+let installEvent = null;
+const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvent = e; renderInstall(); });
+addEventListener('appinstalled', () => { installEvent = null; renderInstall(); });
+function renderInstall() {
+  const el = $('installCard');
+  if (standalone() || store.get('pt-install-hide', false) || !(installEvent || isIOS())) { el.hidden = true; return; }
+  el.hidden = false;
+  el.innerHTML = `<img src="brand/allegrow-icon.svg" alt="">
+    <div class="grow"><b>Put Allegrow on your home screen</b>
+      <span>${installEvent ? 'Opens like an app, full screen, even without internet.' : 'Tap the Share button, then “Add to Home Screen”.'}</span>
+      ${installEvent ? '<div><button class="secondary" id="installGo" style="margin-top:10px">Install</button></div>' : ''}</div>
+    <button class="ghost icon" id="installX" aria-label="Not now" style="align-self:flex-start">${icon('x')}</button>`;
+  $('installGo')?.addEventListener('click', async () => { installEvent.prompt(); await installEvent.userChoice; installEvent = null; renderInstall(); });
+  $('installX').onclick = () => { store.set('pt-install-hide', true); el.hidden = true; };
+}
+if ('serviceWorker' in navigator && !EMULATOR) navigator.serviceWorker.register('sw.js').catch(e => console.error(e));
+
+// ---------- Microphone ----------
+let listening = false, mode = 'practice', audioCtx, analyser, stream, buf, timer, wakeLock;
+let lastTick = 0, lastSoundAt = -Infinity, smoothLevel = 0;
+
+// Sensitivity 1..100 maps to a loudness threshold (0..1 meter scale). Higher sensitivity = lower threshold.
+const threshold = () => 0.6 - (settings.sens / 100) * 0.55;
+function updateMarks() { document.querySelectorAll('.meter .mark').forEach(m => m.style.left = (threshold() * 100) + '%'); }
+
+function tick() {
+  const now = performance.now();
+  const dt = now - lastTick; lastTick = now;
+
+  analyser.getFloatTimeDomainData(buf);
+  let sum = 0;
+  for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+  const rms = Math.sqrt(sum / buf.length);
+  // Convert to a 0..1 scale on a log (dB) curve: -60 dB → 0, 0 dB → 1
+  let level = Math.max(0, Math.min(1, (20 * Math.log10(rms + 1e-8) + 60) / 60));
+  if (metro.timer) level = lowLevel();          // ignore the metronome's own clicks
+  smoothLevel = smoothLevel * 0.7 + level * 0.3;
+
+  const loud = smoothLevel > threshold();
+  const detecting = musicOnly() && classifierState === 'ready';
+  if (detecting && loud && now - lastClassify >= 500) { lastClassify = now; classify(now); }
+  // Classifier looks at the last second, so allow a little slack after its last "music" verdict
+  const musicNow = !detecting || now - lastMusicAt < 1200;
+  if (loud && musicNow) lastSoundAt = now;
+  const talking = detecting && loud && !musicNow && now - lastSpeechAt < 1200;
+  const playing = now - lastSoundAt < settings.grace * 1000 + 150;
+
+  document.querySelectorAll('.meter .level').forEach(l => { l.style.width = (smoothLevel * 100) + '%'; l.classList.toggle('on', loud && musicNow); });
+
+  musicNowFlag = loud && musicNow;
+
+  if (mode === 'practice') {
+    if (dt < 5000) {                              // ignore huge gaps (e.g. device was asleep)
+      if (playing) addPractice(dt);
+      session.active += dt; addStat('active', dt);
+      if (playing) session.stretch += dt;
+    }
+    if (!playing && session.wasPlaying) { endStretch(); session.breaks++; addStat('breaks', 1); }
+    session.wasPlaying = playing;
+
+    // Pitch also finds smooth (legato) note starts for the rhythm score, so keep it running with the metronome
+    if (hasPitch(kid) && (tracksPitch(kid) || metro.timer)) {
+      pitchStep(now);
+      if (now - lastPitchAt > 400) { $('tNote').innerHTML = '&nbsp;'; $('tNeedle').style.left = '50%'; $('tNeedle').className = ''; }
+    }
+    if (family && now - lastFlush > 10000) { lastFlush = now; flushPractice(); }
+    if (kid.link && now - lastTeacherPush > 30000) { lastTeacherPush = now; pushTeacher(kid); }
+    renderPractice(playing, talking);
+  } else renderTest(playing, talking);
+}
+
+async function startAudio(m) {
+  mode = m;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      // Turn off voice processing so it doesn't filter out the instrument
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+    });
+  } catch (e) {
+    alert('Microphone access was blocked. Allow the microphone for this site in your browser settings, then try again.');
+    return;
+  }
+  audioCtx = new AudioContext();
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 2048;
+  buf = new Float32Array(analyser.fftSize);
+  const source = audioCtx.createMediaStreamSource(stream);
+  source.connect(analyser);
+
+  // Keep a rolling 1-second copy of the audio for the music detector
+  ring = new Float32Array(audioCtx.sampleRate); ringPos = 0;
+  processor = audioCtx.createScriptProcessor(4096, 1, 1);
+  processor.onaudioprocess = e => {
+    const data = e.inputBuffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) { ring[ringPos] = data[i]; ringPos = (ringPos + 1) % ring.length; }
+    analyseSamples(data);
+  };
+  const mute = audioCtx.createGain(); mute.gain.value = 0;   // processor must reach the output to run
+  source.connect(processor); processor.connect(mute); mute.connect(audioCtx.destination);
+  lastMusicAt = lastSpeechAt = lastSoundAt = -Infinity;
+  resetAnalysis(audioCtx.sampleRate);
+
+  listening = true;
+  if (mode === 'practice') metroStart();
+  updateMarks();
+  lastTick = performance.now();
+  timer = setInterval(tick, 100);
+  if (mode === 'practice') { renderPractice(); try { wakeLock = await navigator.wakeLock?.request('screen'); } catch {} }
+}
+
+function stopAudio() {
+  listening = false;
+  if (mode === 'practice' && session) { metroStop(); endNote(true); endStretch(); session.wasPlaying = false; }
+  flushPractice();
+  if (mode === 'practice') pushTeacher(kid);
+  clearInterval(timer);
+  stream?.getTracks().forEach(t => t.stop());
+  audioCtx?.close();
+  wakeLock?.release?.(); wakeLock = null;
+  document.querySelectorAll('.meter .level').forEach(l => l.style.width = '0');
+}
+
+// Confetti burst (plain canvas, no library). Skipped for people who've asked their device for less motion.
+function confetti(count = 150, color) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const cv = $('confetti'), ctx = cv.getContext('2d'), dpr = devicePixelRatio || 1;
+  const W = innerWidth, H = innerHeight;
+  cv.width = W * dpr; cv.height = H * dpr; ctx.scale(dpr, dpr); cv.hidden = false;
+  const colors = [color, color, ...COLORS, '#e2b54a'].filter(Boolean);
+  const bits = Array.from({ length: count }, (_, i) => {
+    const fromLeft = i % 2 === 0, a = (fromLeft ? -60 : -120) * Math.PI / 180 + (Math.random() - .5) * 0.9, v = 9 + Math.random() * 9;
+    return { x: fromLeft ? 0 : W, y: H * 0.75, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: Math.random() * 6.3, vr: (Math.random() - .5) * 0.4,
+             w: 6 + Math.random() * 6, h: 4 + Math.random() * 6, c: colors[i % colors.length], round: Math.random() < 0.3 };
+  });
+  const start = performance.now();
+  (function frame(now) {
+    const t = now - start;
+    ctx.clearRect(0, 0, W, H);
+    for (const b of bits) {
+      b.vy += 0.25; b.vx *= 0.99; b.vy *= 0.99; b.x += b.vx; b.y += b.vy; b.r += b.vr;
+      ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.r); ctx.globalAlpha = Math.max(0, 1 - t / 4000);
+      ctx.fillStyle = b.c;
+      if (b.round) { ctx.beginPath(); ctx.arc(0, 0, b.h / 2 + 1, 0, 7); ctx.fill(); }
+      else ctx.fillRect(-b.w / 2, -b.h / 2 * Math.abs(Math.cos(b.r * 2)), b.w, b.h * Math.abs(Math.cos(b.r * 2)) + 1);
+      ctx.restore();
+    }
+    if (t < 4000) requestAnimationFrame(frame); else { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); cv.hidden = true; }
+  })(start);
+}
+
+function celebrate(k) {
+  confetti(200, k && kidColor(k));
+  if (k?.chime === false) return;
+  try {
+    const ctx = new AudioContext();
+    [523, 659, 784, 1047].forEach((f, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.frequency.value = f; o.connect(g); g.connect(ctx.destination);
+      const t = ctx.currentTime + i * 0.15;
+      g.gain.setValueAtTime(0.2, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+      o.start(t); o.stop(t + 0.4);
+    });
+  } catch {}
+}
+
+const flushAll = () => { flushPractice(); flushFields(); };
+addEventListener('pagehide', flushAll);
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'hidden') flushAll();
+  if (listening && mode === 'practice' && document.visibilityState === 'visible') {
+    try { wakeLock = await navigator.wakeLock?.request('screen'); } catch {}
+  }
+});
+
+updateMarks();
+show('home');
+if (musicOnly()) loadClassifier();
+if (family) connect();
+watchTeachers().then(() => kids.forEach(pushTeacher));
+// A teacher's invite link: #link=<student code>
+const teacherInvite = location.hash.match(/link=([a-z0-9-]{20,})/);
+if (teacherInvite) { history.replaceState(null, '', location.pathname + location.search); startLink(teacherInvite[1]); }
+if (!family) setSync('local');
+upgradePin();
+// A "Send link to another device" link: #join=<family code>
+const joinLink = location.hash.match(/join=([a-z0-9-]{20,})/);
+if (joinLink) {
+  history.replaceState(null, '', location.pathname);
+  if (joinLink[1] !== family) joinFamily(joinLink[1]).then(() => { if (family === joinLink[1]) show('home'); });
+}
+</script>
+</body>
+</html>

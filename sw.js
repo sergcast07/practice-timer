@@ -3,9 +3,9 @@
 //  • Our own files: served from the saved copy, refreshed in the background.
 //  • Libraries, fonts and the sound model from their CDNs (versioned, never change): saved once, then reused.
 //  • Database, sign-in and email-service requests are never touched – they always go to the network.
-const VERSION = 'allegrow-v14';          // bump when the app's own files change
+const VERSION = 'allegrow-v15';          // bump when the app's own files change
 const CDN_CACHE = 'allegrow-cdn';       // versioned library files: kept across updates
-const SHELL = ['./', './index.html', './teacher.html', './badges.js?v=7', './signin.js?v=1', './manifest.webmanifest', './manifest-studio.webmanifest',
+const SHELL = ['./', './app', './studio', './moved.js?v=1', './badges.js?v=7', './signin.js?v=1', './manifest.webmanifest', './manifest-studio.webmanifest',
                './brand/allegrow-icon.svg', './brand/png/allegrow-icon-192.png', './brand/png/apple-touch-icon.png'];
 const CDN = ['fonts.googleapis.com', 'fonts.gstatic.com', 'www.gstatic.com', 'cdn.jsdelivr.net', 'storage.googleapis.com'];
 
@@ -22,7 +22,7 @@ self.addEventListener('fetch', e => {
   const own = url.origin === self.location.origin;
   if (req.mode === 'navigate' && own) {
     e.respondWith(fetch(req).then(res => { const copy = res.clone(); caches.open(VERSION).then(c => c.put(req, copy)); return res; })
-      .catch(() => caches.match(req, { ignoreSearch: true }).then(r => r || caches.match('./index.html'))));
+      .catch(() => caches.match(req, { ignoreSearch: true }).then(r => r || caches.match('./app'))));
     return;
   }
   if (own) {

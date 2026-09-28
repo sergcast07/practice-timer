@@ -1,0 +1,11 @@
+# The website at allegrowmusic.com: this folder's pages, served by Cloudflare (free static hosting).
+# Deploy from this folder with: npx wrangler deploy
+# (The calendar & email service is a separate Worker in worker/.)
+name = "allegrow-site"
+compatibility_date = "2026-09-01"
+routes = [{ pattern = "allegrowmusic.com", custom_domain = true }]
+
+[assets]
+directory = "."
+html_handling = "auto-trailing-slash"   # studio.html is served at /studio
+not_found_handling = "404-page"

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<script>/* On the old GitHub address, pages that no longer exist there (like teacher.html) forward to allegrowmusic.com */
+if (/github\.io$/.test(location.hostname)) {
+  const page = location.pathname.replace(/^\/practice-timer\/?/, ''), MAP = { 'teacher.html': 'studio', 'landing.html': '' };
+  location.replace('https://allegrowmusic.com/' + (page in MAP ? MAP[page] : page.replace(/\.html$/, '')) + location.search + location.hash);
+}</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Page not found · Allegrow</title>
+<link rel="icon" href="/brand/allegrow-icon.svg">
+<style>
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f6f3ee; color: #1e2a44;
+         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; padding: 20px; box-sizing: border-box; }
+  .card { background: #fff; border-radius: 20px; padding: 32px 28px; max-width: 420px; text-align: center; box-shadow: 0 10px 30px rgba(30,42,68,.08); }
+  h1 { font-family: Georgia, 'Times New Roman', serif; font-weight: 600; margin: 14px 0 8px; }
+  p { color: #6e7385; line-height: 1.5; margin: 0 0 20px; }
+  a.btn { display: inline-block; background: #1e2a44; color: #f6f3ee; text-decoration: none; font-weight: 600; padding: 11px 18px; border-radius: 12px; margin: 4px; }
+  a.btn.ghost { background: #efeae2; color: #1e2a44; }
+  @media (prefers-color-scheme: dark) { body { background: #14171f; color: #eef0f5; } .card { background: #1d212b; } a.btn.ghost { background: #2a2f3b; color: #eef0f5; } }
+</style>
+</head>
+<body>
+  <div class="card">
+    <img src="/brand/allegrow-icon.svg" alt="" width="48" height="48">
+    <h1>Page not found</h1>
+    <p>That page doesn’t exist – it may have moved.</p>
+    <a class="btn" href="/app">Family app</a><a class="btn ghost" href="/studio">Allegrow Studio</a>
+  </div>
+</body>
+</html>

@@ -1,0 +1,11 @@
+# Not part of the website (see wrangler.toml)
+.git
+.gitignore
+.claude
+.wrangler
+worker
+firebase.json
+firestore.rules
+wrangler.toml
+.assetsignore
+node_modules

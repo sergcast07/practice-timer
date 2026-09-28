@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script src="moved.js?v=1"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#f6f3ee" media="(prefers-color-scheme: light)">
@@ -447,7 +448,7 @@
     <div id="signinOptions" style="width:100%;max-width:340px;margin:0 auto"></div>
     <div class="gateErr" id="signinErr"></div>
     <p class="small muted">Just looking? <a href="?demo">Explore a demo studio</a> with sample students.</p>
-    <p class="small muted"><span class="betaChip">Beta</span> Free while in beta · <a href="landing.html">About Allegrow</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a></p>
+    <p class="small muted"><span class="betaChip">Beta</span> Free while in beta · <a href="./">About Allegrow</a> · <a href="privacy">Privacy</a> · <a href="terms">Terms</a></p>
   </div>
 </div>
 
@@ -748,7 +749,7 @@ function betaCodeModal(reason) {
     <p>Allegrow is in beta. Studios who try it with their students and share feedback get <b>unlimited students, free</b>.</p>
     <label class="field">Beta code <input type="text" id="bcCode" placeholder="GROW-XXXX-XXXX" autocapitalize="characters" autocomplete="off" spellcheck="false" style="text-transform:uppercase;letter-spacing:.05em"></label>
     <div class="gateErr" id="bcErr"></div>
-    <p class="small muted">No code yet? <a href="landing.html#beta" target="_blank" rel="noopener">Request one</a> – it takes a minute.</p>
+    <p class="small muted">No code yet? <a href="./#beta" target="_blank" rel="noopener">Request one</a> – it takes a minute.</p>
     <footer><div class="right"><button class="secondary" data-close>Not now</button><button class="primary" id="bcGo">Use code</button></div></footer>`, m => {
     m.querySelector('#bcGo').onclick = async () => {
       const code = val('bcCode').toUpperCase().replace(/\s+/g, '');
@@ -1411,7 +1412,8 @@ function newStudentRecord(data) {
     assignments: {}, upcoming: {}, lessonChanges: {}, cheers: {}, challenges: {}, badgeRules: studio.badgeRules || {}, badgeSet: studio.badgeSet || null,
     created: dayKey(), archived: false };
 }
-function inviteLink(sid) { return location.origin + location.pathname.replace(/teacher\.html$/, '') + '#link=' + sid; }
+// The family app lives next to the studio: …/studio → …/app
+function inviteLink(sid) { return location.origin + location.pathname.replace(/[^/]*$/, '') + 'app#link=' + sid; }
 function inviteModal(sid) {
   const s = students[sid], link = inviteLink(sid);
   openModal(`${mhead('Invite ' + esc(firstName(s.name)) + '’s family')}
@@ -1657,7 +1659,7 @@ function studioModal() {
         <button class="secondary" id="sInsights" type="button">${icon('tune', 'sm')}Practice insights</button></div>
       <div class="planBox" style="display:grid;margin-top:0">${isPartner() ? `<div><b>Beta partner</b> · unlimited students, free.</div>`
         : `<div><b>Free plan</b> · ${active().length} of ${FREE_STUDENTS} students. Beta partners get unlimited students, free.</div><button class="secondary" type="button" id="sCode">Enter a beta code</button>`}</div>
-      <p class="small muted">Signed in as ${esc(me.email || me.displayName || '')}. <a href="privacy.html" target="_blank" rel="noopener">Privacy</a> · <a href="terms.html" target="_blank" rel="noopener">Terms</a></p>
+      <p class="small muted">Signed in as ${esc(me.email || me.displayName || '')}. <a href="privacy" target="_blank" rel="noopener">Privacy</a> · <a href="terms" target="_blank" rel="noopener">Terms</a></p>
     </div>
     <footer><button class="danger" id="sOut">Sign out</button><div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="sSave">Save</button></div></footer>`, m => {
     m.querySelector('#sSave').onclick = async () => {

@@ -1,18 +1,42 @@
 {
-  "id": "./teacher.html",
+  "id": "./studio",
   "name": "Allegrow Studio",
   "short_name": "Allegrow Studio",
   "description": "Allegrow for music teachers: students' practice, lessons, assignments, badges and reports.",
-  "start_url": "./teacher.html",
+  "start_url": "./studio",
   "scope": "./",
   "display": "standalone",
   "background_color": "#f6f3ee",
   "theme_color": "#1e2a44",
-  "categories": ["education", "music", "productivity"],
+  "categories": [
+    "education",
+    "music",
+    "productivity"
+  ],
   "icons": [
-    { "src": "brand/png/allegrow-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "brand/png/allegrow-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "brand/png/allegrow-icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
-    { "src": "brand/png/allegrow-icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "brand/png/allegrow-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "brand/png/allegrow-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "brand/png/allegrow-icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "brand/png/allegrow-icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }
