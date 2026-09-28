@@ -48,8 +48,10 @@
 <h2>What information we handle</h2>
 <table>
   <tr><th>Where</th><th>What</th><th>Where it’s kept</th></tr>
-  <tr><td>Family app</td><td>Each player’s first name or nickname, an optional photo added by a parent (shrunk to a small 128 × 128 picture), instrument, color, practice times and minutes (including practice logged by hand), practice scores worked out on the device (focus, tuning, rhythm), badges, practice plan and app settings, including the parent PIN.</td>
+  <tr><td>Family app</td><td>Each player’s first name or nickname, an optional photo added by a parent (shrunk to a small 128 × 128 picture), instrument, color, practice times and minutes (including practice logged by hand), practice scores worked out on the device (focus, tuning, rhythm), badges, practice plan and app settings, including the parent PIN (stored scrambled, not as the digits).</td>
       <td>On your device. If you turn on <b>sync</b>, also in our database, under a long random family code so your other devices can see it.</td></tr>
+  <tr><td>Parent account (optional)</td><td>If a parent chooses to sign in with Google: their name and email, and which family they belong to. Used only to let them reset the parent PIN and to bring the family back on a new device.</td>
+      <td>In our database. The family’s record lists its parent accounts; each parent’s own sign-in record is visible only to them.</td></tr>
   <tr><td>Connected to a teacher</td><td>Only after a parent agrees: the child’s photo if one was added, their practice summary for the last 60 days, badges, assignment check-offs, which teacher stars they’ve seen and which challenges they’ve finished.</td>
       <td>In our database, on that student’s record, visible to that teacher.</td></tr>
   <tr><td>Allegrow Studio</td><td>The teacher’s Google account name and email, studio name, and the student information the teacher enters: names, an optional small photo, instruments, lesson times, practice plans, lesson notes and ratings, assignments, recitals and exams, badges and stars.</td>
@@ -81,7 +83,7 @@
 
 <h2>Deleting information</h2>
 <ul>
-  <li><b>Families:</b> remove a player in Parent settings to delete their practice history (from this device and, with sync, from our database). “Disconnect” (or “Switch teacher”) stops sharing with a teacher, and can also remove the practice history, badges and photo already shared with them.</li>
+  <li><b>Families:</b> remove a player in Parent settings to delete their practice history (from this device and, with sync, from our database). “Disconnect” (or “Switch teacher”) stops sharing with a teacher, and can also remove the practice history, badges and photo already shared with them. A parent account can be removed in Settings → Devices &amp; sync.</li>
   <li><b>Teachers:</b> archive or delete a student in Allegrow Studio. Deleting a student removes their record and disconnects the family.</li>
   <li><b>Anyone:</b> <a href="landing.html#contact">contact us</a> and we’ll delete information we hold about you or your child.</li>
 </ul>

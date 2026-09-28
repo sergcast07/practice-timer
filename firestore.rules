@@ -16,6 +16,16 @@ service cloud.firestore {
       allow list, delete: if false;
     }
 
+    // A parent's own sign-in record (optional Google sign-in in the family app): which family they belong to.
+    // Only that parent can read or change it, and it can only point at a family that exists.
+    match /parents/{uid} {
+      allow read, delete: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['family', 'email', 'name', 'at'])
+        && request.resource.data.family is string && request.resource.data.family.size() >= 20
+        && exists(/databases/$(db)/documents/families/$(request.resource.data.family));
+    }
+
     // A teacher's studio and everything private to it (lessons, recitals, notes).
     // Only the signed-in teacher who owns it can read or write.
     // The studio's plan (Free, or Beta partner) can only be changed by redeeming an unused beta code in the
