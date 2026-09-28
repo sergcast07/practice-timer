@@ -427,8 +427,9 @@ async function verifyParent(env, idToken) {
   const r = await fetch(`${base}/projects/${env.PROJECT_ID}/databases/(default)/documents/parents/${uid}?key=${env.API_KEY}`, { headers: { Authorization: `Bearer ${idToken}` } });
   if (!r.ok) return null;                                    // not their record, expired or fake token
   const rec = decode({ mapValue: { fields: (await r.json()).fields || {} } });
-  if (!claims.email || claims.email_verified === false || !validCode(rec.family)) return null;
-  return { uid, email: claims.email, name: claims.name || rec.name || '', family: rec.family };
+  if (!claims.email || !validCode(rec.family)) return null;
+  // Email + password (and some Microsoft) accounts start unconfirmed: we don't email an address until its owner confirms it
+  return { uid, email: claims.email, name: claims.name || rec.name || '', family: rec.family, unverified: claims.email_verified !== true };
 }
 async function hmac(env, text) {
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(env.PARENT_SECRET || 'dev-secret'), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
@@ -466,7 +467,7 @@ async function parentsApi(req, env, url) {
     const family = body.family;
     if (!validCode(family)) return json({ error: 'bad request' }, 400);
     const emails = await familyParentEmails(env, family);
-    if (!emails.length) return json({ error: 'No parent email is set up for this family yet.' }, 404);
+    if (!emails.length) return json({ error: 'No confirmed parent email is set up for this family yet.' }, 404);
     const sentKey = `pinrl:${family}`, count = +(await env.KV.get(sentKey) || 0);
     if (count >= 3) return json({ error: 'Too many codes requested. Please wait an hour and try again.' }, 429);
     const code = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, '0');
@@ -492,6 +493,8 @@ async function parentsApi(req, env, url) {
   // Everything else is a signed-in parent looking after their own settings
   const me = await verifyParent(env, body.idToken);
   if (!me) return json({ error: 'Please sign in again.' }, 401);
+  if (me.unverified && path !== '/parents/unlink')
+    return json({ error: `Please confirm ${me.email} first – use the link we emailed you.`, unverified: true }, 403);
   const old = await getJSON(env, `parent:${me.uid}`);
   if (path === '/parents/link' || path === '/parents/prefs') {
     const weekly = path === '/parents/prefs' ? !!body.weekly : !!old?.weekly;

@@ -706,6 +706,7 @@
 </div>
 
 <script src="badges.js?v=7"></script>
+<script src="signin.js?v=1"></script>
 <script>
 const $ = id => document.getElementById(id);
 const CIRC = 2 * Math.PI * 52;
@@ -856,14 +857,16 @@ async function loadAuth() {
   if (EMULATOR) A.connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
   await auth.authStateReady();
 }
-async function googleSignIn() {
+// Google, Microsoft, Yahoo or email + password (signin.js). Resolves with the user, or null if they closed it.
+async function parentSignIn(intro = '') {
   await loadAuth();
-  const p = new A.GoogleAuthProvider(); p.setCustomParameters({ prompt: 'select_account' });
-  return (await A.signInWithPopup(auth, p)).user;
+  return signInDialog({ A, auth, verify: true, title: 'Parent sign-in', intro });
 }
 // The email service (worker) – a signed-in parent proves who they are with their sign-in token
 async function parentApi(path, data = {}) {
-  const idToken = await auth.currentUser.getIdToken();
+  const u = auth.currentUser, was = u.emailVerified;
+  if (!was) await u.reload();                    // they may have clicked the verification link since
+  const idToken = await u.getIdToken(!was && u.emailVerified);
   const r = await fetch(`${WORKER_URL}/parents/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ idToken, tz: Intl.DateTimeFormat().resolvedOptions().timeZone, ...data }) });
   const j = await r.json().catch(() => ({}));
@@ -880,7 +883,8 @@ async function linkParent(u) {
 }
 // From Settings: add a parent account to this family (turning on sync first if needed)
 async function addParentAccount() {
-  let u; try { u = await googleSignIn(); } catch (e) { if (e?.code !== 'auth/popup-closed-by-user') alert('Sign-in didn’t work. Please try again.'); return; }
+  const u = await parentSignIn('So you can reset the parent PIN if you forget it, and get your family back on a new device.');
+  if (!u) return;
   const rec = await parentRecord(u.uid).catch(() => null);
   if (rec && rec.family !== family) {
     const other = await F.getDoc(F.doc(db, 'families', rec.family)).catch(() => null);
@@ -898,7 +902,8 @@ async function addParentAccount() {
 }
 // From a new device: sign in and bring the family back
 async function restoreWithAccount() {
-  let u; try { u = await googleSignIn(); } catch (e) { if (e?.code !== 'auth/popup-closed-by-user') alert('Sign-in didn’t work. Please try again.'); return; }
+  const u = await parentSignIn('Use the same sign-in as on your other device.');
+  if (!u) return;
   const rec = await parentRecord(u.uid).catch(() => null);
   if (!rec) return alert(`No family is linked to ${u.email} yet.\n\nOn a device that already has your players, open Parents → Settings → Devices & sync and add a parent account there first.`);
   await joinFamily(rec.family);
@@ -1487,7 +1492,8 @@ $('pinForgot').onclick = () => {
     $('fgCode').onkeydown = e => { if (e.key === 'Enter') $('fgVerify').click(); };
     $('fgSignIn').onclick = async () => {
       try {
-        const u = await googleSignIn();
+        const u = await parentSignIn('Sign in with the parent account linked to this family.');
+        if (!u) return;
         if (!familyParents[u.uid]) return ($('fgErr').textContent = `${u.email} isn’t a parent account for this family.`);
         pinReset = u.email; askPin(true);
       } catch (e) { if (e?.code !== 'auth/popup-closed-by-user') $('fgErr').textContent = 'Sign-in didn’t work. Please try again.'; }
@@ -1517,7 +1523,8 @@ function renderAccount() {
   // Once per visit, check the email service's copy (e.g. they unsubscribed from an email) and keep the switch honest
   if (mine && !renderAccount.checked) {
     renderAccount.checked = true;
-    parentApi('link').then(r => { if (!!r.weekly !== !!mine.weekly) { mine.weekly = r.weekly; F.updateDoc(ref, { [`parents.${me}.weekly`]: r.weekly }).catch(() => {}); renderAccount(); } }).catch(() => {});
+    parentApi('link').then(r => { if (!!r.weekly !== !!mine.weekly) { mine.weekly = r.weekly; F.updateDoc(ref, { [`parents.${me}.weekly`]: r.weekly }).catch(() => {}); } renderAccount(); })
+      .catch(() => renderAccount());              // (also refreshes the "confirm your email" note)
   }
   $('accountBlock').innerHTML = `<b>Parent account</b>
     ${list.length ? `<div class="parentList">${list.map(([uid, p]) => `<div class="opt"><span>${icon('user', 'sm')} ${esc(p.email || p.name)}${uid === me ? ' <span class="muted small">(signed in here)</span>' : ''}</span>
@@ -1527,10 +1534,13 @@ function renderAccount() {
         <div class="rowBetween"><button class="ghost small" id="testSummary" style="margin-left:-10px">Send me a test</button><span class="small muted" id="summaryMsg"></span></div>` : ''}
       <p class="muted small">Forgot the PIN? We’ll email a reset code to ${list.length === 1 ? 'this address' : 'these addresses'}. On a new device, signing in brings your family back.</p>
       <button class="secondary" id="addParent" style="justify-self:start">${icon('plus', 'sm')}Add another parent</button>`
-    : `<p class="muted small">Optional. Sign in with Google so you can reset the parent PIN if you forget it, and get your family back on a new device.${family ? '' : ' This also turns on sync.'}</p>
-      <button class="secondary block" id="addParent">${icon('user', 'sm')}Continue with Google</button>`}
+    : `<p class="muted small">Optional. Sign in (Google, email and more) so you can reset the parent PIN if you forget it, and get your family back on a new device.${family ? '' : ' This also turns on sync.'}</p>
+      <button class="secondary block" id="addParent">${icon('user', 'sm')}Sign in as a parent</button>`}
+    ${mine && auth.currentUser && !auth.currentUser.emailVerified ? `<p class="small" style="color:var(--warn)">Check your inbox to confirm ${esc(auth.currentUser.email)} – PIN codes and summaries can only be emailed once it’s confirmed.
+      <button class="ghost small" id="resendVerify" style="padding:2px 4px">Send the link again</button></p>` : ''}
     ${settings.pinResetAt ? `<p class="muted small">The PIN was last reset ${new Date(settings.pinResetAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} by ${esc(settings.pinResetBy || 'a parent')}.</p>` : ''}`;
   $('addParent').onclick = addParentAccount;
+  $('resendVerify')?.addEventListener('click', async e => { try { await A.sendEmailVerification(auth.currentUser); e.target.textContent = 'Sent – check your inbox'; } catch { e.target.textContent = 'Couldn’t send – try again later'; } });
   const msg = t => { const el = $('summaryMsg'); if (el) el.textContent = t; };
   $('weeklyToggle')?.addEventListener('change', async e => {
     const on = e.target.checked;
