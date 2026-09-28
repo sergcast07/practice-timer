@@ -247,15 +247,18 @@ const row = (left, title, lines) => `<table role="presentation" width="100%" cel
   <td style="padding:12px 0;vertical-align:top"><div style="font-weight:700;font-size:15px">${title}</div>${lines.filter(Boolean).map(l => `<div style="font-size:14px;color:#3d4760;margin-top:3px;line-height:1.45">${l}</div>`).join('')}</td></tr></table>`;
 const section = (title, inner) => `<h2 style="font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6e7385;margin:22px 0 4px">${title}</h2>${inner}`;
 const good = t => `<span style="color:#23865f;font-weight:600">${t}</span>`;
+// Practice insights: the teacher's choice per student (show / trend / off), copied onto the student by the studio
+const insMode = (s, m) => ['show', 'trend', 'off'].includes(s.insights?.[m]) ? s.insights[m] : 'show';
+const trendWordTxt = (a, b) => { if (b == null) return 'getting started'; const d = Math.round((a - b) * 100); return d >= 3 ? good('improving') : d <= -3 ? 'a little lower' : 'steady'; };
+const scoreTxt = (s, m, label, c, p) => c[m] == null || insMode(s, m) === 'off' ? null
+  : insMode(s, m) === 'trend' ? `${label} ${trendWordTxt(c[m], p[m])}` : `${label} ${pct(c[m])}${trendTxt(c[m], p[m])}`;
 const trendTxt = (a, b) => { if (a == null || b == null) return ''; const d = Math.round((a - b) * 100); return d >= 3 ? ' ' + good(`↑${d}`) : ''; };
 
 // One line that tells the teacher how the week went, in the order a teacher cares about (numbers only – safe as HTML)
 function weekLine(s, todayKey) {
   if (!s.linkedAt) return 'Not connected to the app yet';
   const c = week(s, todayKey), p = week(s, todayKey, 1), parts = [`${c.days} of ${plannedDays(s)} planned days · ${minsText(c.total)}${c.manual ? ` <span style="color:#6e7385">(${minsText(c.manual)} by hand)</span>` : ''}`];
-  if (c.focus != null) parts.push(`focus ${pct(c.focus)}${trendTxt(c.focus, p.focus)}`);
-  if (s.instrument !== 'piano' && c.tune != null) parts.push(`in tune ${pct(c.tune)}${trendTxt(c.tune, p.tune)}`);
-  if (c.rhythm != null) parts.push(`rhythm ${pct(c.rhythm)}${trendTxt(c.rhythm, p.rhythm)}`);
+  for (const [m, label] of [['focus', 'focus'], ['tune', 'in tune'], ['rhythm', 'rhythm']]) { const t = scoreTxt(s, m, label, c, p); if (t) parts.push(t); }
   return parts.join(' · ');
 }
 function assignmentLine(s, todayKey) {
@@ -300,8 +303,9 @@ function digestEmail(env, feed, students, now, test) {
   for (const { s, c, p } of weeks) {
     const planned = plannedDays(s);
     if (planned && c.days >= planned) wins.push([90, `${esc(first(s.name))} practiced on ${c.days > planned ? `${c.days} days – more than the ${planned} planned` : `every planned day (${planned})`}.`]);
-    if (s.instrument !== 'piano' && c.tune != null && p.tune != null && c.tune - p.tune >= 0.05) wins.push([80, `${esc(first(s.name))}’s tuning improved from ${pct(p.tune)} to ${pct(c.tune)}.`]);
-    if (c.rhythm != null && p.rhythm != null && c.rhythm - p.rhythm >= 0.05) wins.push([75, `${esc(first(s.name))}’s rhythm got steadier: ${pct(p.rhythm)} → ${pct(c.rhythm)}.`]);
+    const num = m => insMode(s, m) === 'show';
+    if (insMode(s, 'tune') !== 'off' && c.tune != null && p.tune != null && c.tune - p.tune >= 0.05) wins.push([80, `${esc(first(s.name))}’s tuning improved${num('tune') ? ` from ${pct(p.tune)} to ${pct(c.tune)}` : ''}.`]);
+    if (insMode(s, 'rhythm') !== 'off' && c.rhythm != null && p.rhythm != null && c.rhythm - p.rhythm >= 0.05) wins.push([75, `${esc(first(s.name))}’s rhythm got steadier${num('rhythm') ? `: ${pct(p.rhythm)} → ${pct(c.rhythm)}` : ''}.`]);
     if (p.total > 0 && c.total >= p.total * 1.5 && c.total - p.total >= 20 * 60000) wins.push([65, `${esc(first(s.name))} practiced ${minsText(c.total - p.total)} more than last week.`]);
     // badges and teacher challenges completed this week (reported by the family app)
     for (const b of Object.values(s.badges || {})) if (b.date > addKey(now.key, -7) && b.tier >= 1) wins.push([70 + 3 * b.tier, `${esc(first(s.name))} earned ${esc(b.label)}.`]);

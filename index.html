@@ -251,6 +251,9 @@
   .days { display: flex; gap: 5px; margin-top: 6px; }
   .days span { flex: 1; text-align: center; font-size: 11px; color: var(--muted); }
   .footnote { font-size: 12.5px; color: var(--muted); margin-top: 12px; line-height: 1.5; }
+  .footnote .how summary { cursor: pointer; color: var(--accent); font-weight: 600; margin-top: 6px; }
+  .footnote .how p { margin: 8px 0 0; }
+  .stats b .tword { font-size: 14px; white-space: normal; line-height: 1.25; } .tword.up { color: var(--good); } .tword.down { color: var(--warn); }
 
   /* Settings */
   .sectionLabel { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 8px 4px -2px; }
@@ -633,14 +636,16 @@
   </div>
 </div>
 
-<script src="badges.js?v=6"></script>
+<script src="badges.js?v=7"></script>
 <script>
 const $ = id => document.getElementById(id);
 const CIRC = 2 * Math.PI * 52;
 $('prog').style.strokeDasharray = CIRC;
 // Instruments (badges.js): the lowest note we listen for, per instrument. Piano, guitar and drums aren't checked for tuning.
 const hasPitch = k => !!instrumentLow(k?.instrument);          // instrument we can hear pitch on
-const tracksPitch = k => hasPitch(k) && k.tuning !== false;      // …and the parent wants tuning shown for this kid
+// Practice insights: a connected teacher chooses whether focus, tuning and rhythm show as scores, trends only, or not at all
+const insOf = (k, m) => insightMode(teacherOf(k)?.insights, m);
+const tracksPitch = k => hasPitch(k) && k.tuning !== false && insOf(k, 'tune') !== 'off';   // …and the parent (and teacher) want tuning shown
 const COLORS = ['#cf5c3c', '#1f8a7e', '#6a55c8', '#2f6bcc', '#b3821c', '#c2457a'];
 const OLD_COLORS = ['#e0653a', '#2a9d8f', '#7b5cd6', '#2f7ed8', '#d4a017', '#d6457a'];   // earlier palette → map to the refined one
 const kidColor = k => OLD_COLORS.includes(k.color) ? COLORS[OLD_COLORS.indexOf(k.color)] : k.color;
@@ -1189,15 +1194,16 @@ function addPractice(ms) {
 function showSummary(k, s, played) {
   const focus = s.active ? Math.min(played / s.active, 1) : null;
   const today = msOn(k), goal = goalOf(k) * 60000;
-  const rows = [
-    ['clock', clock(played) + ' played', `Microphone was on for ${clock(s.active)}`],
-    ['target', pct(focus) + ' focus', `Longest stretch ${clock(s.longest)} · ${s.breaks} ${s.breaks === 1 ? 'break' : 'breaks'}`]
-  ];
-  if (tracksPitch(k) && s.notes >= 10) rows.push(['tune', pct(s.inTune / s.notes) + ' in tune', `${s.notes} notes checked`]);
-  if (s.beats >= 8) rows.push(['metronome', pct(s.steady / s.beats) + ' steady rhythm', `${s.beats} notes with the metronome`]);
+  const fm = insOf(k, 'focus'), rm = insOf(k, 'rhythm'), breaks = `${s.breaks} ${s.breaks === 1 ? 'break' : 'breaks'}`;
+  const rows = [['clock', clock(played) + ' played', `Microphone was on for ${clock(s.active)}`]];
+  // "Trends only" shows no percentages here – the trend is on the History screen
+  if (fm === 'show') rows.push(['target', pct(focus) + ' focus', `Longest stretch ${clock(s.longest)} · ${breaks}`]);
+  if (fm === 'trend') rows.push(['target', `Longest stretch ${clock(s.longest)}`, breaks]);
+  if (tracksPitch(k) && insOf(k, 'tune') === 'show' && s.notes >= 10) rows.push(['tune', pct(s.inTune / s.notes) + ' in tune', `${s.notes} notes checked`]);
+  if (rm === 'show' && s.beats >= 8) rows.push(['metronome', pct(s.steady / s.beats) + ' steady rhythm', `${s.beats} notes with the metronome`]);
   rows.push(!goal ? ['star', 'Bonus practice on a rest day', `${mins(today)} practiced today`]
     : today >= goal ? ['check', 'Today’s goal reached', `${mins(today)} practiced today`] : ['flag', `${mins(goal - today)} to go`, `toward today’s ${goalOf(k)} min goal`]);
-  const won = goal > 0 && today >= goal, great = focus >= 0.8;
+  const won = goal > 0 && today >= goal, great = fm !== 'off' && focus >= 0.8;
   $('summary').querySelector('.card').style.setProperty('--kid', kidColor(k));
   $('sumBadge').innerHTML = icon(won ? 'trophy' : great ? 'star' : 'spark');
   $('sumTitle').textContent = won ? `Goal reached, ${k.name}!` : great ? `Great focus, ${k.name}!` : `Nice work, ${k.name}!`;
@@ -1239,10 +1245,10 @@ function renderHistory() {
       </div>
       ${(() => {
         const cur = statsOver(k, lastDays(7)), prev = statsOver(k, lastDays(14).slice(0, 7));
-        return `<div class="stats">
-          <div><b>${pct(cur.focus)}${trend(cur.focus, prev.focus)}</b><span>focus</span></div>
-          ${tracksPitch(k) ? `<div><b>${pct(cur.tune)}${trend(cur.tune, prev.tune)}</b><span>in tune</span></div>` : ''}
-          <div><b>${pct(cur.rhythm)}${trend(cur.rhythm, prev.rhythm)}</b><span>steady rhythm</span></div>
+        const on = INSIGHT_ORDER.filter(m => insOf(k, m) !== 'off' && (m !== 'tune' || tracksPitch(k)));
+        if (!on.length) return '';
+        return `<div class="stats">${on.map(m => { const w = insOf(k, m) === 'trend' && trendWord(cur[m], prev[m]);
+          return `<div><b>${insOf(k, m) === 'trend' ? (w ? `<span class="tword ${w.cls}">${w.text}</span>` : '–') : pct(cur[m]) + trend(cur[m], prev[m])}</b><span>${INSIGHTS[m].unit}</span></div>`; }).join('')}
         </div>`;
       })()}
       <div class="chart">
@@ -1252,8 +1258,9 @@ function renderHistory() {
       </div>
       <div class="days">${days.map((d, i) => `<span>${i === days.length - 1 ? 'Today' : DOW[d.getDay()]}</span>`).join('')}</div>
       <div class="footnote">Last two weeks. Dashes mark each day’s goal (plan: ${planText(planFor(k))}); solid bars met it; striped parts were logged by hand.
-        Focus, tuning and rhythm cover the last 7 days, with the change from the week before.
-        ${tracksPitch(k) ? `A note is in tune within ${IN_TUNE_CENTS} cents of the instrument’s own tuning.` : ''}</div>
+        ${(on => on.length ? `${(t => t.charAt(0).toUpperCase() + t.slice(1))(on.map(m => INSIGHTS[m].label.toLowerCase()).join(', ').replace(/, ([^,]*)$/, ' and $1'))} ${on.length === 1 ? 'covers' : 'cover'} the last 7 days, compared with the week before.
+          <details class="how"><summary>How ${on.length === 1 ? 'it’s' : 'they’re'} measured</summary>${on.map(m => `<p><b>${INSIGHTS[m].label}.</b> ${INSIGHTS[m].how.join(' ')} <i>${INSIGHTS[m].limits}</i></p>`).join('')}</details>` : '')
+          (INSIGHT_ORDER.filter(m => insOf(k, m) !== 'off' && (m !== 'tune' || tracksPitch(k))))}</div>
     </div>`;
   }).join('') || '<div class="card empty muted">No players yet.</div>';
 }
@@ -1294,7 +1301,8 @@ function renderParent() {
         <select data-instr="${k.id}" aria-label="Instrument">${instrumentOptions(k.instrument || '', 'Choose instrument…')}</select>
         <input type="text" data-instr-other="${k.id}" maxlength="30" placeholder="Type the instrument, e.g. Harp" aria-label="Instrument name"
           value="${k.instrument && !INSTRUMENTS[k.instrument] && k.instrument !== 'other' ? esc(k.instrument) : ''}" ${k.instrument && !INSTRUMENTS[k.instrument] ? '' : 'hidden'}>
-        ${hasPitch(k) ? `<label class="opt">Tuner and in-tune score <input type="checkbox" class="toggle" data-tuning="${k.id}" ${k.tuning !== false ? 'checked' : ''}></label>` : ''}
+        ${hasPitch(k) ? insOf(k, 'tune') === 'off' ? `<div class="opt"><span>Tuner and in-tune score<br><small class="muted">Turned off by ${esc(teacherOf(k).teacherName || 'the teacher')}</small></span></div>`
+          : `<label class="opt">Tuner and in-tune score <input type="checkbox" class="toggle" data-tuning="${k.id}" ${k.tuning !== false ? 'checked' : ''}></label>` : ''}
         <div class="opt"><span>Practice plan<br><small class="muted">${esc(planText(planFor(k)))}${(f => f ? ` · ${f.by === 'a parent' ? 'set by you' : 'set by ' + esc(f.by)}` : ' · child chooses')(planFloor(k))}</small></span>
           <button class="secondary" data-plan="${k.id}">Edit</button></div>
         <div class="opt"><span>Photo<br><small class="muted">A small picture so ${k.link ? 'the teacher' : 'a teacher'} can tell who’s who</small></span>
@@ -1944,9 +1952,10 @@ function kidRecap(k, w) {
   const wins = [];
   if (practiced >= 3 && practiced >= Math.min(5, planned))
     wins.push([90, practiced > planned ? `Practiced ${practiced} days – more than planned!` : practiced === planned ? `Practiced on every planned day (${planned}) – brilliant consistency.` : `Practiced ${practiced} of ${planned} planned days – great consistency.`]);
-  if (tracksPitch(k) && sc.tune != null && sp.tune != null && sc.tune - sp.tune >= 0.05) wins.push([80, `Tuning improved from ${pct(sp.tune)} to ${pct(sc.tune)}.`]);
-  if (sc.rhythm != null && sp.rhythm != null && sc.rhythm - sp.rhythm >= 0.05) wins.push([75, `Steadier rhythm: ${pct(sp.rhythm)} → ${pct(sc.rhythm)}.`]);
-  if (longest >= 5 * 60000 && longest > best) wins.push([70, `Longest focused stretch yet: ${mins(longest)}.`]);
+  const num = m => insOf(k, m) === 'show';                     // "Trends only": say it improved, without the numbers
+  if (tracksPitch(k) && sc.tune != null && sp.tune != null && sc.tune - sp.tune >= 0.05) wins.push([80, num('tune') ? `Tuning improved from ${pct(sp.tune)} to ${pct(sc.tune)}.` : 'Tuning is improving.']);
+  if (insOf(k, 'rhythm') !== 'off' && sc.rhythm != null && sp.rhythm != null && sc.rhythm - sp.rhythm >= 0.05) wins.push([75, num('rhythm') ? `Steadier rhythm: ${pct(sp.rhythm)} → ${pct(sc.rhythm)}.` : 'Rhythm is getting steadier.']);
+  if (insOf(k, 'focus') !== 'off' && longest >= 5 * 60000 && longest > best) wins.push([70, `Longest focused stretch yet: ${mins(longest)}.`]);
   if (goalDays >= 3) wins.push([60, `Reached the day’s goal ${goalDays} times.`]);
   if (prev > 0 && cur > prev + 10 * 60000) wins.push([55, `${mins(cur - prev)} more practice than the week before.`]);
   if (cur > 0) wins.push([10, `${mins(cur)} of practice this week – every minute counts.`]);
@@ -1989,7 +1998,7 @@ function tickDays(k) {
   for (const days of Object.values(t?.progress || {})) for (const d of Object.keys(days)) out.add(d);
   return out;
 }
-const kidBadges = k => badgeLevels(badgeMetrics({ days: kidDays(k), goalFor: goalMsFor(k), tickDays: tickDays(k) }), teacherOf(k)?.badgeRules || {}, { strings: tracksPitch(k) }, teacherOf(k)?.badgeSet);
+const kidBadges = k => badgeLevels(badgeMetrics({ days: kidDays(k), goalFor: goalMsFor(k), tickDays: tickDays(k) }), teacherOf(k)?.badgeRules || {}, { strings: tracksPitch(k), off: INSIGHT_ORDER.filter(m => insOf(k, m) === 'off') }, teacherOf(k)?.badgeSet);
 
 // Badge levels reached since we last looked. The very first time, it just records what's already earned.
 function newBadges(k) {

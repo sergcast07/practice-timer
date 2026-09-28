@@ -177,7 +177,7 @@
 
   /* Practice table */
   .ptable { display: grid; }
-  .ptr { display: grid; grid-template-columns: minmax(150px, 1.6fr) 1.6fr .6fr .7fr .7fr .7fr 1fr; gap: 12px; align-items: center; padding: 11px 6px;
+  .ptr { display: grid; grid-template-columns: var(--cols, minmax(150px, 1.6fr) 1.6fr .6fr .8fr .8fr .8fr 1fr); gap: 12px; align-items: center; padding: 11px 6px;
          border-top: 1px solid var(--line); font-size: 14.5px; }
   .ptr.head { border-top: 0; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; padding-top: 0; }
   .ptr:not(.head) { cursor: pointer; border-radius: 10px; }
@@ -225,6 +225,22 @@
   .stat b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
   .stat span { font-size: 12.5px; color: var(--muted); font-weight: 600; }
   .trend { font-size: 12px; font-weight: 700; margin-left: 4px; }
+  .tword { font-size: 13.5px; font-weight: 700; color: var(--ink-2); } .tword.up { color: var(--good); } .tword.down { color: var(--warn); }
+  .stat .tword { font-size: 17px; }
+  .infoBtn { width: 17px; height: 17px; min-height: 0; padding: 0; border-radius: 50%; display: inline-grid; place-items: center; vertical-align: 1px;
+             font: italic 700 11px/1 Georgia, serif; text-transform: none; letter-spacing: 0; background: var(--soft); color: var(--muted); border: 1px solid var(--line); cursor: help; }
+  .infoBtn:hover { color: var(--ink); border-color: var(--muted); }
+  @media print { .infoBtn { display: none; } }
+  .insRow { display: grid; gap: 8px; padding: 14px 0; border-top: 1px solid var(--line); }
+  .insRow:first-of-type { border-top: 0; }
+  .insRow .seg, #fInsights .seg { justify-self: start; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 12px; padding: 3px; gap: 2px; background: var(--soft); flex-wrap: wrap; }
+  .seg button { background: none; color: var(--ink-2); padding: 7px 12px; border-radius: 9px; font-size: 14px; min-height: 0; }
+  .seg button.on { background: var(--card); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+  .insHow { font-size: 14px; color: var(--ink-2); line-height: 1.55; }
+  .insHow ul { margin: 6px 0 0; padding-left: 18px; } .insHow li { margin: 4px 0; }
+  .insHow summary { cursor: pointer; color: var(--accent); font-weight: 600; font-size: 13.5px; }
+  .insData { background: var(--soft); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
   .trend.up { color: var(--good); } .trend.down { color: var(--warn); }
   .chart { position: relative; display: flex; align-items: flex-end; gap: 3px; height: 140px; margin-top: 18px; }
   .chart .col { flex: 1; height: 100%; display: flex; align-items: flex-end; }
@@ -463,7 +479,7 @@
 <div class="overlay" id="modal" hidden><div class="card modal" id="modalCard" role="dialog" aria-modal="true"></div></div>
 <div id="toast"></div>
 
-<script src="badges.js?v=6"></script>
+<script src="badges.js?v=7"></script>
 <script>
 // ============================================================================================
 // Allegrow Studio (teacher side of Allegrow)
@@ -539,18 +555,32 @@ const planOfStudent = s => planOf(s.plan, s.target || 20);
 const goalMsOn = (s, key) => planOfStudent(s)[parseDay(key).getDay()] * 60000;
 const sDay = (s, d) => s.practice?.stats?.[dayKey(d)] || {};
 function practiceSummary(s, days) {
-  const t = { total: 0, manual: 0, days: 0, active: 0, played: 0, notes: 0, inTune: 0, beats: 0, steady: 0 };
+  const t = { total: 0, manual: 0, days: 0, active: 0, played: 0, notes: 0, inTune: 0, beats: 0, steady: 0, longest: 0 };
   for (const d of days) {
     const ms = pDay(s, d), st = sDay(s, d);
-    t.total += ms; t.manual += manDay(s, d); if (ms >= 60000) t.days++;
+    t.total += ms; t.manual += manDay(s, d); if (ms >= 60000) t.days++; t.longest = Math.max(t.longest, st.longest || 0);
     if (st.active) { t.active += st.active; t.played += Math.min(recDay(s, d), st.active); }
     t.notes += st.notes || 0; t.inTune += st.inTune || 0; t.beats += st.beats || 0; t.steady += st.steady || 0;
   }
-  return { total: t.total, manual: t.manual, days: t.days,
+  return { total: t.total, manual: t.manual, days: t.days, raw: t,
     focus: t.active >= 60000 ? t.played / t.active : null,
     tune: t.notes >= 10 ? t.inTune / t.notes : null,
     rhythm: t.beats >= 8 ? t.steady / t.beats : null };
 }
+// Practice insights (badges.js): what the teacher chose for this student – the studio's setting unless the student has their own
+const insMode = (s, m) => m === 'tune' && !instrumentLow(s.instrument) ? 'na' : insightMode(insightsFor(studio?.insights, s.insightOverride), m);
+function insightValue(s, m, c, p) {
+  const mode = insMode(s, m);
+  if (mode === 'na') return '<span class="muted">n/a</span>';
+  if (mode === 'off') return '<span class="muted small">Off</span>';
+  if (mode === 'trend') { const w = trendWord(c[m], p?.[m]); return w ? `<span class="tword ${w.cls}">${w.text}</span>` : '–'; }
+  return `${pct(c[m])}${p ? trend(c[m], p[m]) : ''}`;
+}
+const infoBtn = (m, sid = '') => `<button type="button" class="infoBtn" data-insight="${m}" data-sid="${sid}" aria-label="How ${INSIGHTS[m].label.toLowerCase()} is measured" title="How it’s measured">i</button>`;
+// A stat tile for the student page and report (nothing at all when the teacher turned it off)
+const insightStat = (s, m, c, p) => ['off', 'na'].includes(insMode(s, m)) ? ''
+  : `<div class="stat"><b>${insightValue(s, m, c, p)}</b><span>${INSIGHTS[m].unit} ${infoBtn(m, s.id)}</span></div>`;
+
 function lastPracticed(s) {
   for (let i = 0; i < 120; i++) if (pDay(s, addDays(today(), -i)) >= 60000) return i;
   return null;
@@ -906,20 +936,21 @@ function gettingStarted() {
 function practiceTable(list) {
   if (!list.length) return '<div class="emptyBig">' + icon('users', 'lg') + '<p>Add your first student to get started.</p><div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><button class="accent" data-act="import">' + icon('report', 'sm') + 'Import a list</button><button class="secondary" data-act="addStudent">' + icon('plus', 'sm') + 'Add one student</button></div></div>';
   const wk = lastDays(7), prev = lastDays(7, addDays(today(), -7));
-  return `<div class="ptable">
-    <div class="ptr head"><div>Student</div><div>Minutes vs target</div><div>Days</div><div>Focus</div><div>In tune</div><div>Rhythm</div><div>Last practiced</div></div>
+  // A score's column is left out when it's off (or doesn't apply) for every student in the list
+  const cols = INSIGHT_ORDER.filter(m => list.some(s => !['off', 'na'].includes(insMode(s, m))));
+  const head = { focus: 'Focus', tune: 'In tune', rhythm: 'Rhythm' };
+  return `<div class="ptable" style="--cols: minmax(150px, 1.6fr) 1.6fr .6fr ${cols.map(() => '.8fr').join(' ')} 1fr">
+    <div class="ptr head"><div>Student</div><div>Minutes vs target</div><div>Days</div>${cols.map(m => `<div>${head[m]} ${infoBtn(m)}</div>`).join('')}<div>Last practiced</div></div>
     ${list.map(s => {
       if (!s.linkedAt) return `<div class="ptr" data-student="${s.id}" style="--kid:${s.color}"><div class="name"><div class="avatar sm">${face(s)}</div><span>${esc(s.name)}</span></div>
-        <div class="mins"><span class="chip info">${icon('link')}Not connected</span></div><div></div><div></div><div></div><div></div><div></div></div>`;
+        <div class="mins"><span class="chip info">${icon('link')}Not connected</span></div><div></div>${cols.map(() => '<div></div>').join('')}<div></div></div>`;
       const c = practiceSummary(s, wk), p = practiceSummary(s, prev), plan = planOfStudent(s), target = Math.max(1, planTotal(plan)) * 60000, f = Math.min(c.total / target, 1);
       return `<div class="ptr" data-student="${s.id}" style="--kid:${s.color}">
         <div class="name"><div class="avatar sm">${face(s)}</div><span>${esc(s.name)}</span></div>
         <div class="mins"><span class="num">${mins(c.total)}</span> <span class="muted small">/ ${mins(target)}</span>${c.manual ? `<span class="byHand" title="Logged by hand">${icon('edit')}${mins(c.manual)}</span>` : ''}
           <div class="mbar ${f >= 1 ? 'full' : ''}"><div style="width:${Math.min((c.total - c.manual) / target, 1) * 100}%"></div><div class="hatch" style="width:${(f - Math.min((c.total - c.manual) / target, 1)) * 100}%"></div></div></div>
         <div><span class="lbl-m">Days</span><span class="num">${c.days}<span class="muted small"> / ${planDayCount(plan)}</span></span></div>
-        <div><span class="lbl-m">Focus</span><span class="num">${pct(c.focus)}</span>${trend(c.focus, p.focus)}</div>
-        <div><span class="lbl-m">In tune</span><span class="num">${!instrumentLow(s.instrument) ? '<span class="muted">n/a</span>' : pct(c.tune)}</span>${trend(c.tune, p.tune)}</div>
-        <div><span class="lbl-m">Rhythm</span><span class="num">${pct(c.rhythm)}</span>${trend(c.rhythm, p.rhythm)}</div>
+        ${cols.map(m => `<div><span class="lbl-m">${head[m]}</span><span class="num">${insightValue(s, m, c, p)}</span></div>`).join('')}
         <div class="small muted">${lastPracticedText(lastPracticed(s))}</div></div>`;
     }).join('')}</div>`;
 }
@@ -1010,9 +1041,7 @@ function tProgress(s) {
       <div class="stats">
         <div class="stat"><b>${mins(c.total)}</b><span>last 7 days${c.manual ? ` · ${mins(c.manual)} by hand` : ''}</span></div>
         <div class="stat"><b>${c.days} ${c.days === 1 ? 'day' : 'days'}</b><span>practiced · ${planDayCount(planOfStudent(s))} planned</span></div>
-        <div class="stat"><b>${pct(c.focus)}${trend(c.focus, p.focus)}</b><span>focus</span></div>
-        ${instrumentLow(s.instrument) ? `<div class="stat"><b>${pct(c.tune)}${trend(c.tune, p.tune)}</b><span>in tune</span></div>` : ''}
-        <div class="stat"><b>${pct(c.rhythm)}${trend(c.rhythm, p.rhythm)}</b><span>steady rhythm</span></div>
+        ${INSIGHT_ORDER.map(k => insightStat(s, k, c, p)).join('')}
         <div class="stat"><b>${mins(m.total)}</b><span>last 30 days</span></div>
       </div>
       <div class="chart">
@@ -1141,7 +1170,7 @@ function vReports() {
   const list = active(), sid = sub.sid && students[sub.sid] ? sub.sid : list[0]?.id, range = +(sub.range || 28);
   if (!sid) return `<div class="pageHead"><h1>Reports</h1></div><div class="card">${practiceTable([])}</div>`;
   const s = students[sid], end = today(), start = addDays(end, -range + 1), days = lastDays(range);
-  const P = practiceSummary(s, days), ls = lessonsBetween(start, end, sid).filter(l => parseDay(l.date) <= end);
+  const P = practiceSummary(s, days), Pp = practiceSummary(s, lastDays(range, addDays(start, -1))), ls = lessonsBetween(start, end, sid).filter(l => parseDay(l.date) <= end);
   const doneL = ls.filter(l => l.status === 'done'), cancelled = ls.filter(l => l.status === 'cancelled'), noshow = ls.filter(l => l.status === 'noshow');
   const rated = ls.filter(l => l.ratings && Object.keys(l.ratings).length);
   const asg = Object.values(s.assignments || {}), asgDone = asg.filter(a => a.status === 'done' && a.completed && a.completed >= dayKey(start));
@@ -1163,9 +1192,7 @@ function vReports() {
         <div class="stat"><b>${mins(P.total)}</b><span>total${P.manual ? ` (${mins(P.manual)} logged by hand)` : ''}</span></div>
         <div class="stat"><b>${mins(P.total / (range / 7))}</b><span>per week</span></div>
         <div class="stat"><b>${P.days} of ${range}</b><span>days practiced</span></div>
-        <div class="stat"><b>${pct(P.focus)}</b><span>focus</span></div>
-        ${instrumentLow(s.instrument) ? `<div class="stat"><b>${pct(P.tune)}</b><span>in tune</span></div>` : ''}
-        <div class="stat"><b>${pct(P.rhythm)}</b><span>steady rhythm</span></div></div>
+        ${INSIGHT_ORDER.map(k => insightStat(s, k, P, insMode(s, k) === 'trend' ? Pp : null)).join('')}</div>
       <div class="chart" style="height:110px">${wVals.map((v, i) => `<div class="col" title="Week of ${fmtDate(weeks[i][0])}: ${mins(v)}"><div class="b met" style="height:${v / wTop * 100}%"></div></div>`).join('')}
         <div class="goal" style="bottom:${weekTarget / wTop * 100}%"></div></div>
       <div class="axis"><span>Minutes per week</span><span>dashed line = weekly plan (${planText(planOfStudent(s))})</span></div>`
@@ -1193,6 +1220,7 @@ function bindView() {
   V.querySelectorAll('[data-student]').forEach(b => b.onclick = () => { sub = {}; go('student', { id: b.dataset.student }); });
   V.querySelectorAll('[data-go2]').forEach(b => b.onclick = () => { sub = {}; go(b.dataset.go2); });
   V.querySelectorAll('[data-lesson]').forEach(b => b.onclick = () => lessonModal(b.dataset.lesson));
+  V.querySelectorAll('[data-insight]').forEach(b => b.onclick = e => { e.stopPropagation(); insightInfoModal(b.dataset.insight, b.dataset.sid); });
   V.querySelectorAll('[data-event]').forEach(b => b.onclick = () => eventModal(b.dataset.event));
   V.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { sub.tab = b.dataset.tab; render(); });
   V.querySelectorAll('[data-week]').forEach(b => b.onclick = () => {
@@ -1236,7 +1264,7 @@ addEventListener('keydown', e => { if (e.key === 'Escape' && !$('modal').hidden)
 const mhead = t => `<header><h2>${t}</h2><button class="ghost icon" data-close aria-label="Close">${icon('x')}</button></header>`;
 const val = id => $('modalCard').querySelector('#' + id)?.value.trim() ?? '';
 
-function studentModal(sid) {
+function studentModal(sid, scrollTo) {
   const s = sid ? students[sid] : { name: '', instrument: '', color: COLORS[Object.keys(students).length % COLORS.length], lesson: { day: '', time: '16:00', length: 30 }, target: 20 };
   let color = s.color;
   openModal(`${mhead(sid ? 'Edit student' : 'Add student')}
@@ -1260,6 +1288,11 @@ function studentModal(sid) {
       <div class="field">Lesson times <span class="small muted" style="font-weight:500">Weekly lessons, each running between two dates – add one per term.${(studio.terms || []).length ? '' : ' Set up your terms in Settings → Terms to pick them here.'}</span>
         <div id="slotList"></div>
         <button type="button" class="secondary" id="addSlot" style="justify-self:start">${icon('plus', 'sm')}Add a lesson time</button></div>
+      <div class="field" id="fInsights">Practice insights <span class="small muted" style="font-weight:500">How ${s.name ? esc(firstName(s.name)) + '’s' : 'this student’s'} focus, tuning and rhythm scores appear – for example, off for a young beginner.</span>
+        ${INSIGHT_ORDER.map(k => `<div style="display:grid;gap:6px;margin-top:6px"><span class="small" style="font-weight:600">${INSIGHTS[k].label}${k === 'tune' ? ' <span class="muted" style="font-weight:500">(strings, voice, winds and brass)</span>' : ''}</span>
+          ${segHtml('ins-' + k, s.insightOverride?.[k] || '', { '': `Studio setting (${INSIGHT_MODES[insightMode(studio.insights, k)].toLowerCase()})`, ...INSIGHT_MODES })}</div>`).join('')}
+        <details class="insHow" style="font-weight:400"><summary>How they’re measured</summary>${INSIGHT_ORDER.map(k => `<p style="margin:10px 0 0"><b>${INSIGHTS[k].label}</b></p>
+          <ul>${INSIGHTS[k].how.map(x => `<li>${x}</li>`).join('')}</ul><p class="small muted" style="margin:4px 0 0">${INSIGHTS[k].limits}</p>`).join('')}</details></div>
       <div class="gateErr" id="fErr"></div>
     </div>
     <footer>${sid ? `<button class="danger" id="fArchive">${s.archived ? 'Delete permanently' : 'Archive student'}</button>` : ''}
@@ -1312,6 +1345,8 @@ function studentModal(sid) {
     m.querySelector('#fInstr').onchange = () => { const other = val('fInstr') === '__other'; m.querySelector('#fInstrOtherWrap').hidden = !other; if (other) m.querySelector('#fInstrOther').focus(); };
     // A typed name that matches a known instrument ("keyboard", "alto sax") is stored as that instrument
     const readInstr = () => val('fInstr') !== '__other' ? val('fInstr') : instrumentFrom(val('fInstrOther')) || (s.instrument === 'other' ? 'other' : '');
+    bindSeg(m);
+    if (scrollTo === 'insights') setTimeout(() => m.querySelector('#fInsights').scrollIntoView({ block: 'center' }), 80);
     m.querySelectorAll('[data-color]').forEach(b => b.onclick = () => { color = b.dataset.color; m.querySelectorAll('[data-color]').forEach(x => x.classList.toggle('on', x === b)); });
     m.querySelector('#fSave').onclick = async () => {
       const name = val('fName'); if (!name) return (m.querySelector('#fErr').textContent = 'Please enter a name.');
@@ -1328,7 +1363,8 @@ function studentModal(sid) {
         } else final.push({ ...L, end: L.end || '' });
       }
       final.sort((a, b) => a.start.localeCompare(b.start));
-      const data = { name, instrument: readInstr(), color, plan, target: Math.round(planTotal(plan) / planDayCount(plan)), teacherPhoto: tPhoto,
+      const insightOverride = Object.fromEntries(INSIGHT_ORDER.map(k => [k, pickedSeg(m, 'ins-' + k)]).filter(([, v]) => v));
+      const data = { name, instrument: readInstr(), color, insightOverride, insights: insightsFor(studio.insights, insightOverride), plan, target: Math.round(planTotal(plan) / planDayCount(plan)), teacherPhoto: tPhoto,
                      slots: final, lesson: currentSlot({ slots: final }) || final[final.length - 1] || null };
       if (sid) {
         await api.patchStudent(sid, data); closeModal(); toast('Saved');
@@ -1349,7 +1385,7 @@ function studentModal(sid) {
 }
 
 function newStudentRecord(data) {
-  return { ...data, tz: TZ, studioId: me.uid, studioName: studio.studioName, teacherName: studio.teacherName,
+  return { ...data, insights: insightsFor(studio.insights, data.insightOverride), tz: TZ, studioId: me.uid, studioName: studio.studioName, teacherName: studio.teacherName,
     assignments: {}, upcoming: {}, lessonChanges: {}, cheers: {}, challenges: {}, badgeRules: studio.badgeRules || {}, badgeSet: studio.badgeSet || null,
     created: dayKey(), archived: false };
 }
@@ -1520,6 +1556,74 @@ function eventModal(eid, preselect) {
   });
 }
 
+// ============================================================================================
+// Practice insights: how focus, tuning and rhythm are measured, and who sees them
+// ============================================================================================
+const segHtml = (name, cur, opts) => `<div class="seg" role="radiogroup">${Object.entries(opts).map(([v, l]) =>
+  `<button type="button" role="radio" aria-checked="${cur === v}" class="${cur === v ? 'on' : ''}" data-seg="${name}" data-v="${v}">${l}</button>`).join('')}</div>`;
+function bindSeg(m, onPick) {
+  m.querySelectorAll('[data-seg]').forEach(b => b.onclick = () => {
+    m.querySelectorAll(`[data-seg="${b.dataset.seg}"]`).forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', x === b); });
+    onPick?.(b.dataset.seg, b.dataset.v);
+  });
+}
+const pickedSeg = (m, name) => m.querySelector(`[data-seg="${name}"].on`)?.dataset.v;
+const howHtml = (k, open) => `<details class="insHow" ${open ? 'open' : ''}><summary>How it’s measured</summary>
+  <ul>${INSIGHTS[k].how.map(x => `<li>${x}</li>`).join('')}</ul><p class="small muted" style="margin:6px 0 0">${INSIGHTS[k].limits}</p></details>`;
+
+// The numbers behind one student's scores this week (so a score is never a mystery)
+function insightData(s, k) {
+  const c = practiceSummary(s, lastDays(7)), r = c.raw;
+  if (k === 'focus') return r.active >= 60000 ? `This week: ${mins(r.played)} playing out of ${mins(r.active)} with the timer on (${pct(c.focus)}). Longest stretch without stopping: ${mins(r.longest)}.` : 'Not enough practice with the timer this week to work it out.';
+  if (k === 'tune') return !instrumentLow(s.instrument) ? `Not measured for ${instrumentLabel(s.instrument, 'this instrument').toLowerCase()}.`
+    : r.notes >= 10 ? `This week: ${r.inTune} of ${r.notes} notes checked were in tune (${pct(c.tune)}).` : `Only ${r.notes} ${r.notes === 1 ? 'note' : 'notes'} checked this week – at least 10 are needed.`;
+  return r.beats >= 8 ? `This week: ${r.steady} of ${r.beats} notes played with the metronome were steady (${pct(c.rhythm)}).` : 'No practice with the app’s metronome this week.';
+}
+
+function insightInfoModal(focusOn, sid) {
+  const s = sid && students[sid];
+  openModal(`${mhead('How practice scores work')}
+    <p class="muted" style="margin-top:-6px">Allegrow works these out on the family’s device while the practice timer listens. Nothing is recorded or sent except the numbers.</p>
+    ${INSIGHT_ORDER.map(k => { const mode = s ? insMode(s, k) : insightMode(studio.insights, k); return `<div class="insRow">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>${INSIGHTS[k].label}</b>
+        <span class="chip ${mode === 'off' || mode === 'na' ? '' : 'info'}">${mode === 'na' ? 'Not measured' : INSIGHT_MODES[mode]}${s ? '' : ' · studio'}</span></div>
+      <div class="small muted">${INSIGHTS[k].what}</div>
+      ${s && s.linkedAt && mode !== 'off' ? `<div class="insData">${insightData(s, k)}</div>` : ''}
+      ${howHtml(k, k === focusOn)}</div>`; }).join('')}
+    <footer><div class="right">${s ? `<button class="secondary" id="iStudent">Change for ${esc(firstName(s.name))}</button>` : ''}
+      <button class="${s ? 'secondary' : 'primary'}" id="iStudio">Studio settings</button>${s ? '<button class="primary" data-close>Done</button>' : ''}</div></footer>`, m => {
+    m.querySelector('#iStudent')?.addEventListener('click', () => studentModal(sid, 'insights'));
+    m.querySelector('#iStudio').onclick = () => insightsModal();
+  });
+}
+
+// Studio-wide: each score shown, trends only, or off. Students with their own setting keep it.
+function insightsModal() {
+  const cur = insightsFor(studio.insights, {});
+  openModal(`${mhead('Practice insights')}
+    <p class="muted" style="margin-top:-6px">Choose how focus, tuning and rhythm appear for your students – to you, to families in the app, and in reports and emails. You can also choose differently for one student (Edit student).</p>
+    ${INSIGHT_ORDER.map(k => { const own = active().filter(s => s.insightOverride?.[k]).length; return `<div class="insRow">
+      <div><b>${INSIGHTS[k].label}</b> <span class="small muted">– ${INSIGHTS[k].what.charAt(0).toLowerCase() + INSIGHTS[k].what.slice(1)}</span></div>
+      ${segHtml(k, cur[k], INSIGHT_MODES)}
+      <div class="small muted" data-about="${k}">${INSIGHT_MODE_ABOUT[cur[k]]}${own ? ` · ${own} ${own === 1 ? 'student has' : 'students have'} their own setting.` : ''}</div>
+      ${howHtml(k)}</div>`; }).join('')}
+    <p class="small muted">The family’s app keeps working the scores out, so turning one back on later shows past weeks too.</p>
+    <footer><div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="iSave">Save</button></div></footer>`, m => {
+    bindSeg(m, (k, v) => { const el = m.querySelector(`[data-about="${k}"]`); el.textContent = INSIGHT_MODE_ABOUT[v] + (el.textContent.match(/ · .*/)?.[0] || ''); });
+    m.querySelector('#iSave').onclick = async () => {
+      const ins = Object.fromEntries(INSIGHT_ORDER.map(k => [k, pickedSeg(m, k)]));
+      studio.insights = ins; await api.updateStudio({ insights: ins });
+      await syncInsights();
+      closeModal(); render(); toast('Saved');
+    };
+  });
+}
+// Copy what each student's family should see onto the student record (families can't read the studio's settings)
+async function syncInsights(list = Object.values(students)) {
+  await Promise.all(list.map(s => { const eff = insightsFor(studio.insights, s.insightOverride);
+    return JSON.stringify(eff) === JSON.stringify(s.insights) ? null : api.patchStudent(s.id, { insights: eff }); }));
+}
+
 function studioModal() {
   openModal(`${mhead('Studio settings')}
     <div class="fields">
@@ -1527,7 +1631,8 @@ function studioModal() {
       <label class="field">Your name, as students know you <input type="text" id="sTeacher" value="${esc(studio.teacherName)}" maxlength="60"></label>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="secondary" id="sCal" type="button">${icon('calendar', 'sm')}Calendar &amp; email</button>
         <button class="secondary" id="sTerms" type="button">${icon('calendar', 'sm')}Terms</button>
-        <button class="secondary" id="sBadges" type="button">${icon('award', 'sm')}Studio badges</button></div>
+        <button class="secondary" id="sBadges" type="button">${icon('award', 'sm')}Studio badges</button>
+        <button class="secondary" id="sInsights" type="button">${icon('tune', 'sm')}Practice insights</button></div>
       <div class="planBox" style="display:grid;margin-top:0">${isPartner() ? `<div><b>Beta partner</b> · unlimited students, free.</div>`
         : `<div><b>Free plan</b> · ${active().length} of ${FREE_STUDENTS} students. Beta partners get unlimited students, free.</div><button class="secondary" type="button" id="sCode">Enter a beta code</button>`}</div>
       <p class="small muted">Signed in as ${esc(me.email || me.displayName || '')}. <a href="privacy.html" target="_blank" rel="noopener">Privacy</a> · <a href="terms.html" target="_blank" rel="noopener">Terms</a></p>
@@ -1543,6 +1648,7 @@ function studioModal() {
     m.querySelector('#sOut').onclick = () => api.signOut();
     m.querySelector('#sCal').onclick = () => calendarEmailModal();
     m.querySelector('#sBadges').onclick = () => badgeRulesModal();
+    m.querySelector('#sInsights').onclick = () => insightsModal();
     m.querySelector('#sTerms').onclick = () => termsModal();
     m.querySelector('#sCode')?.addEventListener('click', () => betaCodeModal());
   });
@@ -2191,6 +2297,9 @@ function seedDemo() {
   const sun = dayKey(addDays(t, (7 - t.getDay()) % 7)), mon = dayKey(addDays(t, -((t.getDay() + 6) % 7)));
   students[ids[0]].challenges = { c1: { kind: 'days', target: 5, start: mon, end: sun, icon: 'flag' } };
   students[ids[4]].challenges = { c2: { kind: 'minutes', target: 60, start: mon, end: sun, icon: 'flag', title: 'One hour this week' } };
+  // Per-student practice insights: tuning as a trend for Ava, focus off for Noah (a young beginner)
+  students[ids[3]].insightOverride = { tune: 'trend' }; students[ids[4]].insightOverride = { focus: 'off' };
+  for (const id of ids) students[id].insights = insightsFor(null, students[id].insightOverride);
   students[ids[0]].cheers = { s1: { kind: 'star', note: 'Your shifting is so much smoother!', date: dayKey(addDays(t, -2)) }, b1: { kind: 'badge', title: 'Recital ready', icon: 'trophy', note: 'You know the Seitz by heart now.', date: dayKey(addDays(t, -9)) } };
   students[ids[0]].cheersSeen = { b1: dayKey(addDays(t, -8)) };
 }

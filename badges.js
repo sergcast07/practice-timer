@@ -145,8 +145,9 @@ function badgeMetrics({ days, goalFor, goalMs, tickDays = new Set() }) {
 
 // Which level of each badge is reached, and what's next. set = a studio's own badges (array) or null for the
 // defaults; rules = older { off, tiers } tweaks to the defaults.
-function badgeLevels(metrics, rules = {}, { strings = true } = {}, set = null) {
-  return badgeSetFor(set, rules).filter(b => strings || !b.strings).map(b => {
+// `off`: metrics whose badges are hidden (e.g. ['tune'] when a teacher turned tuning scores off)
+function badgeLevels(metrics, rules = {}, { strings = true, off = [] } = {}, set = null) {
+  return badgeSetFor(set, rules).filter(b => (strings || !b.strings) && !off.includes(b.metric)).map(b => {
     const tiers = (b.tiers || []).map(Number).filter(n => n > 0).slice(0, BADGE_TIERS.length);
     const value = metrics[b.metric] || 0;
     let tier = -1; tiers.forEach((t, i) => { if (value >= t) tier = i; });
@@ -235,3 +236,48 @@ function instrumentFrom(text) {
 const instrumentOptions = (v, placeholder = 'Choose…') => `<option value="" ${v ? '' : 'selected'} disabled>${placeholder}</option>` +
   Object.entries(INSTRUMENTS).sort((a, b) => a[1].label.localeCompare(b[1].label)).map(([k, i]) => `<option value="${k}" ${v === k ? 'selected' : ''}>${i.label}</option>`).join('') +
   `<option value="__other" ${v && !INSTRUMENTS[v] ? 'selected' : ''}>Other – type it in…</option>`;
+
+// ---------- Practice insights: focus, tuning and rhythm ----------
+// Scores worked out by listening. A teacher chooses, for the studio and per student, whether each one is shown as a
+// number, as a trend only ("Improving", "Steady"), or not at all. The student record carries the result in
+// `insights` (e.g. { focus: 'show', tune: 'off', rhythm: 'trend' }), so the family app, reports and emails follow it.
+// A parent can also turn tuning off for their child; whichever setting is stricter wins.
+const INSIGHTS = {
+  focus: {
+    label: 'Focus', unit: 'focus',
+    what: 'How much of the practice session was spent playing.',
+    how: ['While the practice timer runs, Allegrow listens. Minutes where it hears music count as playing; pauses, talking and quiet count as breaks.',
+          'Focus = minutes playing ÷ minutes the timer was listening. The app also notes the longest stretch without stopping and how many breaks there were.',
+          'Some pauses are part of good practice – fixing a spot, listening back, reading ahead – so a score below 100% is normal.'],
+    limits: 'A noisy room or long silent rests in the music can make it read lower than it should.'
+  },
+  tune: {
+    label: 'Tuning', unit: 'in tune',
+    what: 'How many notes were in tune.',
+    how: ['Each note held for at least 0.15 seconds is checked against the instrument’s own tuning (so a violin tuned a little sharp overall isn’t marked wrong for every note).',
+          'A note counts as in tune within 20 cents – one fifth of a half step. The score is in-tune notes ÷ notes checked, shown once at least 10 notes were checked.',
+          'Only for instruments where the player shapes every note: violin, viola, cello, voice, flute, clarinet, saxophone and trumpet. Never for piano, guitar, ukulele or drums.'],
+    limits: 'It listens through a phone microphone, so echoey rooms, fast passages, double stops and vibrato can make it less accurate. Treat it as a trend, not a grade.'
+  },
+  rhythm: {
+    label: 'Rhythm', unit: 'steady rhythm',
+    what: 'How steadily notes landed with the metronome.',
+    how: ['Only measured while the app’s metronome is on.',
+          'The start of each note is compared with the metronome’s beat grid (eighth notes). A note counts as steady if it lands within 50 milliseconds (less at fast tempos) of where the player usually lands – so a constant delay from the phone’s speaker isn’t held against them.',
+          'The score is steady notes ÷ notes played with the metronome, shown once at least 8 notes were played.'],
+    limits: 'Rests, syncopation and very soft note starts can be missed or misread.'
+  }
+};
+const INSIGHT_ORDER = ['focus', 'tune', 'rhythm'];
+const INSIGHT_MODES = { show: 'Show scores', trend: 'Trends only', off: 'Off' };
+const INSIGHT_MODE_ABOUT = { show: 'Percentages, with the change from the week before.', trend: 'No numbers – just “Improving”, “Steady” or “A little lower”.', off: 'Not shown anywhere – not to you, the family or in reports and emails.' };
+const insightMode = (ins, m) => INSIGHT_MODES[ins?.[m]] ? ins[m] : 'show';
+// Studio defaults + this student's own choices → what everyone sees for this student
+const insightsFor = (studioIns, own) => Object.fromEntries(INSIGHT_ORDER.map(m => [m, INSIGHT_MODES[own?.[m]] ? own[m] : insightMode(studioIns, m)]));
+// A number-free trend for "Trends only": this week against the week before (in percentage points)
+function trendWord(cur, prev) {
+  if (cur == null) return null;
+  if (prev == null) return { text: 'Getting started', cls: '' };
+  const d = Math.round((cur - prev) * 100);
+  return d >= 3 ? { text: 'Improving', cls: 'up' } : d <= -3 ? { text: 'A little lower', cls: 'down' } : { text: 'Steady', cls: '' };
+}
