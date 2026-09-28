@@ -2,6 +2,14 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{db}/documents {
 
+    // Admins (the app's owner). Added by hand in the Firebase console: collection "admins", document ID = the
+    // admin's user ID. Nobody can add or change admins from the apps.
+    function isAdmin() { return request.auth != null && exists(/databases/$(db)/documents/admins/$(request.auth.uid)); }
+    match /admins/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;       // lets the app check "am I an admin?"
+      allow list, write: if false;
+    }
+
     // A family's players and practice history. The long random family code is the key.
     match /families/{family} {
       allow get, create, update: if family.size() >= 20;
@@ -10,9 +18,19 @@ service cloud.firestore {
 
     // A teacher's studio and everything private to it (lessons, recitals, notes).
     // Only the signed-in teacher who owns it can read or write.
+    // The studio's plan (Free, or Beta partner) can only be changed by redeeming an unused beta code in the
+    // same write, or by an admin.
     match /studios/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
-      match /{document=**} {
+      allow read: if (request.auth != null && request.auth.uid == uid) || isAdmin();
+      allow create: if request.auth != null && request.auth.uid == uid && !('plan' in request.resource.data);
+      allow update: if isAdmin() || (request.auth != null && request.auth.uid == uid && (
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['plan'])
+        || (request.resource.data.plan.tier == 'beta'
+            && getAfter(/databases/$(db)/documents/betaCodes/$(request.resource.data.plan.code)).data.usedBy == request.auth.uid)));
+      allow delete: if false;
+      // Everything inside the studio (lessons, recitals, notes). "{sub}/" makes sure this only matches documents
+      // below the studio – a bare {document=**} would also match the studio record itself and bypass the plan rule.
+      match /{sub}/{document=**} {
         allow read, write: if request.auth != null && request.auth.uid == uid;
       }
     }
@@ -26,6 +44,29 @@ service cloud.firestore {
       allow list: if false;
     }
 
+    // Beta codes: single use. A signed-in teacher can look up a code they were given and claim it once.
+    match /betaCodes/{code} {
+      allow get: if request.auth != null;
+      allow list, create, delete: if isAdmin();
+      allow update: if isAdmin() || (request.auth != null && resource.data.usedBy == null && resource.data.revoked != true
+        && request.resource.data.usedBy == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usedBy', 'usedAt', 'usedByName']));
+    }
+
+    // Beta requests (landing page form) and feedback (both apps): anyone can send one; only admins read them.
+    match /betaRequests/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['name', 'studio', 'email', 'students', 'instruments', 'message', 'at'])
+        && request.resource.data.email is string && request.resource.data.email.size() <= 120
+        && request.resource.data.get('message', '').size() <= 2000 && request.resource.data.name.size() <= 120;
+      allow read, update, delete: if isAdmin();
+    }
+    match /feedback/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['from', 'role', 'rating', 'message', 'page', 'at', 'studioId', 'contact'])
+        && request.resource.data.message is string && request.resource.data.message.size() <= 4000
+        && (!('studioId' in request.resource.data) || (request.auth != null && request.resource.data.studioId == request.auth.uid));
+      allow read, update, delete: if isAdmin();
+    }
+
     // One student: shared between their teacher and their family.
     // The student code (sent to the family as an invite link) is long and random.
     match /students/{sid} {
@@ -36,7 +77,7 @@ service cloud.firestore {
       // earned badges, which stars they've seen and which challenges they've finished
       allow get: if sid.size() >= 20;
       allow update: if sid.size() >= 20
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['practice', 'progress', 'linkedAt', 'kidName', 'badges', 'cheersSeen', 'challengeDone']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['practice', 'progress', 'linkedAt', 'kidName', 'badges', 'cheersSeen', 'challengeDone', 'consent']);
     }
   }
 }

@@ -309,6 +309,15 @@
   .ruleRow { display: grid; grid-template-columns: auto 1fr 150px; gap: 10px 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
   .ruleRow .grow b { display: block; font-size: 14.5px; } .ruleRow .grow span { font-size: 12.5px; color: var(--muted); }
   @media (max-width: 520px) { .ruleRow { grid-template-columns: auto 1fr; } .ruleRow input[type=text] { grid-column: 2; } }
+  /* Beta */
+  .betaChip { font-family: var(--sans); font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 2px 7px;
+              border-radius: 999px; background: color-mix(in srgb, var(--leaf) 16%, transparent); color: var(--leaf); vertical-align: 2px; }
+  .planBox { margin-top: 14px; padding: 12px; border-radius: 14px; background: var(--soft); font-size: 13px; color: var(--ink-2); display: grid; gap: 8px; }
+  .planBox b { color: var(--ink); }
+  .planBox button { justify-self: start; padding: 6px 10px; font-size: 13px; }
+  .planBox:empty { display: none; }
+  @media (max-width: 860px) { .planBox { display: none; } }
+  .adminList .assign code { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 14px; font-weight: 700; letter-spacing: .03em; }
   /* Report */
   .report { max-width: 760px; }
   .report .rhead { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border-bottom: 2px solid var(--ink); padding-bottom: 16px; margin-bottom: 18px; flex-wrap: wrap; }
@@ -382,6 +391,7 @@
       Continue with Google</button>
     <div class="gateErr" id="signinErr"></div>
     <p class="small muted">Just looking? <a href="?demo">Explore a demo studio</a> with sample students.</p>
+    <p class="small muted"><span class="betaChip">Beta</span> Free while in beta · <a href="landing.html">About Allegrow</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a></p>
   </div>
 </div>
 
@@ -401,17 +411,20 @@
 <!-- App -->
 <div id="shell" hidden>
   <aside>
-    <div class="brand"><img class="logo" src="brand/allegrow-icon.svg" alt=""><div><span id="studioName"></span><small class="wm small">Alle<b>grow</b> Studio</small></div></div>
+    <div class="brand"><img class="logo" src="brand/allegrow-icon.svg" alt=""><div><span id="studioName"></span><small class="wm small">Alle<b>grow</b> Studio <span class="betaChip">Beta</span></small></div></div>
     <nav id="nav">
       <button data-go="overview"><svg class="ic"><use href="#i-home"/></svg>Overview</button>
       <button data-go="students"><svg class="ic"><use href="#i-users"/></svg>Students</button>
       <button data-go="schedule"><svg class="ic"><use href="#i-calendar"/></svg>Schedule</button>
       <button data-go="events"><svg class="ic"><use href="#i-award"/></svg><span>Recitals<span class="mobileHide"> &amp; exams</span></span></button>
       <button data-go="reports"><svg class="ic"><use href="#i-report"/></svg>Reports</button>
+      <button data-go="admin" id="adminNav" hidden><svg class="ic"><use href="#i-settings"/></svg>Beta admin</button>
     </nav>
+    <div class="planBox" id="planBox"></div>
     <div class="account">
       <div class="who"><b id="meName"></b><span id="meEmail"></span></div>
       <button class="ghost icon" id="installBtn" title="Install Allegrow Studio" aria-label="Install Allegrow Studio" hidden><svg class="ic"><use href="#i-share"/></svg></button>
+      <button class="ghost icon" id="feedbackBtn" title="Send feedback" aria-label="Send feedback"><svg class="ic"><use href="#i-heart"/></svg></button>
       <button class="ghost icon" id="studioBtn" title="Studio settings" aria-label="Studio settings"><svg class="ic"><use href="#i-settings"/></svg></button>
       <button class="ghost icon" id="signOutBtn" title="Sign out" aria-label="Sign out"><svg class="ic"><use href="#i-logout"/></svg></button>
     </div>
@@ -575,7 +588,29 @@ async function firebaseApi() {
     deleteEvent: id => F.deleteDoc(F.doc(db, 'studios', me.uid, 'events', id)).catch(fail),
     saveNote: (sid, text) => F.setDoc(F.doc(db, 'studios', me.uid, 'notes', sid), { text }).catch(fail),
     getFeed: async token => { const s = await F.getDoc(F.doc(db, 'feeds', token)); return s.exists() ? s.data() : null; },
-    saveFeed: (token, data) => F.setDoc(F.doc(db, 'feeds', token), data, { merge: true })
+    saveFeed: (token, data) => F.setDoc(F.doc(db, 'feeds', token), data, { merge: true }),
+    // Beta: plan, codes, feedback
+    isAdmin: async () => { try { return (await F.getDoc(F.doc(db, 'admins', me.uid))).exists(); } catch { return false; } },
+    redeem: async code => {
+      const ref = F.doc(db, 'betaCodes', code), snap = await F.getDoc(ref);
+      if (!snap.exists() || snap.data().revoked) throw new Error('That code isn’t valid. Check it and try again.');
+      if (snap.data().usedBy && snap.data().usedBy !== me.uid) throw new Error('That code has already been used.');
+      const plan = { tier: 'beta', code, since: dayKey() }, b = F.writeBatch(db);
+      if (!snap.data().usedBy) b.update(ref, { usedBy: me.uid, usedAt: new Date().toISOString(), usedByName: `${studio.studioName} (${studio.teacherName})` });
+      b.update(F.doc(db, 'studios', me.uid), { plan });
+      await b.commit();
+      return plan;
+    },
+    sendFeedback: data => F.addDoc(F.collection(db, 'feedback'), { ...data, at: new Date().toISOString(), studioId: me.uid }),
+    admin: {
+      codes: async () => (await F.getDocs(F.collection(db, 'betaCodes'))).docs.map(d => ({ id: d.id, ...d.data() })),
+      createCode: (code, label) => F.setDoc(F.doc(db, 'betaCodes', code), { label, created: new Date().toISOString(), usedBy: null, revoked: false }),
+      revokeCode: code => F.updateDoc(F.doc(db, 'betaCodes', code), { revoked: true }),
+      requests: async () => (await F.getDocs(F.collection(db, 'betaRequests'))).docs.map(d => ({ id: d.id, ...d.data() })),
+      deleteRequest: id => F.deleteDoc(F.doc(db, 'betaRequests', id)),
+      feedback: async () => (await F.getDocs(F.collection(db, 'feedback'))).docs.map(d => ({ id: d.id, ...d.data() })),
+      deleteFeedback: id => F.deleteDoc(F.doc(db, 'feedback', id))
+    }
   };
 }
 
@@ -598,8 +633,114 @@ function demoApi() {
     deleteEvent: async id => { delete events[id]; later(); },
     saveNote: async (sid, t) => { notes[sid] = t; },
     getFeed: async () => null,
-    saveFeed: async () => {}
+    saveFeed: async () => {},
+    isAdmin: async () => false,
+    redeem: async () => { throw new Error('This is the demo studio – sign in to use a beta code.'); },
+    sendFeedback: async () => {}
   };
+}
+
+// ---------- Plan (beta) ----------
+// Free studios can have up to FREE_STUDENTS active students. A beta code makes a studio a Beta partner (unlimited,
+// free). The code is claimed on the server (see firestore.rules), so a studio can't simply mark itself as a partner.
+const FREE_STUDENTS = 3;
+let amAdmin = false;
+const isPartner = () => DEMO || amAdmin || studio?.plan?.tier === 'beta';
+const canAddStudent = () => isPartner() || active().length < FREE_STUDENTS;
+function renderPlan() {
+  $('planBox').innerHTML = !studio || DEMO ? '' : isPartner()
+    ? `<div><b>Beta partner</b><br>Unlimited students, free${studio.plan?.since ? ` · since ${fmtDate(studio.plan.since, { month: 'short', year: 'numeric' })}` : ''}. Thank you for your feedback!</div>`
+    : `<div><b>Free plan</b> · ${active().length} of ${FREE_STUDENTS} students<br>Beta partners get unlimited students, free.</div><button class="secondary" id="planCode">Enter a beta code</button>`;
+  $('planCode')?.addEventListener('click', () => betaCodeModal());
+}
+function betaCodeModal(reason) {
+  openModal(`${mhead('Become a beta partner')}
+    ${reason ? `<p><b>${reason}</b></p>` : ''}
+    <p>Allegrow is in beta. Studios who try it with their students and share feedback get <b>unlimited students, free</b>.</p>
+    <label class="field">Beta code <input type="text" id="bcCode" placeholder="GROW-XXXX-XXXX" autocapitalize="characters" autocomplete="off" spellcheck="false" style="text-transform:uppercase;letter-spacing:.05em"></label>
+    <div class="gateErr" id="bcErr"></div>
+    <p class="small muted">No code yet? <a href="landing.html#beta" target="_blank" rel="noopener">Request one</a> – it takes a minute.</p>
+    <footer><div class="right"><button class="secondary" data-close>Not now</button><button class="primary" id="bcGo">Use code</button></div></footer>`, m => {
+    m.querySelector('#bcGo').onclick = async () => {
+      const code = val('bcCode').toUpperCase().replace(/\s+/g, '');
+      if (!/^GROW-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(code)) return (m.querySelector('#bcErr').textContent = 'Codes look like GROW-ABCD-1234.');
+      m.querySelector('#bcGo').disabled = true;
+      try { studio.plan = await api.redeem(code); closeModal(); render(); toast('Welcome, beta partner!'); }
+      catch (e) { console.error(e); m.querySelector('#bcErr').textContent = e.message?.startsWith('That') ? e.message : 'Couldn’t use that code. Please try again.'; m.querySelector('#bcGo').disabled = false; }
+    };
+  });
+}
+
+// ---------- Feedback ----------
+function feedbackModal() {
+  let rating = 0;
+  openModal(`${mhead('Send feedback')}
+    <p class="muted" style="margin-top:-6px">What’s working, what’s confusing, what you wish it did – it all helps shape Allegrow.</p>
+    <div class="field">How is Allegrow working for you? <div class="rate"><span></span><div class="dots">${[1, 2, 3, 4, 5].map(n => `<button type="button" data-r="${n}">${n}</button>`).join('')}</div></div></div>
+    <label class="field">Your feedback <textarea id="fbMsg" maxlength="4000" style="min-height:140px" placeholder="e.g. My students love the badges, but I wish I could…"></textarea></label>
+    <label class="participant" style="grid-template-columns:auto 1fr;border:0;padding:0"><input type="checkbox" id="fbContact" checked><span class="small">It’s OK to email me about this (${esc(me?.email || '')})</span></label>
+    <div class="gateErr" id="fbErr"></div>
+    <footer><div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="fbSend">Send</button></div></footer>`, m => {
+    m.querySelectorAll('[data-r]').forEach(b => b.onclick = () => { rating = +b.dataset.r; m.querySelectorAll('[data-r]').forEach(x => x.classList.toggle('on', +x.dataset.r <= rating)); });
+    m.querySelector('#fbSend').onclick = async () => {
+      const message = val('fbMsg'); if (!message) return (m.querySelector('#fbErr').textContent = 'Write a few words first.');
+      m.querySelector('#fbSend').disabled = true;
+      try {
+        await api.sendFeedback({ from: `${studio.teacherName} · ${studio.studioName}`, role: 'teacher', rating, message, page: route.view, contact: m.querySelector('#fbContact').checked ? (me.email || '') : '' });
+        closeModal(); toast('Thank you – feedback sent');
+      } catch (e) { console.error(e); m.querySelector('#fbErr').textContent = 'Couldn’t send. Please try again.'; m.querySelector('#fbSend').disabled = false; }
+    };
+  });
+}
+$('feedbackBtn').onclick = () => feedbackModal();
+
+// ---------- Beta admin (only for the app's owner) ----------
+let adminData = null;
+const newBetaCode = () => { const abc = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789', r = crypto.getRandomValues(new Uint8Array(8)); const c = [...r].map(x => abc[x % abc.length]).join(''); return `GROW-${c.slice(0, 4)}-${c.slice(4)}`; };
+async function loadAdmin() {
+  try { const [codes, requests, feedback] = await Promise.all([api.admin.codes(), api.admin.requests(), api.admin.feedback()]); adminData = { codes, requests, feedback }; }
+  catch (e) { console.error(e); adminData = { error: true }; }
+  if (route.view === 'admin') render();
+}
+function vAdmin() {
+  if (!amAdmin) return `<div class="emptyBig">${icon('alert', 'lg')}<p>This page is only for Allegrow admins.</p></div>`;
+  if (!adminData) { loadAdmin(); return '<div class="emptyBig"><p>Loading…</p></div>'; }
+  if (adminData.error) return '<div class="emptyBig"><p>Couldn’t load admin data. Check that the latest database rules are published.</p></div>';
+  const by = (a, b) => (b.at || b.created || '').localeCompare(a.at || a.created || '');
+  const codes = [...adminData.codes].sort(by), unused = codes.filter(c => !c.usedBy && !c.revoked).length;
+  return `<div class="pageHead"><div><div class="eyebrow">Only you can see this</div><h1>Beta admin</h1></div>
+    <div class="actions"><button class="secondary" id="adRefresh">${icon('refresh', 'sm')}Refresh</button></div></div>
+  <div class="stack adminList">
+    <div class="card"><h2>Beta codes <span class="muted small">${unused} unused</span></h2>
+      <div class="addRow" style="display:flex;gap:8px;margin-bottom:10px"><input type="text" id="adLabel" placeholder="Who is it for? e.g. Riverside Strings – Ana" maxlength="80"><button class="accent" id="adCreate">${icon('plus', 'sm')}Create code</button></div>
+      ${codes.map(c => `<div class="assign"><div class="grow"><div class="t"><code>${c.id}</code>
+          ${c.revoked ? '<span class="chip bad">Revoked</span>' : c.usedBy ? '<span class="chip good">Used</span>' : '<span class="chip info">Unused</span>'}</div>
+        <div class="det">${esc(c.label || '')}${c.usedBy ? ` · used by ${esc(c.usedByName || '')}${/^\d{4}-\d\d-\d\d/.test(c.usedAt || '') ? ' on ' + fmtDate(c.usedAt.slice(0, 10)) : ''}` : ''}</div></div>
+        ${!c.usedBy && !c.revoked ? `<button class="ghost icon" data-copy="${c.id}" aria-label="Copy">${icon('copy')}</button><button class="ghost icon" data-revoke="${c.id}" aria-label="Revoke">${icon('x')}</button>` : ''}</div>`).join('') || '<div class="empty">No codes yet.</div>'}</div>
+    <div class="card"><h2>Beta requests <span class="muted small">${adminData.requests.length}</span></h2>
+      ${[...adminData.requests].sort(by).map(r => `<div class="assign"><div class="grow"><div class="t">${esc(r.name)} · ${esc(r.studio || '')}</div>
+        <div class="det">${esc(r.email)} · ${esc(r.students || '?')} students · ${esc(r.instruments || '')}</div>${r.message ? `<div class="det">“${esc(r.message)}”</div>` : ''}
+        <div class="det muted">${fmtDate(r.at.slice(0, 10))}</div></div>
+        <button class="secondary small" data-codefor="${esc(`${r.studio || r.name} – ${r.name} <${r.email}>`)}">Create code</button><button class="ghost icon" data-delreq="${r.id}" aria-label="Delete">${icon('trash')}</button></div>`).join('') || '<div class="empty">No requests yet. Share the landing page to get some.</div>'}</div>
+    <div class="card"><h2>Feedback <span class="muted small">${adminData.feedback.length}</span></h2>
+      ${[...adminData.feedback].sort(by).map(f => `<div class="assign"><div class="grow"><div class="t">${{ parent: 'Parent', teacher: 'Teacher', visitor: 'Website' }[f.role] || 'Message'}${f.from ? ' · ' + esc(f.from) : ''}${f.rating ? ` <span class="chip info">${f.rating}/5</span>` : ''}</div>
+        <div class="det">${esc(f.message)}</div><div class="det muted">${fmtDate(f.at.slice(0, 10))}${f.page ? ' · from ' + esc(f.page) : ''}${f.contact ? ' · ' + esc(f.contact) : ''}</div></div>
+        <button class="ghost icon" data-delfb="${f.id}" aria-label="Delete">${icon('trash')}</button></div>`).join('') || '<div class="empty">No feedback yet.</div>'}</div>
+  </div>`;
+}
+function bindAdmin() {
+  const V = $('view');
+  V.querySelector('#adRefresh')?.addEventListener('click', () => { adminData = null; render(); });
+  V.querySelector('#adCreate')?.addEventListener('click', async () => {
+    const code = newBetaCode(); await api.admin.createCode(code, $('adLabel').value.trim());
+    try { await navigator.clipboard.writeText(code); } catch {}
+    toast(`${code} created and copied`); adminData = null; render();
+  });
+  V.querySelectorAll('[data-copy]').forEach(b => b.onclick = async () => { try { await navigator.clipboard.writeText(b.dataset.copy); toast('Copied'); } catch { prompt('Copy this code:', b.dataset.copy); } });
+  V.querySelectorAll('[data-revoke]').forEach(b => b.onclick = async () => { if (!confirm(`Revoke ${b.dataset.revoke}?`)) return; await api.admin.revokeCode(b.dataset.revoke); adminData = null; render(); });
+  V.querySelectorAll('[data-codefor]').forEach(b => b.onclick = () => { $('adLabel').value = b.dataset.codefor; $('adLabel').focus(); window.scrollTo(0, 0); });
+  V.querySelectorAll('[data-delreq]').forEach(b => b.onclick = async () => { if (!confirm('Delete this request?')) return; await api.admin.deleteRequest(b.dataset.delreq); adminData = null; render(); });
+  V.querySelectorAll('[data-delfb]').forEach(b => b.onclick = async () => { if (!confirm('Delete this feedback?')) return; await api.admin.deleteFeedback(b.dataset.delfb); adminData = null; render(); });
 }
 
 // ---------- Lessons: weekly recurring slots + saved changes ----------
@@ -640,7 +781,8 @@ function render() {
   if (!studio) return;
   $('studioName').textContent = studio.studioName;
   document.querySelectorAll('[data-go]').forEach(b => b.classList.toggle('on', b.dataset.go === (route.view === 'student' ? 'students' : route.view)));
-  const v = { overview: vOverview, students: vStudents, student: vStudent, schedule: vSchedule, events: vEvents, reports: vReports }[route.view] || vOverview;
+  const v = { overview: vOverview, students: vStudents, student: vStudent, schedule: vSchedule, events: vEvents, reports: vReports, admin: vAdmin }[route.view] || vOverview;
+  renderPlan();
   // Don't redraw under someone who is typing
   const ae = document.activeElement;
   if (ae && $('view').contains(ae) && ['TEXTAREA', 'INPUT'].includes(ae.tagName) && ae.dataset.keep) return;
@@ -673,7 +815,9 @@ function vOverview() {
   return `
   <div class="pageHead">
     <div><div class="eyebrow">${fmtDate(t, { weekday: 'long', day: 'numeric', month: 'long' })}</div><h1>${greeting()}, ${esc(studio.teacherName)}</h1></div>
-    <div class="actions"><button class="secondary" data-act="addStudent">${icon('plus', 'sm')}Add student</button></div>
+    <div class="actions"><button class="secondary" data-act="addStudent">${icon('plus', 'sm')}Add student</button>
+      <button class="secondary mobileOnly" data-act="settings">${icon('settings', 'sm')}Settings</button>
+      <button class="secondary mobileOnly" data-act="feedback">${icon('heart', 'sm')}Feedback</button></div>
   </div>
   <div class="stack">
     <div class="kpis">
@@ -995,14 +1139,14 @@ function bindView() {
     sub.week = +b.dataset.week === 0 ? null : dayKey(addDays(cur, +b.dataset.week)); render();
   });
   V.querySelectorAll('[data-act]').forEach(b => b.onclick = () => ({
-    addStudent: () => studentModal(), editStudent: () => studentModal(route.id), invite: () => inviteModal(route.id),
+    addStudent: () => canAddStudent() ? studentModal() : betaCodeModal(`The free plan includes ${FREE_STUDENTS} students.`), editStudent: () => studentModal(route.id), invite: () => inviteModal(route.id),
     report: () => { sub = { sid: route.id }; go('reports'); }, addAssign: () => assignModal(route.id),
     addLesson: () => extraLessonModal(route.view === 'student' ? route.id : null),
     calendar: () => calendarEmailModal(),
     addEvent: () => eventModal(null, route.view === 'student' ? route.id : null),
     unarchive: () => api.patchStudent(route.id, { archived: false }),
     star: () => cheerModal(route.id, 'star'), award: () => cheerModal(route.id, 'badge'), challenge: () => challengeModal(route.id),
-    badgeRules: () => badgeRulesModal()
+    badgeRules: () => badgeRulesModal(), settings: () => studioModal(), feedback: () => feedbackModal()
   })[b.dataset.act]());
   V.querySelectorAll('[data-assign-done]').forEach(b => b.onclick = () => api.patchStudent(route.id, { [`assignments.${b.dataset.assignDone}.status`]: 'done', [`assignments.${b.dataset.assignDone}.completed`]: dayKey() }).then(() => toast('Marked complete')));
   V.querySelectorAll('[data-assign-reopen]').forEach(b => b.onclick = () => api.patchStudent(route.id, { [`assignments.${b.dataset.assignReopen}.status`]: 'active' }));
@@ -1012,6 +1156,7 @@ function bindView() {
   const nb = $('noteBox');
   if (nb) nb.oninput = () => { clearTimeout(nb.t); $('noteState').textContent = 'Saving…'; nb.t = setTimeout(async () => { notes[route.id] = nb.value; await api.saveNote(route.id, nb.value); $('noteState') && ($('noteState').textContent = 'Saved. Only you can see these.'); }, 700); };
   if (route.view === 'student' && sub.tab === 'rewards') bindRewards();
+  if (route.view === 'admin') bindAdmin();
   if ($('repStudent')) { $('repStudent').onchange = () => { sub.sid = $('repStudent').value; render(); }; $('repRange').onchange = () => { sub.range = $('repRange').value; render(); }; }
 }
 
@@ -1293,7 +1438,9 @@ function studioModal() {
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="secondary" id="sCal" type="button">${icon('calendar', 'sm')}Calendar &amp; email</button>
         <button class="secondary" id="sTerms" type="button">${icon('calendar', 'sm')}Terms</button>
         <button class="secondary" id="sBadges" type="button">${icon('award', 'sm')}Studio badges</button></div>
-      <p class="small muted">Signed in as ${esc(me.email || me.displayName || '')}.</p>
+      <div class="planBox" style="display:grid;margin-top:0">${isPartner() ? `<div><b>Beta partner</b> · unlimited students, free.</div>`
+        : `<div><b>Free plan</b> · ${active().length} of ${FREE_STUDENTS} students. Beta partners get unlimited students, free.</div><button class="secondary" type="button" id="sCode">Enter a beta code</button>`}</div>
+      <p class="small muted">Signed in as ${esc(me.email || me.displayName || '')}. <a href="privacy.html" target="_blank" rel="noopener">Privacy</a> · <a href="terms.html" target="_blank" rel="noopener">Terms</a></p>
     </div>
     <footer><button class="danger" id="sOut">Sign out</button><div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="sSave">Save</button></div></footer>`, m => {
     m.querySelector('#sSave').onclick = async () => {
@@ -1307,6 +1454,7 @@ function studioModal() {
     m.querySelector('#sCal').onclick = () => calendarEmailModal();
     m.querySelector('#sBadges').onclick = () => badgeRulesModal();
     m.querySelector('#sTerms').onclick = () => termsModal();
+    m.querySelector('#sCode')?.addEventListener('click', () => betaCodeModal());
   });
 }
 $('studioBtn').onclick = studioModal;
@@ -1694,6 +1842,7 @@ async function start() {
 }
 function enter() {
   showOnly('shell'); parseRoute();
+  api.isAdmin().then(a => { amAdmin = a; $('adminNav').hidden = !a; render(); });
   let t; api.watch(() => { render(); clearTimeout(t); t = setTimeout(syncFeed, 1500); });
   render();
 }

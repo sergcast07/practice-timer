@@ -311,6 +311,11 @@
   .cheerNote .from { display: block; font-size: 13px; color: var(--muted); margin-top: 6px; }
   .teacherAwards { display: flex; gap: 10px; flex-wrap: wrap; }
   .teacherAwards > div { display: grid; justify-items: center; gap: 2px; width: 88px; text-align: center; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+  .consent { display: flex; gap: 10px; align-items: flex-start; text-align: left; font-size: 13.5px; line-height: 1.45; color: var(--ink-2);
+             background: var(--soft); border-radius: 12px; padding: 12px; margin-top: 12px; cursor: pointer; }
+  .consent input { width: 20px; height: 20px; flex: none; margin-top: 1px; accent-color: var(--accent); }
+  .betaChip { font-family: var(--sans); font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 2px 7px;
+              border-radius: 999px; background: color-mix(in srgb, var(--leaf) 16%, transparent); color: var(--leaf); margin-left: 6px; vertical-align: 3px; }
   /* Weekly recap */
   .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
   .recap { display: grid; gap: 12px; border: 1.5px solid color-mix(in srgb, var(--accent) 22%, transparent); }
@@ -404,7 +409,7 @@
   <!-- HOME -->
   <section class="screen" id="home">
     <header>
-      <div class="brand"><img class="logo" src="brand/allegrow-icon.svg" alt=""><span class="wm">Alle<b>grow</b></span></div>
+      <div class="brand"><img class="logo" src="brand/allegrow-icon.svg" alt=""><span class="wm">Alle<b>grow</b></span><span class="betaChip">Beta</span></div>
       <button class="ghost" id="parentBtn"><svg class="ic sm"><use href="#i-lock"/></svg>Parents</button>
     </header>
     <div class="intro">
@@ -546,6 +551,7 @@
         <input type="text" id="newName" placeholder="Add a player’s name" maxlength="20" aria-label="New player name">
         <button class="secondary" id="addBtn"><svg class="ic sm"><use href="#i-plus"/></svg>Add</button>
       </div>
+      <p class="muted small" style="margin-top:10px">Use a first name or nickname. Practice stays on this device unless you turn on sync or connect a teacher – see the <a href="privacy.html">privacy policy</a>.</p>
     </div>
 
     <div class="sectionLabel">Sync across devices</div>
@@ -595,11 +601,18 @@
       </div>
     </div>
 
+    <div class="sectionLabel">Help us improve</div>
+    <div class="card rowBetween">
+      <div class="label"><svg class="ic"><use href="#i-heart"/></svg>Allegrow is in beta</div>
+      <button class="secondary" id="feedbackBtn">Send feedback</button>
+    </div>
+
     <div class="sectionLabel">Security</div>
     <div class="card rowBetween">
       <div class="label"><svg class="ic"><use href="#i-lock"/></svg>Settings PIN</div>
       <button class="secondary" id="changePinBtn">Change PIN</button>
     </div>
+    <p class="muted small" style="text-align:center"><a href="landing.html">About Allegrow</a> · <a href="privacy.html">Privacy policy</a> · <a href="terms.html">Terms</a></p>
   </section>
 
 </main>
@@ -1099,6 +1112,32 @@ function manualDialog() {
   $('linkDlg').hidden = false;
 }
 $('manualBtn').onclick = manualDialog;
+
+// Feedback from parents goes to the Allegrow team (read only by admins – see firestore.rules)
+$('feedbackBtn').onclick = () => {
+  const card = $('linkCard');
+  card.innerHTML = `<div class="medal" style="--kid:var(--leaf)">${icon('heart')}</div>
+    <h2 style="text-align:center">Send feedback</h2>
+    <p class="muted" style="text-align:center">What’s working, what’s confusing, what your kids love or don’t – it all helps.</p>
+    <label class="fieldRow">Your feedback <textarea id="fbMsg" maxlength="4000" style="min-height:120px;font:inherit;padding:10px 12px;border-radius:12px;border:1.5px solid var(--line);background:var(--soft);color:var(--ink)"></textarea></label>
+    <label class="fieldRow">Email, if you’d like a reply (optional) <input type="text" id="fbEmail" inputmode="email" maxlength="120"></label>
+    <p class="small" id="fbErr" style="color:var(--danger);min-height:1.2em;text-align:center"></p>
+    <div class="pickList"><button class="primary" id="fbSend" style="--kid:var(--brand);color:var(--bg);justify-content:center">Send</button>
+      <button class="ghost block" id="fbCancel" style="justify-content:center">Cancel</button></div>`;
+  $('linkDlg').hidden = false;
+  card.querySelector('#fbCancel').onclick = () => { $('linkDlg').hidden = true; };
+  card.querySelector('#fbSend').onclick = async () => {
+    const message = card.querySelector('#fbMsg').value.trim(); if (!message) return (card.querySelector('#fbErr').textContent = 'Write a few words first.');
+    card.querySelector('#fbSend').disabled = true;
+    try {
+      await loadFirebase();
+      await F.addDoc(F.collection(db, 'feedback'), { role: 'parent', from: '', message, page: 'family app', contact: card.querySelector('#fbEmail').value.trim(), at: new Date().toISOString() });
+      card.innerHTML = `<div class="medal" style="--kid:var(--leaf)">${icon('check')}</div><h2 style="text-align:center">Thank you!</h2>
+        <p class="muted" style="text-align:center">Your feedback was sent.</p><div class="pickList"><button class="primary" id="fbDone" style="--kid:var(--brand);color:var(--bg);justify-content:center">Done</button></div>`;
+      card.querySelector('#fbDone').onclick = () => { $('linkDlg').hidden = true; };
+    } catch (e) { console.error(e); card.querySelector('#fbErr').textContent = 'Couldn’t send – check the internet connection.'; card.querySelector('#fbSend').disabled = false; }
+  };
+};
 function badgeDialog(fresh, doneC) {
   const card = $('linkCard'), b = fresh[0];
   card.innerHTML = `<div style="display:grid;justify-items:center">${b ? medalSvg(b.icon, BADGE_TIERS[b.tier].color, { size: 96 }) : medalSvg('flag', BADGE_TIERS[3].color, { size: 96 })}</div>
@@ -1684,19 +1723,24 @@ async function startLink(code, forKid) {
     if (code.length >= 20) { await loadFirebase(); const snap = await F.getDoc(F.doc(db, 'students', code)); t = snap.exists() ? snap.data() : null; }
   } catch (e) { console.error(e); return alert('Couldn’t reach the server. Check the internet connection and try again.'); }
   if (!t) return alert('That teacher invite isn’t valid. Please check the link or code with your teacher.');
-  if (forKid) return finishLink(forKid, code, t);
-  const card = $('linkCard');
+  // A parent must agree before a child's practice is shared with a teacher (recorded on the student record)
+  const card = $('linkCard'), choices = forKid ? [forKid] : kids;
   card.innerHTML = `<div class="medal" style="--kid:var(--accent)">${icon('users')}</div>
     <h2 style="text-align:center">Connect to ${esc(t.teacherName)}</h2>
-    <p class="muted" style="text-align:center">${esc(t.studioName)} invited <b>${esc(t.name)}</b>. Which player is this?</p>
+    <p class="muted" style="text-align:center">${esc(t.studioName)} invited <b>${esc(t.name)}</b>.${forKid ? '' : ' Which player is this?'}</p>
+    <label class="consent"><input type="checkbox" id="lkConsent"><span>I’m this child’s parent or guardian. I agree to share their practice time, practice scores and badges with
+      ${esc(t.teacherName)}, and to receive their assignments and lesson times, as described in the <a href="privacy.html" target="_blank" rel="noopener">privacy policy</a>.
+      Sound is never recorded or sent anywhere.</span></label>
+    <p class="small" id="lkErr" style="color:var(--danger);min-height:1.2em;text-align:center"></p>
     <div class="pickList">
-      ${kids.map(k => `<button class="secondary block" data-pick="${k.id}"><div class="avatar" style="--kid:${kidColor(k)}">${initial(k)}</div>${esc(k.name)}${k.link === code ? '<span class="muted small">(already connected)</span>' : ''}</button>`).join('')}
-      <button class="secondary block" data-pick="new">${icon('plus', 'sm')}Add ${esc(firstWord(t.name))} as a new player</button>
+      ${choices.map(k => `<button class="secondary block" data-pick="${k.id}"><div class="avatar" style="--kid:${kidColor(k)}">${initial(k)}</div>${forKid ? `Connect ${esc(k.name)}` : esc(k.name)}${k.link === code ? '<span class="muted small">(already connected)</span>' : ''}</button>`).join('')}
+      ${forKid ? '' : `<button class="secondary block" data-pick="new">${icon('plus', 'sm')}Add ${esc(firstWord(t.name))} as a new player</button>`}
       <button class="ghost block" data-pick="cancel">Not now</button>
     </div>
-    <p class="muted small" style="margin-top:12px;text-align:center">Only this player’s practice is shared with the teacher.</p>`;
+    <p class="muted small" style="margin-top:12px;text-align:center">Only this player’s practice is shared with the teacher. You can disconnect any time in Parent settings.</p>`;
   $('linkDlg').hidden = false;
   card.querySelectorAll('[data-pick]').forEach(b => b.onclick = async () => {
+    if (b.dataset.pick !== 'cancel' && !$('lkConsent').checked) return ($('lkErr').textContent = 'Please tick the box to agree first.');
     $('linkDlg').hidden = true;
     if (b.dataset.pick === 'cancel') return;
     const k = kids.find(x => x.id === b.dataset.pick) || newKid(firstWord(t.name), t.instrument || '');
@@ -1708,7 +1752,7 @@ async function finishLink(k, code, t) {
   k.link = code;
   if (!k.instrument && t.instrument) k.instrument = t.instrument;
   saveKids();
-  try { await F.updateDoc(F.doc(db, 'students', code), { linkedAt: new Date().toISOString(), kidName: k.name }); } catch (e) { console.error(e); }
+  try { await F.updateDoc(F.doc(db, 'students', code), { linkedAt: new Date().toISOString(), kidName: k.name, consent: { by: 'parent', at: new Date().toISOString(), version: 1 } }); } catch (e) { console.error(e); }
   await watchTeachers();
   pushTeacher(k);
   const card = $('linkCard');
