@@ -1,0 +1,1269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f3ee" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14171f" media="(prefers-color-scheme: dark)">
+<title>Practice Timer for Teachers</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231e2a44'/%3E%3Cpath d='M13 22V10l9-2v12' stroke='%23f6f3ee' stroke-width='2.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='10.5' cy='22' r='2.7' fill='%23f6f3ee'/%3E%3Ccircle cx='19.5' cy='20' r='2.7' fill='%23f6f3ee'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f6f3ee; --card: #ffffff; --ink: #1e2a44; --ink-2: #3d4760; --muted: #6e7385;
+    --line: #e9e3da; --track: #efeae2; --soft: #f8f5f0;
+    --brand: #1e2a44; --accent: #3b5bab; --good: #23865f; --warn: #c0612b; --danger: #b8402f; --gold: #b3821c;
+    --kid: var(--accent);
+    --shadow: 0 1px 2px rgba(30, 42, 68, .05), 0 6px 20px rgba(30, 42, 68, .06);
+    --radius: 18px;
+    --serif: 'Fraunces', Georgia, serif;
+    --sans: 'Figtree', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #14171f; --card: #1d212b; --ink: #eef0f5; --ink-2: #c9cdd8; --muted: #9aa0ae;
+            --line: #2b303c; --track: #292e3a; --soft: #222733;
+            --brand: #eef0f5; --accent: #8aa4f0; --good: #4cc08d; --warn: #f08a55; --danger: #f07a66; --gold: #e2b54a;
+            --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25); }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 15.5px;
+         line-height: 1.45; -webkit-font-smoothing: antialiased; }
+  h1, h2, h3, .serif { font-family: var(--serif); font-weight: 600; letter-spacing: -0.01em; margin: 0; }
+  h1 { font-size: 30px; line-height: 1.15; }
+  h2 { font-size: 19px; }
+  h3 { font-size: 16px; font-family: var(--sans); font-weight: 700; letter-spacing: 0; }
+  p { margin: 0; }
+  a { color: var(--accent); }
+  .muted { color: var(--muted); } .small { font-size: 13.5px; }
+  .ic { width: 20px; height: 20px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; }
+  .ic.sm { width: 16px; height: 16px; } .ic.lg { width: 28px; height: 28px; }
+
+  button { font: inherit; font-weight: 600; border: 0; border-radius: 12px; cursor: pointer; color: var(--ink); background: var(--soft);
+           padding: 9px 14px; font-size: 14.5px; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+           transition: background .15s, transform .08s; white-space: nowrap; }
+  button:active { transform: scale(.97); }
+  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible, .rowLink:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--accent) 40%, transparent); outline-offset: 2px; }
+  button.primary { background: var(--brand); color: var(--bg); }
+  button.accent { background: var(--accent); color: #fff; }
+  button.secondary { background: var(--card); border: 1.5px solid var(--line); }
+  button.ghost { background: transparent; color: var(--ink-2); }
+  button.ghost:hover, button.secondary:hover { background: var(--soft); }
+  button.danger { background: transparent; color: var(--danger); }
+  button.icon { padding: 8px; }
+  button:disabled { opacity: .5; cursor: default; }
+
+  input[type=text], input[type=number], input[type=date], input[type=time], input[type=search], select, textarea {
+    font: inherit; font-size: 15px; padding: 9px 12px; border-radius: 11px; border: 1.5px solid var(--line);
+    background: var(--soft); color: var(--ink); width: 100%; min-width: 0; }
+  textarea { resize: vertical; min-height: 90px; line-height: 1.5; }
+  select { appearance: none; -webkit-appearance: none; padding-right: 32px; cursor: pointer;
+           background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236e7385' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+           background-repeat: no-repeat; background-position: right 10px center; background-size: 16px; }
+  .field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted); min-width: 0; }
+  .field > span { display: flex; justify-content: space-between; }
+  .fields { display: grid; gap: 14px; }
+  .fields.two { grid-template-columns: 1fr 1fr; }
+  .fields.three { grid-template-columns: 1fr 1fr 1fr; }
+  @media (max-width: 520px) { .fields.two, .fields.three { grid-template-columns: 1fr; } }
+
+  /* Sign-in / setup */
+  .gate { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; }
+  .gate .card { max-width: 440px; width: 100%; text-align: center; padding: 36px 28px; display: flex; flex-direction: column; gap: 16px; align-items: stretch; }
+  .gate .logo { margin: 0 auto; width: 56px; height: 56px; border-radius: 16px; }
+  .gate .logo .ic { width: 30px; height: 30px; }
+  .gate h1 { font-size: 28px; }
+  .gate .text-left { text-align: left; }
+  .googleBtn { background: var(--card); border: 1.5px solid var(--line); padding: 12px 16px; font-size: 15.5px; }
+  .googleBtn svg { width: 18px; height: 18px; }
+  .features { text-align: left; display: grid; gap: 10px; margin: 4px 0; }
+  .features div { display: flex; gap: 10px; align-items: flex-start; font-size: 14.5px; color: var(--ink-2); }
+  .features .ic { color: var(--accent); margin-top: 1px; }
+  .gateErr { color: var(--danger); font-size: 14px; min-height: 1.2em; }
+
+  /* Shell */
+  #shell { display: grid; grid-template-columns: 244px 1fr; min-height: 100vh; }
+  aside { background: var(--card); border-right: 1px solid var(--line); padding: 20px 14px; position: sticky; top: 0; height: 100vh;
+          display: flex; flex-direction: column; gap: 4px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; padding: 4px 8px 18px; }
+  .logo { width: 32px; height: 32px; border-radius: 9px; background: var(--brand); color: var(--bg); display: grid; place-items: center; flex: none; }
+  .logo .ic { width: 18px; height: 18px; stroke-width: 2.2; }
+  .brand small { display: block; font-weight: 500; color: var(--muted); font-size: 12.5px; }
+  nav { display: flex; flex-direction: column; gap: 2px; }
+  nav button { justify-content: flex-start; background: transparent; color: var(--ink-2); padding: 10px 12px; font-size: 15px; gap: 12px; }
+  nav button:hover { background: var(--soft); }
+  nav button.on { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
+  .account { margin-top: auto; border-top: 1px solid var(--line); padding: 14px 8px 0; display: flex; align-items: center; gap: 10px; }
+  .account .who { flex: 1; min-width: 0; font-size: 13.5px; }
+  .account .who b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .account .who span { color: var(--muted); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #view { padding: 32px 36px 72px; max-width: 1120px; width: 100%; min-width: 0; }
+  .demoBar { background: color-mix(in srgb, var(--gold) 16%, var(--card)); color: var(--ink); border-radius: 12px; padding: 10px 14px;
+             font-size: 13.5px; display: flex; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 18px; flex-wrap: wrap; }
+  @media (max-width: 860px) {
+    #shell { grid-template-columns: 1fr; }
+    aside { position: fixed; top: auto; bottom: 0; left: 0; right: 0; height: auto; z-index: 5; flex-direction: row; padding: 6px 6px max(6px, env(safe-area-inset-bottom));
+            border-right: 0; border-top: 1px solid var(--line); }
+    .brand, .account { display: none; }
+    nav { flex-direction: row; flex: 1; justify-content: space-around; }
+    nav button { flex-direction: column; gap: 3px; font-size: 11px; padding: 6px 4px; flex: 1; }
+    nav button .ic { width: 22px; height: 22px; }
+    #view { padding: max(20px, env(safe-area-inset-top)) 16px 100px; }
+    .mobileOnly { display: inline-flex !important; }
+    .mobileHide { display: none; }
+  }
+  .mobileOnly { display: none !important; }
+
+  /* Page parts */
+  .pageHead { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 22px; flex-wrap: wrap; }
+  .pageHead .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .eyebrow { font-size: 12.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .card { background: var(--card); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); min-width: 0; }
+  .card > h2 { margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .stack { display: grid; gap: 16px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+  .kpi { background: var(--card); border-radius: 16px; padding: 16px 18px; box-shadow: var(--shadow); }
+  .kpi .v { font-family: var(--serif); font-size: 30px; font-weight: 600; line-height: 1.1; margin: 4px 0 2px; font-variant-numeric: tabular-nums; }
+  .kpi .l { font-size: 13px; color: var(--muted); font-weight: 600; }
+  .kpi .s { font-size: 12.5px; color: var(--muted); }
+  .empty { color: var(--muted); font-size: 14px; padding: 8px 0; }
+  .emptyBig { text-align: center; padding: 40px 20px; color: var(--muted); display: grid; gap: 12px; justify-items: center; }
+
+  .avatar { flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--kid); color: #fff; display: grid; place-items: center;
+            font-family: var(--serif); font-weight: 600; font-size: 17px; }
+  .avatar.sm { width: 30px; height: 30px; font-size: 13px; }
+  .avatar.lg { width: 60px; height: 60px; font-size: 25px; }
+  .list { display: grid; }
+  .rowLink { display: flex; align-items: center; gap: 12px; padding: 12px 6px; border-top: 1px solid var(--line); cursor: pointer; border-radius: 10px;
+             background: none; width: 100%; text-align: left; font-weight: 500; color: var(--ink); font-size: 15px; }
+  .list > .rowLink:first-child { border-top: 0; }
+  .rowLink:hover { background: var(--soft); }
+  .rowLink .grow { flex: 1; min-width: 0; }
+  .rowLink .t { font-weight: 700; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .rowLink .d { font-size: 13.5px; color: var(--muted); }
+  .rowLink .time { font-variant-numeric: tabular-nums; font-weight: 700; min-width: 72px; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px;
+          background: var(--soft); color: var(--ink-2); white-space: nowrap; }
+  .chip .ic { width: 13px; height: 13px; stroke-width: 2.2; }
+  .chip.good { background: color-mix(in srgb, var(--good) 13%, transparent); color: var(--good); }
+  .chip.warn { background: color-mix(in srgb, var(--warn) 13%, transparent); color: var(--warn); }
+  .chip.bad { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
+  .chip.info { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
+  .chip.gold { background: color-mix(in srgb, var(--gold) 16%, transparent); color: var(--gold); }
+  .strike { text-decoration: line-through; opacity: .6; }
+
+  /* Practice table */
+  .ptable { display: grid; }
+  .ptr { display: grid; grid-template-columns: minmax(150px, 1.6fr) 1.6fr .6fr .7fr .7fr .7fr 1fr; gap: 12px; align-items: center; padding: 11px 6px;
+         border-top: 1px solid var(--line); font-size: 14.5px; }
+  .ptr.head { border-top: 0; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; padding-top: 0; }
+  .ptr:not(.head) { cursor: pointer; border-radius: 10px; }
+  .ptr:not(.head):hover { background: var(--soft); }
+  .ptr .name { display: flex; align-items: center; gap: 10px; font-weight: 700; min-width: 0; }
+  .ptr .name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .num { font-variant-numeric: tabular-nums; }
+  .mbar { height: 6px; background: var(--track); border-radius: 3px; overflow: hidden; margin-top: 5px; }
+  .mbar > div { height: 100%; background: var(--kid); border-radius: 3px; }
+  .mbar.full > div { background: var(--good); }
+  .lbl-m { display: none; font-size: 11.5px; color: var(--muted); font-weight: 600; }
+  @media (max-width: 760px) {
+    .ptr.head { display: none; }
+    .ptr { grid-template-columns: 1fr 1fr 1fr; row-gap: 8px; }
+    .ptr .name { grid-column: 1 / -1; }
+    .ptr .mins { grid-column: 1 / -1; }
+    .lbl-m { display: block; }
+  }
+
+  /* Tabs, segmented */
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 6px 0 18px; overflow-x: auto; scrollbar-width: none; }
+  .tabs button { background: none; border-radius: 0; padding: 10px 12px; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tabs button.on { color: var(--ink); border-bottom-color: var(--ink); }
+  .seg { display: inline-flex; background: var(--soft); border-radius: 12px; padding: 3px; gap: 2px; flex-wrap: wrap; }
+  .seg button { background: none; padding: 7px 12px; border-radius: 9px; color: var(--ink-2); font-size: 14px; }
+  .seg button.on { background: var(--card); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+
+  /* Student header */
+  .studentHead { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .studentHead .grow { flex: 1; min-width: 200px; }
+  .studentHead h1 { font-size: 28px; }
+  .banner { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 14px; font-size: 14px; margin: 16px 0 0;
+            background: color-mix(in srgb, var(--accent) 9%, transparent); color: var(--ink-2); flex-wrap: wrap; }
+  .banner .grow { flex: 1; min-width: 200px; }
+  .banner .ic { color: var(--accent); }
+
+  /* Stats + chart */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; }
+  .stat { background: var(--soft); border-radius: 14px; padding: 12px; }
+  .stat b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: 12.5px; color: var(--muted); font-weight: 600; }
+  .trend { font-size: 12px; font-weight: 700; margin-left: 4px; }
+  .trend.up { color: var(--good); } .trend.down { color: var(--warn); }
+  .chart { position: relative; display: flex; align-items: flex-end; gap: 3px; height: 140px; margin-top: 18px; }
+  .chart .col { flex: 1; height: 100%; display: flex; align-items: flex-end; }
+  .chart .b { width: 100%; background: var(--kid); opacity: .35; border-radius: 4px 4px 1px 1px; min-height: 2px; }
+  .chart .b.met { opacity: 1; }
+  .chart .goal { position: absolute; left: 0; right: 0; border-top: 1.5px dashed var(--muted); opacity: .55; }
+  .axis { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--muted); margin-top: 6px; }
+
+  /* Assignments */
+  .assign { padding: 14px 0; border-top: 1px solid var(--line); display: flex; gap: 12px; align-items: flex-start; }
+  .assign:first-child { border-top: 0; padding-top: 4px; }
+  .assign .grow { flex: 1; min-width: 0; }
+  .assign .t { font-weight: 700; font-size: 15.5px; }
+  .assign .det { font-size: 14px; color: var(--ink-2); margin-top: 3px; white-space: pre-wrap; }
+  .assign .meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .week { display: flex; gap: 4px; margin-top: 10px; }
+  .week div { width: 24px; text-align: center; font-size: 10.5px; color: var(--muted); }
+  .week i { display: block; width: 14px; height: 14px; border-radius: 50%; background: var(--track); margin: 0 auto 3px; }
+  .week i.on { background: var(--good); }
+
+  /* Ratings */
+  .rate { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .rate .dots { display: flex; gap: 6px; }
+  .rate .dots button { width: 30px; height: 30px; padding: 0; border-radius: 50%; background: var(--track); font-size: 13px; color: var(--muted); }
+  .rate .dots button.on { background: var(--accent); color: #fff; }
+  .rbar { display: flex; align-items: center; gap: 10px; font-size: 13.5px; }
+  .rbar .l { width: 96px; color: var(--muted); font-weight: 600; }
+  .rbar .track { flex: 1; height: 8px; border-radius: 4px; background: var(--track); overflow: hidden; }
+  .rbar .track div { height: 100%; background: var(--accent); border-radius: 4px; }
+  .rbar b { width: 34px; text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* Schedule */
+  .weekNav { display: flex; align-items: center; gap: 8px; }
+  .weekNav .lbl { font-weight: 700; min-width: 170px; text-align: center; }
+  .dayBlock + .dayBlock { margin-top: 18px; }
+  .dayBlock h3 { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+  .dayBlock h3 .muted { font-weight: 500; font-size: 13.5px; }
+  .dayBlock.today h3 { color: var(--accent); }
+
+  /* Modal */
+  .overlay { position: fixed; inset: 0; background: rgba(20, 23, 31, .5); display: flex; align-items: flex-start; justify-content: center;
+             padding: 24px 16px; z-index: 20; overflow-y: auto; backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+  .modal { width: 100%; max-width: 540px; margin: auto 0; padding: 24px; display: grid; gap: 16px; animation: pop .3s cubic-bezier(.2, 1.3, .4, 1) both; }
+  .modal header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .modal footer { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding-top: 4px; }
+  .modal footer .right { display: flex; gap: 8px; margin-left: auto; }
+  @keyframes pop { from { transform: translateY(12px) scale(.97); opacity: 0; } to { transform: none; opacity: 1; } }
+  .swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+  .swatches button { width: 32px; height: 32px; border-radius: 50%; padding: 0; border: 3px solid transparent; }
+  .swatches button.on { border-color: var(--card); box-shadow: 0 0 0 2px var(--ink); }
+  .codeBox { font-family: ui-monospace, 'SF Mono', Menlo, monospace; background: var(--soft); border-radius: 12px; padding: 12px; font-size: 15px;
+             word-break: break-all; user-select: all; letter-spacing: .03em; }
+  .participant { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+  .participant .more { grid-column: 2; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .participant label.chk { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+  input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; }
+  #toast { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%) translateY(20px); background: var(--brand); color: var(--bg);
+           padding: 10px 16px; border-radius: 12px; font-weight: 600; font-size: 14px; opacity: 0; transition: .25s; z-index: 30; pointer-events: none; }
+  #toast.show { opacity: 1; transform: translateX(-50%); }
+
+  /* Report */
+  .report { max-width: 760px; }
+  .report .rhead { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border-bottom: 2px solid var(--ink); padding-bottom: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+  .report section + section { margin-top: 22px; }
+  .report h3 { margin-bottom: 10px; }
+  .comment { min-height: 80px; border: 1.5px dashed var(--line); border-radius: 12px; padding: 12px; font-size: 14.5px; }
+  .comment:empty::before { content: attr(data-placeholder); color: var(--muted); }
+  @media print {
+    body { background: #fff; color: #111; font-size: 12pt; }
+    aside, .noprint, .demoBar, #toast { display: none !important; }
+    #shell { display: block; } #view { padding: 0; max-width: none; }
+    .card { box-shadow: none; padding: 0; }
+    .comment { border: 1px solid #ccc; }
+    .stat { background: #f4f4f4; }
+  }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-note" viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3.5 10.5 12 3.5l8.5 7V20a1 1 0 0 1-1 1h-5v-6h-5v6h-5a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.2a6.5 6.5 0 0 1 3 5.8"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="16" rx="2.5"/><path d="M16 3v4M8 3v4M3.5 10h17"/></symbol>
+  <symbol id="i-award" viewBox="0 0 24 24"><circle cx="12" cy="9" r="6"/><path d="m8.5 14 -1.5 7 5-2.5 5 2.5-1.5-7"/></symbol>
+  <symbol id="i-report" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14.5 3v4.5H19M9 12h7M9 16h7M9 8h3"/></symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h4M16 17l5-5-5-5M21 12H9"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><path d="M4.5 12.5V19a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-6.5"/><path d="m16 6.5-4-4-4 4M12 2.5V15"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/></symbol>
+  <symbol id="i-metronome" viewBox="0 0 24 24"><path d="M9.2 3h5.6l4 17.5H5.2z"/><path d="M5.8 17.5h12.4M12 15 16.5 6.5"/></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></symbol>
+  <symbol id="i-print" viewBox="0 0 24 24"><path d="M7 9V3h10v6M7 18H4v-7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7h-3"/><rect x="7" y="14" width="10" height="7" rx="1"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s7-6.2 7-11.5a7 7 0 0 0-14 0C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21a2 2 0 0 1 2-2h13v2"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol>
+  <symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 21.5c3.9 0 6.5-2.7 6.5-6.4 0-3.9-2.8-5.9-4.2-9.1-1 2-2 3-3.5 3.6.2-2.2-.7-4.3-2.6-6.1.2 4-4.7 6.6-4.7 11.6 0 3.7 2.6 6.4 6.5 6.4z"/></symbol>
+</svg>
+
+<!-- Signed out -->
+<div class="gate" id="signin" hidden>
+  <div class="card">
+    <div class="logo"><svg class="ic"><use href="#i-note"/></svg></div>
+    <div><h1>Practice Timer for Teachers</h1>
+      <p class="muted" style="margin-top:8px">Your studio in one place, free.</p></div>
+    <div class="features">
+      <div><svg class="ic"><use href="#i-users"/></svg>See every student’s practice time, focus, tuning and rhythm</div>
+      <div><svg class="ic"><use href="#i-calendar"/></svg>Plan your weekly lessons and keep lesson notes</div>
+      <div><svg class="ic"><use href="#i-book"/></svg>Set practice assignments that appear in the student’s app</div>
+      <div><svg class="ic"><use href="#i-award"/></svg>Track recitals and exams, and print progress reports</div>
+    </div>
+    <button class="googleBtn" id="googleBtn">
+      <svg viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.2-.1-2.4-.4-3.5z"/></svg>
+      Continue with Google</button>
+    <div class="gateErr" id="signinErr"></div>
+    <p class="small muted">Just looking? <a href="?demo">Explore a demo studio</a> with sample students.</p>
+  </div>
+</div>
+
+<!-- First-time setup -->
+<div class="gate" id="setup" hidden>
+  <div class="card text-left">
+    <div class="logo"><svg class="ic"><use href="#i-note"/></svg></div>
+    <div style="text-align:center"><h1>Set up your studio</h1><p class="muted" style="margin-top:8px">Families see these names in their app.</p></div>
+    <label class="field">Studio name <input type="text" id="setupStudio" placeholder="e.g. Riverside Strings" maxlength="60"></label>
+    <label class="field">Your name, as students know you <input type="text" id="setupTeacher" placeholder="e.g. Ms. Alvarez" maxlength="60"></label>
+    <div class="gateErr" id="setupErr"></div>
+    <button class="primary" id="setupBtn">Create studio</button>
+    <button class="ghost" id="setupSignOut">Sign out</button>
+  </div>
+</div>
+
+<!-- App -->
+<div id="shell" hidden>
+  <aside>
+    <div class="brand"><div class="logo"><svg class="ic"><use href="#i-note"/></svg></div><div><span id="studioName"></span><small>Practice Timer</small></div></div>
+    <nav id="nav">
+      <button data-go="overview"><svg class="ic"><use href="#i-home"/></svg>Overview</button>
+      <button data-go="students"><svg class="ic"><use href="#i-users"/></svg>Students</button>
+      <button data-go="schedule"><svg class="ic"><use href="#i-calendar"/></svg>Schedule</button>
+      <button data-go="events"><svg class="ic"><use href="#i-award"/></svg><span>Recitals<span class="mobileHide"> &amp; exams</span></span></button>
+      <button data-go="reports"><svg class="ic"><use href="#i-report"/></svg>Reports</button>
+    </nav>
+    <div class="account">
+      <div class="who"><b id="meName"></b><span id="meEmail"></span></div>
+      <button class="ghost icon" id="studioBtn" title="Studio settings" aria-label="Studio settings"><svg class="ic"><use href="#i-settings"/></svg></button>
+      <button class="ghost icon" id="signOutBtn" title="Sign out" aria-label="Sign out"><svg class="ic"><use href="#i-logout"/></svg></button>
+    </div>
+  </aside>
+  <main id="view"></main>
+</div>
+
+<div class="overlay" id="modal" hidden><div class="card modal" id="modalCard" role="dialog" aria-modal="true"></div></div>
+<div id="toast"></div>
+
+<script>
+// ============================================================================================
+// Practice Timer for Teachers
+// Data lives in Firebase (same project as the family app):
+//   studios/{uid}                    studio name + teacher name (only this teacher)
+//   studios/{uid}/lessons/{sid_date} lesson status, notes, ratings (private)
+//   studios/{uid}/events/{id}        recitals, exams, competitions (private master copy)
+//   studios/{uid}/notes/{sid}        private notes about a student
+//   students/{sid}                   shared with the family: name, lesson time, assignments, upcoming events,
+//                                    and the family's mirrored practice data. sid is the invite code.
+// ?demo runs everything in memory with sample data.
+// ============================================================================================
+const $ = id => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+const DEMO = params.has('demo');
+const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
+const EMULATOR = LOCAL && params.has('emulator');
+const FIREBASE = EMULATOR ? { apiKey: 'demo-key', authDomain: 'localhost', projectId: 'demo-practice' } : {
+  apiKey: 'AIzaSyAUn6GqVxRR-m9i5kjTH9dY7-nGWCo1374',
+  authDomain: 'music-practice-tracker-d77f7.firebaseapp.com',
+  projectId: 'music-practice-tracker-d77f7',
+  storageBucket: 'music-practice-tracker-d77f7.firebasestorage.app',
+  messagingSenderId: '933602552014',
+  appId: '1:933602552014:web:1b19df5cc27f55fc58c89f'
+};
+const FB = 'https://www.gstatic.com/firebasejs/12.19.0';
+
+// ---------- Helpers ----------
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const icon = (n, cls = '') => `<svg class="ic ${cls}" aria-hidden="true"><use href="#i-${n}"/></svg>`;
+const pad = n => String(n).padStart(2, '0');
+const dayKey = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const parseDay = k => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); };
+const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const today = () => { const t = new Date(); return new Date(t.getFullYear(), t.getMonth(), t.getDate()); };
+const weekStart = d => addDays(d, -((d.getDay() + 6) % 7));       // Monday
+const lastDays = (n, end = today()) => Array.from({ length: n }, (_, i) => addDays(end, i - n + 1));
+const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const fmtDate = (d, o = { weekday: 'short', day: 'numeric', month: 'short' }) => (typeof d === 'string' ? parseDay(d) : d).toLocaleDateString(undefined, o);
+const fmtTime = t => { if (!t) return ''; const [h, m] = t.split(':').map(Number); return new Date(2000, 0, 1, h, m).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }); };
+const mins = ms => { const m = Math.round(ms / 60000); return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m} min`; };
+const pct = x => x == null ? '–' : Math.round(x * 100) + '%';
+const initial = s => esc([...(s || '?').trim()][0]?.toUpperCase() || '?');
+const firstName = s => (s || '').trim().split(/\s+/).filter(w => !/^(mr|mrs|ms|miss|dr|mx)\.?$/i.test(w))[0] || s;
+const randomCode = () => {
+  const abc = 'abcdefghjkmnpqrstuvwxyz23456789', r = crypto.getRandomValues(new Uint8Array(25));
+  return [...r].map(x => abc[x % abc.length]).join('').match(/.{5}/g).join('-');
+};
+const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const INSTRUMENTS = { piano: 'Piano', violin: 'Violin', viola: 'Viola', cello: 'Cello', other: 'Other' };
+const COLORS = ['#cf5c3c', '#1f8a7e', '#6a55c8', '#2f6bcc', '#b3821c', '#c2457a', '#4b7f3a', '#8a5a44'];
+const EVENT_TYPES = { recital: 'Recital', exam: 'Exam', competition: 'Competition', masterclass: 'Masterclass', other: 'Other' };
+const STATUS = { scheduled: ['Scheduled', ''], done: ['Done', 'good'], cancelled: ['Cancelled', 'bad'], noshow: ['No-show', 'warn'], moved: ['Moved', ''] };
+const RATINGS = [['preparation', 'Preparation'], ['technique', 'Technique'], ['musicality', 'Musicality']];
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2200); }
+
+// ---------- Practice data (mirrored from the family app) ----------
+const pDay = (s, d) => s.practice?.log?.[dayKey(d)] || 0;
+const sDay = (s, d) => s.practice?.stats?.[dayKey(d)] || {};
+function practiceSummary(s, days) {
+  const t = { total: 0, days: 0, active: 0, played: 0, notes: 0, inTune: 0, beats: 0, steady: 0 };
+  for (const d of days) {
+    const ms = pDay(s, d), st = sDay(s, d);
+    t.total += ms; if (ms >= 60000) t.days++;
+    if (st.active) { t.active += st.active; t.played += Math.min(ms, st.active); }
+    t.notes += st.notes || 0; t.inTune += st.inTune || 0; t.beats += st.beats || 0; t.steady += st.steady || 0;
+  }
+  return { total: t.total, days: t.days,
+    focus: t.active >= 60000 ? t.played / t.active : null,
+    tune: t.notes >= 10 ? t.inTune / t.notes : null,
+    rhythm: t.beats >= 8 ? t.steady / t.beats : null };
+}
+function lastPracticed(s) {
+  for (let i = 0; i < 120; i++) if (pDay(s, addDays(today(), -i)) >= 60000) return i;
+  return null;
+}
+const lastPracticedText = n => n == null ? 'No practice yet' : n === 0 ? 'Today' : n === 1 ? 'Yesterday' : `${n} days ago`;
+function trend(a, b) {
+  if (a == null || b == null) return '';
+  const d = Math.round((a - b) * 100);
+  return d ? `<span class="trend ${d > 0 ? 'up' : 'down'}">${d > 0 ? '+' : '−'}${Math.abs(d)}</span>` : '';
+}
+
+// ---------- State ----------
+let me = null, studio = null, students = {}, lessons = {}, events = {}, notes = {};
+const active = () => Object.values(students).filter(s => !s.archived).sort((a, b) => a.name.localeCompare(b.name));
+
+// ---------- Data layer: Firestore, or in-memory for the demo ----------
+const DEL = Symbol('delete');
+function applyPatch(obj, patch) {
+  for (const [path, v] of Object.entries(patch)) {
+    const keys = path.split('.'); let o = obj;
+    for (const k of keys.slice(0, -1)) o = (o[k] = o[k] && typeof o[k] === 'object' ? o[k] : {});
+    if (v === DEL) delete o[keys.at(-1)]; else o[keys.at(-1)] = structuredClone(v);
+  }
+  return obj;
+}
+let api;
+
+async function firebaseApi() {
+  const [{ initializeApp }, A, F] = await Promise.all([import(FB + '/firebase-app.js'), import(FB + '/firebase-auth.js'), import(FB + '/firebase-firestore.js')]);
+  const app = initializeApp(FIREBASE), auth = A.getAuth(app), db = F.getFirestore(app);
+  if (EMULATOR) { A.connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true }); F.connectFirestoreEmulator(db, '127.0.0.1', 8080); }
+  const conv = patch => Object.fromEntries(Object.entries(patch).map(([k, v]) => [k, v === DEL ? F.deleteField() : v]));
+  const unsubs = [];
+  const fail = e => { console.error(e); toast('Couldn’t save – check your connection'); };
+  return {
+    auth, A,
+    onAuth: cb => A.onAuthStateChanged(auth, cb),
+    signIn: async () => {
+      const p = new A.GoogleAuthProvider();
+      try { await A.signInWithPopup(auth, p); }
+      catch (e) { if (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment') await A.signInWithRedirect(auth, p); else throw e; }
+    },
+    signOut: () => { unsubs.splice(0).forEach(u => u()); return A.signOut(auth); },
+    getStudio: async uid => { const s = await F.getDoc(F.doc(db, 'studios', uid)); return s.exists() ? s.data() : null; },
+    createStudio: data => F.setDoc(F.doc(db, 'studios', me.uid), { ...data, email: me.email || '', created: F.serverTimestamp() }),
+    updateStudio: patch => F.updateDoc(F.doc(db, 'studios', me.uid), conv(patch)).catch(fail),
+    watch(render) {
+      const uid = me.uid, since = dayKey(addDays(today(), -400));
+      unsubs.push(F.onSnapshot(F.query(F.collection(db, 'students'), F.where('studioId', '==', uid)), q => {
+        students = {}; q.forEach(d => students[d.id] = { id: d.id, ...d.data() }); render();
+      }, fail));
+      unsubs.push(F.onSnapshot(F.query(F.collection(db, 'studios', uid, 'lessons'), F.where('date', '>=', since)), q => {
+        lessons = {}; q.forEach(d => lessons[d.id] = { id: d.id, ...d.data() }); render();
+      }, fail));
+      unsubs.push(F.onSnapshot(F.collection(db, 'studios', uid, 'events'), q => {
+        events = {}; q.forEach(d => events[d.id] = { id: d.id, ...d.data() }); render();
+      }, fail));
+      unsubs.push(F.onSnapshot(F.collection(db, 'studios', uid, 'notes'), q => {
+        notes = {}; q.forEach(d => notes[d.id] = d.data().text || ''); render();
+      }, fail));
+    },
+    createStudent: (sid, data) => F.setDoc(F.doc(db, 'students', sid), data).catch(fail),
+    patchStudent: (sid, patch) => F.updateDoc(F.doc(db, 'students', sid), conv(patch)).catch(fail),
+    deleteStudent: sid => F.deleteDoc(F.doc(db, 'students', sid)).catch(fail),
+    saveLesson: (id, data) => F.setDoc(F.doc(db, 'studios', me.uid, 'lessons', id), data, { merge: true }).catch(fail),
+    deleteLesson: id => F.deleteDoc(F.doc(db, 'studios', me.uid, 'lessons', id)).catch(fail),
+    saveEvent: (id, data) => F.setDoc(F.doc(db, 'studios', me.uid, 'events', id), data).catch(fail),
+    deleteEvent: id => F.deleteDoc(F.doc(db, 'studios', me.uid, 'events', id)).catch(fail),
+    saveNote: (sid, text) => F.setDoc(F.doc(db, 'studios', me.uid, 'notes', sid), { text }).catch(fail)
+  };
+}
+
+function demoApi() {
+  let rerender = () => {};
+  const later = () => setTimeout(() => rerender(), 0);
+  return {
+    onAuth: cb => cb({ uid: 'demo', displayName: 'Ms. Alvarez', email: 'demo studio' }),
+    signOut: () => { location.href = location.pathname; },
+    getStudio: async () => studio || { studioName: 'Riverside Strings & Keys', teacherName: 'Ms. Alvarez' },
+    createStudio: async d => { studio = d; },
+    updateStudio: async p => { applyPatch(studio, p); later(); },
+    watch(render) { rerender = render; seedDemo(); render(); },
+    createStudent: async (sid, data) => { students[sid] = { id: sid, ...structuredClone(data) }; later(); },
+    patchStudent: async (sid, p) => { applyPatch(students[sid], p); later(); },
+    deleteStudent: async sid => { delete students[sid]; later(); },
+    saveLesson: async (id, d) => { lessons[id] = { id, ...(lessons[id] || {}), ...structuredClone(d) }; later(); },
+    deleteLesson: async id => { delete lessons[id]; later(); },
+    saveEvent: async (id, d) => { events[id] = { id, ...structuredClone(d) }; later(); },
+    deleteEvent: async id => { delete events[id]; later(); },
+    saveNote: async (sid, t) => { notes[sid] = t; }
+  };
+}
+
+// ---------- Lessons: weekly recurring slots + saved changes ----------
+function lessonsBetween(start, end, sid) {
+  const out = {};
+  for (const s of active()) {
+    if (sid && s.id !== sid) continue;
+    const L = s.lesson;
+    if (!L || L.day == null || L.day === '' || !L.time) continue;
+    let d = addDays(start, (Number(L.day) - start.getDay() + 7) % 7);
+    for (; d <= end; d = addDays(d, 7)) {
+      const k = dayKey(d);
+      if (L.start && k < L.start) continue;
+      const id = `${s.id}_${k}`;
+      out[id] = { id, sid: s.id, date: k, time: L.time, length: L.length || 30, status: 'scheduled', ...(lessons[id] || {}) };
+    }
+  }
+  for (const l of Object.values(lessons)) {             // one-off / moved lessons
+    if (!l.extra || (sid && l.sid !== sid) || !students[l.sid] || students[l.sid].archived) continue;
+    const d = parseDay(l.date);
+    if (d >= start && d <= end) out[l.id] = { length: 30, status: 'scheduled', ...l };
+  }
+  return Object.values(out).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+}
+const countsAsLesson = l => l.status !== 'moved' && l.status !== 'cancelled';
+
+// ---------- Router ----------
+let route = { view: 'overview' }, sub = {};
+function go(view, extra = {}) { location.hash = '#/' + view + (extra.id ? '/' + extra.id : ''); }
+function parseRoute() {
+  const [, view = 'overview', id] = location.hash.split('/');
+  route = { view: view || 'overview', id };
+}
+addEventListener('hashchange', () => { parseRoute(); render(); window.scrollTo(0, 0); });
+document.querySelectorAll('[data-go]').forEach(b => b.onclick = () => go(b.dataset.go));
+
+function render() {
+  if (!studio) return;
+  $('studioName').textContent = studio.studioName;
+  document.querySelectorAll('[data-go]').forEach(b => b.classList.toggle('on', b.dataset.go === (route.view === 'student' ? 'students' : route.view)));
+  const v = { overview: vOverview, students: vStudents, student: vStudent, schedule: vSchedule, events: vEvents, reports: vReports }[route.view] || vOverview;
+  // Don't redraw under someone who is typing
+  const ae = document.activeElement;
+  if (ae && $('view').contains(ae) && ['TEXTAREA', 'INPUT'].includes(ae.tagName) && ae.dataset.keep) return;
+  $('view').innerHTML = (DEMO ? `<div class="demoBar noprint"><span><b>Demo studio.</b> Sample data – changes aren’t saved.</span><a href="${location.pathname}">Sign in to create your studio</a></div>` : '') + v();
+  bindView();
+}
+
+// ============================================================================================
+// Views
+// ============================================================================================
+function greeting() { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'; }
+
+function vOverview() {
+  const all = active(), t = today(), wk = lastDays(7), prevWk = lastDays(7, addDays(t, -7));
+  const linked = all.filter(s => s.linkedAt);
+  const weekTotal = linked.reduce((a, s) => a + practiceSummary(s, wk).total, 0);
+  const consistent = linked.filter(s => practiceSummary(s, wk).days >= 5).length;
+  const thisWeek = lessonsBetween(weekStart(t), addDays(weekStart(t), 6)).filter(countsAsLesson);
+  const todays = lessonsBetween(t, t);
+  const attention = [];
+  for (const s of all) {
+    if (!s.linkedAt) { attention.push([s, 'info', 'link', 'Not connected yet', 'Send the family their invite link']); continue; }
+    const lp = lastPracticed(s);
+    if (lp == null || lp >= 4) attention.push([s, 'warn', 'alert', lp == null ? 'No practice recorded' : `No practice for ${lp} days`, 'Last practiced ' + lastPracticedText(lp).toLowerCase()]);
+    for (const a of Object.values(s.assignments || {})) if (a.status === 'active' && a.due && a.due < dayKey(t))
+      attention.push([s, 'bad', 'book', 'Assignment overdue', `${a.title} – due ${fmtDate(a.due)}`]);
+  }
+  const upcoming = Object.values(events).filter(e => e.date >= dayKey(t) && e.date <= dayKey(addDays(t, 60))).sort((a, b) => a.date.localeCompare(b.date));
+
+  return `
+  <div class="pageHead">
+    <div><div class="eyebrow">${fmtDate(t, { weekday: 'long', day: 'numeric', month: 'long' })}</div><h1>${greeting()}, ${esc(studio.teacherName)}</h1></div>
+    <div class="actions"><button class="secondary" data-act="addStudent">${icon('plus', 'sm')}Add student</button></div>
+  </div>
+  <div class="stack">
+    <div class="kpis">
+      <div class="kpi"><div class="l">Students</div><div class="v">${all.length}</div><div class="s">${linked.length} connected to the app</div></div>
+      <div class="kpi"><div class="l">Practice this week</div><div class="v">${mins(weekTotal)}</div><div class="s">across connected students</div></div>
+      <div class="kpi"><div class="l">Practiced 5+ days</div><div class="v">${consistent}<span class="muted" style="font-size:18px"> / ${linked.length}</span></div><div class="s">in the last 7 days</div></div>
+      <div class="kpi"><div class="l">Lessons this week</div><div class="v">${thisWeek.length}</div><div class="s">${thisWeek.filter(l => l.status === 'done').length} done</div></div>
+    </div>
+    <div class="grid2">
+      <section class="card"><h2>Today’s lessons <button class="ghost small" data-go2="schedule">Schedule ${icon('chev', 'sm')}</button></h2>
+        <div class="list">${todays.length ? todays.map(lessonRow).join('') : '<div class="empty">No lessons today.</div>'}</div></section>
+      <section class="card"><h2>Needs attention</h2>
+        <div class="list">${attention.length ? attention.slice(0, 7).map(([s, kind, ic, t1, t2]) => `
+          <button class="rowLink" data-student="${s.id}" style="--kid:${s.color}">
+            <div class="avatar sm">${initial(s.name)}</div>
+            <div class="grow"><div class="t">${esc(s.name)} <span class="chip ${kind}">${icon(ic)}${t1}</span></div><div class="d">${esc(t2)}</div></div>
+          </button>`).join('') : '<div class="empty">Everyone is on track. Nice.</div>'}</div></section>
+    </div>
+    <section class="card"><h2>Practice, last 7 days</h2>${practiceTable(all)}</section>
+    <section class="card"><h2>Coming up <button class="ghost small" data-go2="events">All events ${icon('chev', 'sm')}</button></h2>
+      <div class="list">${upcoming.length ? upcoming.slice(0, 6).map(eventRow).join('') : '<div class="empty">No recitals or exams in the next two months.</div>'}</div></section>
+  </div>`;
+}
+
+function practiceTable(list) {
+  if (!list.length) return '<div class="emptyBig">' + icon('users', 'lg') + '<p>Add your first student to get started.</p><button class="accent" data-act="addStudent">' + icon('plus', 'sm') + 'Add student</button></div>';
+  const wk = lastDays(7), prev = lastDays(7, addDays(today(), -7));
+  return `<div class="ptable">
+    <div class="ptr head"><div>Student</div><div>Minutes vs target</div><div>Days</div><div>Focus</div><div>In tune</div><div>Rhythm</div><div>Last practiced</div></div>
+    ${list.map(s => {
+      if (!s.linkedAt) return `<div class="ptr" data-student="${s.id}" style="--kid:${s.color}"><div class="name"><div class="avatar sm">${initial(s.name)}</div><span>${esc(s.name)}</span></div>
+        <div class="mins"><span class="chip info">${icon('link')}Not connected</span></div><div></div><div></div><div></div><div></div><div></div></div>`;
+      const c = practiceSummary(s, wk), p = practiceSummary(s, prev), target = (s.target || 20) * 7 * 60000, f = Math.min(c.total / target, 1);
+      return `<div class="ptr" data-student="${s.id}" style="--kid:${s.color}">
+        <div class="name"><div class="avatar sm">${initial(s.name)}</div><span>${esc(s.name)}</span></div>
+        <div class="mins"><span class="num">${mins(c.total)}</span> <span class="muted small">/ ${mins(target)}</span><div class="mbar ${f >= 1 ? 'full' : ''}"><div style="width:${f * 100}%"></div></div></div>
+        <div><span class="lbl-m">Days</span><span class="num">${c.days}</span></div>
+        <div><span class="lbl-m">Focus</span><span class="num">${pct(c.focus)}</span>${trend(c.focus, p.focus)}</div>
+        <div><span class="lbl-m">In tune</span><span class="num">${s.instrument === 'piano' ? '<span class="muted">n/a</span>' : pct(c.tune)}</span>${trend(c.tune, p.tune)}</div>
+        <div><span class="lbl-m">Rhythm</span><span class="num">${pct(c.rhythm)}</span>${trend(c.rhythm, p.rhythm)}</div>
+        <div class="small muted">${lastPracticedText(lastPracticed(s))}</div></div>`;
+    }).join('')}</div>`;
+}
+
+function lessonRow(l) {
+  const s = students[l.sid]; if (!s) return '';
+  const [label, kind] = STATUS[l.status] || STATUS.scheduled;
+  return `<button class="rowLink" data-lesson="${l.id}" style="--kid:${s.color}">
+    <div class="time ${l.status === 'moved' || l.status === 'cancelled' ? 'strike' : ''}">${fmtTime(l.time)}</div>
+    <div class="avatar sm">${initial(s.name)}</div>
+    <div class="grow"><div class="t">${esc(s.name)} ${l.status !== 'scheduled' ? `<span class="chip ${kind}">${label}</span>` : ''}${l.extra ? '<span class="chip">Extra</span>' : ''}</div>
+      <div class="d">${l.length} min · ${esc(INSTRUMENTS[s.instrument] || '')}${l.notes ? ' · ' + esc(l.notes.slice(0, 60)) + (l.notes.length > 60 ? '…' : '') : ''}</div></div>
+    ${icon('chev', 'muted')}</button>`;
+}
+
+function eventRow(e) {
+  const n = Object.keys(e.participants || {}).length, days = Math.round((parseDay(e.date) - today()) / 864e5);
+  return `<button class="rowLink" data-event="${e.id}">
+    <div class="time">${fmtDate(e.date, { day: 'numeric', month: 'short' })}</div>
+    <div class="grow"><div class="t">${esc(e.title)} <span class="chip ${e.type === 'exam' ? 'info' : 'gold'}">${EVENT_TYPES[e.type] || 'Event'}</span></div>
+      <div class="d">${n} ${n === 1 ? 'student' : 'students'}${e.location ? ' · ' + esc(e.location) : ''}${days >= 0 ? ` · ${days === 0 ? 'today' : days === 1 ? 'tomorrow' : 'in ' + days + ' days'}` : ''}</div></div>
+    ${icon('chev', 'muted')}</button>`;
+}
+
+// ---------- Students ----------
+function vStudents() {
+  const q = (sub.q || '').toLowerCase(), list = active().filter(s => !q || s.name.toLowerCase().includes(q));
+  const archived = Object.values(students).filter(s => s.archived);
+  return `
+  <div class="pageHead"><div><div class="eyebrow">${active().length} active</div><h1>Students</h1></div>
+    <div class="actions"><button class="accent" data-act="addStudent">${icon('plus', 'sm')}Add student</button></div></div>
+  <div class="card">
+    ${active().length > 6 ? `<input type="search" id="search" placeholder="Search students" value="${esc(sub.q || '')}" data-keep="1" style="margin-bottom:10px">` : ''}
+    <div class="list">${list.map(s => {
+      const c = practiceSummary(s, lastDays(7));
+      return `<button class="rowLink" data-student="${s.id}" style="--kid:${s.color}">
+        <div class="avatar">${initial(s.name)}</div>
+        <div class="grow"><div class="t">${esc(s.name)} ${s.linkedAt ? '' : `<span class="chip info">${icon('link')}Invite pending</span>`}</div>
+          <div class="d">${esc(INSTRUMENTS[s.instrument] || 'Instrument not set')} · ${lessonText(s)}</div></div>
+        <div class="small muted num" style="text-align:right">${s.linkedAt ? mins(c.total) + '<br>this week' : ''}</div>
+        ${icon('chev', 'muted')}</button>`;
+    }).join('') || (active().length ? '<div class="empty">No matches.</div>' : practiceTable([]))}</div>
+  </div>
+  ${archived.length ? `<details class="card" style="margin-top:16px"><summary style="cursor:pointer;font-weight:700">Archived (${archived.length})</summary>
+    <div class="list" style="margin-top:10px">${archived.map(s => `<button class="rowLink" data-student="${s.id}" style="--kid:${s.color}"><div class="avatar sm">${initial(s.name)}</div><div class="grow">${esc(s.name)}</div></button>`).join('')}</div></details>` : ''}`;
+}
+const lessonText = s => s.lesson && s.lesson.day !== '' && s.lesson.day != null && s.lesson.time
+  ? `${DAYS[s.lesson.day]}s at ${fmtTime(s.lesson.time)}, ${s.lesson.length || 30} min` : 'No regular lesson time';
+
+function vStudent() {
+  const s = students[route.id];
+  if (!s) return `<div class="emptyBig">${icon('users', 'lg')}<p>This student isn’t in your studio.</p><button class="secondary" data-go2="students">Back to students</button></div>`;
+  const tab = sub.tab || 'progress';
+  const tabs = [['progress', 'Progress'], ['assignments', 'Assignments'], ['lessons', 'Lessons'], ['events', 'Recitals & exams'], ['notes', 'Notes']];
+  return `<div style="--kid:${s.color}">
+    <button class="ghost" data-go2="students" style="margin-left:-10px;margin-bottom:10px">${icon('back', 'sm')}Students</button>
+    <div class="studentHead">
+      <div class="avatar lg">${initial(s.name)}</div>
+      <div class="grow"><h1>${esc(s.name)}</h1><div class="muted">${esc(INSTRUMENTS[s.instrument] || 'Instrument not set')} · ${lessonText(s)}</div></div>
+      <div class="actions" style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="secondary" data-act="invite">${icon('link', 'sm')}${s.linkedAt ? 'Invite link' : 'Invite family'}</button>
+        <button class="secondary" data-act="editStudent">${icon('edit', 'sm')}Edit</button>
+        <button class="secondary" data-act="report">${icon('report', 'sm')}Report</button>
+      </div>
+    </div>
+    ${s.archived ? `<div class="banner">${icon('alert')}<div class="grow">This student is archived.</div><button class="secondary" data-act="unarchive">Restore</button></div>` : ''}
+    ${!s.linkedAt && !s.archived ? `<div class="banner">${icon('link')}<div class="grow"><b>Not connected yet.</b> Send the family the invite link so ${esc(firstName(s.name))}’s practice shows up here and your assignments appear in their app.</div><button class="accent" data-act="invite">Send invite</button></div>` : ''}
+    <div class="tabs noprint">${tabs.map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    ${{ progress: tProgress, assignments: tAssignments, lessons: tLessons, events: tEvents, notes: tNotes }[tab](s)}
+  </div>`;
+}
+
+function tProgress(s) {
+  if (!s.linkedAt) return `<div class="card emptyBig">${icon('clock', 'lg')}<p>Practice data appears here once the family connects the app.</p></div>`;
+  const wk = lastDays(7), prev = lastDays(7, addDays(today(), -7)), c = practiceSummary(s, wk), p = practiceSummary(s, prev), m = practiceSummary(s, lastDays(30));
+  const days = lastDays(28), vals = days.map(d => pDay(s, d)), target = (s.target || 20) * 60000, top = Math.max(target, ...vals) * 1.1;
+  return `<div class="stack">
+    <div class="card">
+      <div class="stats">
+        <div class="stat"><b>${mins(c.total)}</b><span>last 7 days</span></div>
+        <div class="stat"><b>${c.days}/7</b><span>days practiced</span></div>
+        <div class="stat"><b>${pct(c.focus)}${trend(c.focus, p.focus)}</b><span>focus</span></div>
+        ${s.instrument !== 'piano' ? `<div class="stat"><b>${pct(c.tune)}${trend(c.tune, p.tune)}</b><span>in tune</span></div>` : ''}
+        <div class="stat"><b>${pct(c.rhythm)}${trend(c.rhythm, p.rhythm)}</b><span>steady rhythm</span></div>
+        <div class="stat"><b>${mins(m.total)}</b><span>last 30 days</span></div>
+      </div>
+      <div class="chart">
+        <div class="goal" style="bottom:${target / top * 100}%" title="Target ${s.target || 20} min"></div>
+        ${vals.map((v, i) => `<div class="col" title="${fmtDate(days[i])}: ${mins(v)}"><div class="b ${v >= target ? 'met' : ''}" style="height:${v / top * 100}%"></div></div>`).join('')}
+      </div>
+      <div class="axis"><span>${fmtDate(days[0], { day: 'numeric', month: 'short' })}</span><span>Last 4 weeks · dashed line = ${s.target || 20} min/day target</span><span>Today</span></div>
+    </div>
+    <p class="small muted">Last practiced: ${lastPracticedText(lastPracticed(s))}. Practice data comes from ${esc(s.kidName || firstName(s.name))}’s Practice Timer app.</p>
+  </div>`;
+}
+
+function weekDots(s, a) {
+  const done = s.progress?.[a.id] || {};
+  return `<div class="week">${lastDays(7).map(d => `<div><i class="${done[dayKey(d)] ? 'on' : ''}"></i>${'SMTWTFS'[d.getDay()]}</div>`).join('')}</div>`;
+}
+function tAssignments(s) {
+  const list = Object.values(s.assignments || {}).sort((a, b) => (b.created || '').localeCompare(a.created || ''));
+  const act = list.filter(a => a.status === 'active'), done = list.filter(a => a.status === 'done');
+  const item = a => `<div class="assign">
+    <div class="grow"><div class="t">${esc(a.title)}</div>${a.details ? `<div class="det">${esc(a.details)}</div>` : ''}
+      <div class="meta">${a.bpm ? `<span class="chip">${icon('metronome')}${a.bpm} bpm</span>` : ''}${a.minutes ? `<span class="chip">${icon('clock')}${a.minutes} min/day</span>` : ''}
+        ${a.due ? `<span class="chip ${a.status === 'active' && a.due < dayKey() ? 'bad' : ''}">Due ${fmtDate(a.due)}</span>` : ''}
+        ${a.status === 'active' ? `<span class="chip good">${Object.keys(s.progress?.[a.id] || {}).length} days practiced</span>` : ''}</div>
+      ${a.status === 'active' ? weekDots(s, a) : ''}</div>
+    <div style="display:flex;gap:4px">
+      ${a.status === 'active' ? `<button class="ghost icon" data-assign-done="${a.id}" title="Mark complete" aria-label="Mark complete">${icon('check')}</button>` : `<button class="ghost small" data-assign-reopen="${a.id}">Reopen</button>`}
+      <button class="ghost icon" data-assign-edit="${a.id}" title="Edit" aria-label="Edit">${icon('edit')}</button>
+    </div></div>`;
+  return `<div class="stack"><div class="card">
+    <h2>Current assignments <button class="accent" data-act="addAssign">${icon('plus', 'sm')}New assignment</button></h2>
+    ${act.length ? act.map(item).join('') : `<div class="empty">No current assignments. ${s.linkedAt ? '' : 'They’ll appear in the student’s app once the family connects.'}</div>`}
+    <p class="small muted" style="margin-top:12px">Assignments appear on ${esc(firstName(s.name))}’s practice screen. They tick off each day they practise it.</p>
+  </div>
+  ${done.length ? `<details class="card"><summary style="cursor:pointer;font-weight:700">Completed (${done.length})</summary><div style="margin-top:8px">${done.map(item).join('')}</div></details>` : ''}</div>`;
+}
+
+function tLessons(s) {
+  const t = today(), past = lessonsBetween(addDays(t, -180), addDays(t, -1), s.id).reverse(), next = lessonsBetween(t, addDays(t, 27), s.id);
+  const rated = past.filter(l => l.ratings && Object.keys(l.ratings).length);
+  return `<div class="stack">
+    <div class="grid2">
+      <div class="card"><h2>Upcoming <button class="secondary small" data-act="addLesson">${icon('plus', 'sm')}Extra lesson</button></h2>
+        <div class="list">${next.length ? next.map(l => lessonRowDated(l)).join('') : '<div class="empty">No lessons scheduled. Set a regular lesson time with Edit.</div>'}</div></div>
+      <div class="card"><h2>Lesson ratings</h2>${ratingSummary(rated) || '<div class="empty">Rate lessons (preparation, technique, musicality) to see how things are going over time.</div>'}</div>
+    </div>
+    <div class="card"><h2>Past lessons</h2><div class="list">${past.length ? past.slice(0, 30).map(l => lessonRowDated(l, true)).join('') : '<div class="empty">No past lessons yet.</div>'}</div></div>
+  </div>`;
+}
+function lessonRowDated(l, withNotes) {
+  const [label, kind] = STATUS[l.status] || STATUS.scheduled, avg = avgRating(l.ratings);
+  return `<button class="rowLink" data-lesson="${l.id}">
+    <div class="time ${l.status === 'moved' || l.status === 'cancelled' ? 'strike' : ''}" style="min-width:100px">${fmtDate(l.date)}</div>
+    <div class="grow"><div class="t">${fmtTime(l.time)} <span class="chip ${kind}">${label}</span>${l.extra ? '<span class="chip">Extra</span>' : ''}${avg ? `<span class="chip info">${avg.toFixed(1)} / 5</span>` : ''}</div>
+      ${withNotes && l.notes ? `<div class="d">${esc(l.notes.slice(0, 140))}${l.notes.length > 140 ? '…' : ''}</div>` : ''}</div>${icon('chev', 'muted')}</button>`;
+}
+const avgRating = r => { const v = Object.values(r || {}).filter(Number); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+function ratingSummary(rated) {
+  if (!rated.length) return '';
+  return RATINGS.map(([k, label]) => {
+    const v = rated.map(l => l.ratings[k]).filter(Number);
+    if (!v.length) return '';
+    const avg = v.reduce((a, b) => a + b, 0) / v.length;
+    return `<div class="rbar" style="margin-top:10px"><span class="l">${label}</span><div class="track"><div style="width:${avg / 5 * 100}%"></div></div><b>${avg.toFixed(1)}</b></div>`;
+  }).join('') + `<p class="small muted" style="margin-top:12px">Average of ${rated.length} rated ${rated.length === 1 ? 'lesson' : 'lessons'} (out of 5).</p>`;
+}
+
+function tEvents(s) {
+  const list = Object.values(events).filter(e => e.participants?.[s.id]).sort((a, b) => b.date.localeCompare(a.date));
+  return `<div class="card"><h2>Recitals & exams <button class="accent" data-act="addEvent">${icon('plus', 'sm')}Add</button></h2>
+    <div class="list">${list.length ? list.map(e => {
+      const p = e.participants[s.id];
+      return `<button class="rowLink" data-event="${e.id}"><div class="time" style="min-width:100px">${fmtDate(e.date)}</div>
+        <div class="grow"><div class="t">${esc(e.title)} <span class="chip ${e.type === 'exam' ? 'info' : 'gold'}">${EVENT_TYPES[e.type]}</span>${p.result ? `<span class="chip good">${esc(p.result)}</span>` : ''}</div>
+        <div class="d">${p.piece ? esc(p.piece) : 'Piece not set'}</div></div>${icon('chev', 'muted')}</button>`;
+    }).join('') : '<div class="empty">No recitals or exams yet.</div>'}</div></div>`;
+}
+
+function tNotes(s) {
+  return `<div class="card"><h2>Private notes</h2>
+    <textarea id="noteBox" data-keep="1" style="min-height:260px" placeholder="Anything you want to remember about ${esc(firstName(s.name))}: goals, repertoire, what works, parent conversations…">${esc(notes[s.id] || '')}</textarea>
+    <p class="small muted" style="margin-top:8px" id="noteState">Only you can see these. Saved automatically.</p></div>`;
+}
+
+// ---------- Schedule ----------
+function vSchedule() {
+  const start = sub.week ? parseDay(sub.week) : weekStart(today()), end = addDays(start, 6), list = lessonsBetween(start, end);
+  const isThis = dayKey(start) === dayKey(weekStart(today()));
+  const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
+  const total = list.filter(countsAsLesson);
+  return `
+  <div class="pageHead"><div><div class="eyebrow">${total.length} lessons · ${mins(total.reduce((a, l) => a + l.length * 60000, 0))} teaching</div><h1>Schedule</h1></div>
+    <div class="actions"><button class="accent" data-act="addLesson">${icon('plus', 'sm')}Add lesson</button></div></div>
+  <div class="card">
+    <div class="rowBetween" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+      <div class="weekNav"><button class="secondary icon" data-week="-7" aria-label="Previous week">${icon('back')}</button>
+        <div class="lbl">${fmtDate(start, { day: 'numeric', month: 'short' })} – ${fmtDate(end, { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+        <button class="secondary icon" data-week="7" aria-label="Next week">${icon('chev')}</button></div>
+      ${isThis ? '' : '<button class="ghost" data-week="0">This week</button>'}
+    </div>
+    ${days.map(d => {
+      const k = dayKey(d), ls = list.filter(l => l.date === k);
+      return `<div class="dayBlock ${k === dayKey() ? 'today' : ''}"><h3>${DAYS[d.getDay()]} <span class="muted">${fmtDate(d, { day: 'numeric', month: 'short' })}${k === dayKey() ? ' · Today' : ''}</span></h3>
+        <div class="list">${ls.length ? ls.map(lessonRow).join('') : '<div class="empty" style="padding:2px 0 4px">No lessons</div>'}</div></div>`;
+    }).join('')}
+  </div>`;
+}
+
+// ---------- Events ----------
+function vEvents() {
+  const all = Object.values(events), t = dayKey();
+  const up = all.filter(e => e.date >= t).sort((a, b) => a.date.localeCompare(b.date)), past = all.filter(e => e.date < t).sort((a, b) => b.date.localeCompare(a.date));
+  return `
+  <div class="pageHead"><div><div class="eyebrow">${up.length} upcoming</div><h1>Recitals & exams</h1></div>
+    <div class="actions"><button class="accent" data-act="addEvent">${icon('plus', 'sm')}Add event</button></div></div>
+  <div class="stack">
+    <div class="card"><h2>Upcoming</h2><div class="list">${up.length ? up.map(eventRow).join('') : '<div class="empty">Nothing planned. Add a recital, exam or competition – students see it in their app with a countdown.</div>'}</div></div>
+    ${past.length ? `<div class="card"><h2>Past</h2><div class="list">${past.map(eventRow).join('')}</div></div>` : ''}
+  </div>`;
+}
+
+// ---------- Reports ----------
+const RANGES = { 28: 'Last 4 weeks', 91: 'Last 3 months', 182: 'Last 6 months' };
+function vReports() {
+  const list = active(), sid = sub.sid && students[sub.sid] ? sub.sid : list[0]?.id, range = +(sub.range || 28);
+  if (!sid) return `<div class="pageHead"><h1>Reports</h1></div><div class="card">${practiceTable([])}</div>`;
+  const s = students[sid], end = today(), start = addDays(end, -range + 1), days = lastDays(range);
+  const P = practiceSummary(s, days), ls = lessonsBetween(start, end, sid).filter(l => parseDay(l.date) <= end);
+  const doneL = ls.filter(l => l.status === 'done'), cancelled = ls.filter(l => l.status === 'cancelled'), noshow = ls.filter(l => l.status === 'noshow');
+  const rated = ls.filter(l => l.ratings && Object.keys(l.ratings).length);
+  const asg = Object.values(s.assignments || {}), asgDone = asg.filter(a => a.status === 'done' && a.completed && a.completed >= dayKey(start));
+  const ev = Object.values(events).filter(e => e.participants?.[sid] && e.date >= dayKey(start)).sort((a, b) => a.date.localeCompare(b.date));
+  const weeks = []; for (let i = 0; i < range; i += 7) weeks.push(days.slice(i, i + 7));
+  const wVals = weeks.map(w => w.reduce((a, d) => a + pDay(s, d), 0)), wTop = Math.max((s.target || 20) * 7 * 60000, ...wVals) * 1.1;
+  return `
+  <div class="pageHead noprint"><div><div class="eyebrow">Progress report</div><h1>Reports</h1></div>
+    <div class="actions">
+      <select id="repStudent" style="width:auto">${list.map(x => `<option value="${x.id}" ${x.id === sid ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>
+      <select id="repRange" style="width:auto">${Object.entries(RANGES).map(([k, v]) => `<option value="${k}" ${+k === range ? 'selected' : ''}>${v}</option>`).join('')}</select>
+      <button class="primary" onclick="print()">${icon('print', 'sm')}Print / PDF</button></div></div>
+  <div class="card report" style="--kid:${s.color}">
+    <div class="rhead"><div><div class="eyebrow">${esc(studio.studioName)}</div><h1>${esc(s.name)}</h1>
+      <div class="muted">${esc(INSTRUMENTS[s.instrument] || '')} · Teacher: ${esc(studio.teacherName)}</div></div>
+      <div style="text-align:right"><b>Progress report</b><div class="muted small">${fmtDate(start, { day: 'numeric', month: 'long' })} – ${fmtDate(end, { day: 'numeric', month: 'long', year: 'numeric' })}</div></div></div>
+    <section><h3>Practice</h3>
+      ${s.linkedAt ? `<div class="stats">
+        <div class="stat"><b>${mins(P.total)}</b><span>total</span></div>
+        <div class="stat"><b>${mins(P.total / (range / 7))}</b><span>per week</span></div>
+        <div class="stat"><b>${P.days} of ${range}</b><span>days practiced</span></div>
+        <div class="stat"><b>${pct(P.focus)}</b><span>focus</span></div>
+        ${s.instrument !== 'piano' ? `<div class="stat"><b>${pct(P.tune)}</b><span>in tune</span></div>` : ''}
+        <div class="stat"><b>${pct(P.rhythm)}</b><span>steady rhythm</span></div></div>
+      <div class="chart" style="height:110px">${wVals.map((v, i) => `<div class="col" title="Week of ${fmtDate(weeks[i][0])}: ${mins(v)}"><div class="b met" style="height:${v / wTop * 100}%"></div></div>`).join('')}
+        <div class="goal" style="bottom:${(s.target || 20) * 7 * 60000 / wTop * 100}%"></div></div>
+      <div class="axis"><span>Minutes per week</span><span>dashed line = ${(s.target || 20) * 7} min/week target</span></div>`
+      : '<p class="muted">Not connected to the Practice Timer app, so no practice data.</p>'}
+    </section>
+    <section><h3>Lessons</h3>
+      <div class="stats"><div class="stat"><b>${doneL.length}</b><span>attended</span></div><div class="stat"><b>${cancelled.length}</b><span>cancelled</span></div><div class="stat"><b>${noshow.length}</b><span>missed</span></div></div>
+      ${rated.length ? `<div style="margin-top:12px">${ratingSummary(rated)}</div>` : ''}
+    </section>
+    <section><h3>Assignments</h3>
+      ${asgDone.length || asg.some(a => a.status === 'active') ? `<div class="list">${[...asgDone, ...asg.filter(a => a.status === 'active')].map(a => `<div class="assign"><div class="grow"><div class="t">${esc(a.title)}</div>
+        <div class="meta">${a.status === 'done' ? '<span class="chip good">Completed</span>' : '<span class="chip">In progress</span>'}<span class="chip">${Object.keys(s.progress?.[a.id] || {}).length} days practiced</span></div></div></div>`).join('')}</div>` : '<p class="muted">No assignments in this period.</p>'}
+    </section>
+    ${ev.length ? `<section><h3>Recitals & exams</h3><div class="list">${ev.map(e => `<div class="assign"><div class="grow"><div class="t">${esc(e.title)} · ${fmtDate(e.date)}</div>
+      <div class="det">${esc(e.participants[sid].piece || '')}${e.participants[sid].result ? ' — <b>' + esc(e.participants[sid].result) + '</b>' : ''}</div></div></div>`).join('')}</div></section>` : ''}
+    <section><h3>Teacher’s comments</h3><div class="comment" contenteditable="true" data-placeholder="Type comments for the family here before printing (not saved)."></div></section>
+  </div>`;
+}
+
+// ============================================================================================
+// Interactions
+// ============================================================================================
+function bindView() {
+  const V = $('view');
+  V.querySelectorAll('[data-student]').forEach(b => b.onclick = () => { sub = {}; go('student', { id: b.dataset.student }); });
+  V.querySelectorAll('[data-go2]').forEach(b => b.onclick = () => { sub = {}; go(b.dataset.go2); });
+  V.querySelectorAll('[data-lesson]').forEach(b => b.onclick = () => lessonModal(b.dataset.lesson));
+  V.querySelectorAll('[data-event]').forEach(b => b.onclick = () => eventModal(b.dataset.event));
+  V.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { sub.tab = b.dataset.tab; render(); });
+  V.querySelectorAll('[data-week]').forEach(b => b.onclick = () => {
+    const cur = sub.week ? parseDay(sub.week) : weekStart(today());
+    sub.week = +b.dataset.week === 0 ? null : dayKey(addDays(cur, +b.dataset.week)); render();
+  });
+  V.querySelectorAll('[data-act]').forEach(b => b.onclick = () => ({
+    addStudent: () => studentModal(), editStudent: () => studentModal(route.id), invite: () => inviteModal(route.id),
+    report: () => { sub = { sid: route.id }; go('reports'); }, addAssign: () => assignModal(route.id),
+    addLesson: () => extraLessonModal(route.view === 'student' ? route.id : null),
+    addEvent: () => eventModal(null, route.view === 'student' ? route.id : null),
+    unarchive: () => api.patchStudent(route.id, { archived: false })
+  })[b.dataset.act]());
+  V.querySelectorAll('[data-assign-done]').forEach(b => b.onclick = () => api.patchStudent(route.id, { [`assignments.${b.dataset.assignDone}.status`]: 'done', [`assignments.${b.dataset.assignDone}.completed`]: dayKey() }).then(() => toast('Marked complete')));
+  V.querySelectorAll('[data-assign-reopen]').forEach(b => b.onclick = () => api.patchStudent(route.id, { [`assignments.${b.dataset.assignReopen}.status`]: 'active' }));
+  V.querySelectorAll('[data-assign-edit]').forEach(b => b.onclick = () => assignModal(route.id, b.dataset.assignEdit));
+  const search = $('search');
+  if (search) search.oninput = () => { sub.q = search.value; const pos = search.selectionStart; search.dataset.keep = ''; render(); const s2 = $('search'); s2.focus(); s2.setSelectionRange(pos, pos); s2.dataset.keep = '1'; };
+  const nb = $('noteBox');
+  if (nb) nb.oninput = () => { clearTimeout(nb.t); $('noteState').textContent = 'Saving…'; nb.t = setTimeout(async () => { notes[route.id] = nb.value; await api.saveNote(route.id, nb.value); $('noteState') && ($('noteState').textContent = 'Saved. Only you can see these.'); }, 700); };
+  if ($('repStudent')) { $('repStudent').onchange = () => { sub.sid = $('repStudent').value; render(); }; $('repRange').onchange = () => { sub.range = $('repRange').value; render(); }; }
+}
+
+// ---------- Modals ----------
+function openModal(html, bind) {
+  $('modalCard').innerHTML = html; $('modal').hidden = false;
+  $('modalCard').querySelectorAll('[data-close]').forEach(b => b.onclick = closeModal);
+  bind?.($('modalCard'));
+  setTimeout(() => $('modalCard').querySelector('input:not([type=checkbox]), textarea, select')?.focus(), 50);
+}
+function closeModal() { $('modal').hidden = true; $('modalCard').innerHTML = ''; }
+$('modal').onclick = e => { if (e.target === $('modal')) closeModal(); };
+addEventListener('keydown', e => { if (e.key === 'Escape' && !$('modal').hidden) closeModal(); });
+const mhead = t => `<header><h2>${t}</h2><button class="ghost icon" data-close aria-label="Close">${icon('x')}</button></header>`;
+const val = id => $('modalCard').querySelector('#' + id)?.value.trim() ?? '';
+
+function studentModal(sid) {
+  const s = sid ? students[sid] : { name: '', instrument: '', color: COLORS[Object.keys(students).length % COLORS.length], lesson: { day: '', time: '16:00', length: 30 }, target: 20 };
+  let color = s.color;
+  openModal(`${mhead(sid ? 'Edit student' : 'Add student')}
+    <div class="fields">
+      <label class="field">Name <input type="text" id="fName" value="${esc(s.name)}" maxlength="40" placeholder="Student’s name"></label>
+      <div class="fields two">
+        <label class="field">Instrument <select id="fInstr"><option value="">Choose…</option>${Object.entries(INSTRUMENTS).map(([k, v]) => `<option value="${k}" ${s.instrument === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+        <label class="field">Daily practice target (min) <input type="number" id="fTarget" min="5" max="180" value="${s.target || 20}"></label>
+      </div>
+      <div class="field">Colour <div class="swatches">${COLORS.map(c => `<button type="button" data-color="${c}" style="background:${c}" class="${c === color ? 'on' : ''}" aria-label="Colour"></button>`).join('')}</div></div>
+      <div class="fields three">
+        <label class="field">Lesson day <select id="fDay"><option value="">No regular lesson</option>${[1, 2, 3, 4, 5, 6, 0].map(d => `<option value="${d}" ${String(s.lesson?.day) === String(d) ? 'selected' : ''}>${DAYS[d]}</option>`).join('')}</select></label>
+        <label class="field">Time <input type="time" id="fTime" value="${s.lesson?.time || '16:00'}"></label>
+        <label class="field">Length <select id="fLen">${[20, 30, 45, 60, 90].map(n => `<option value="${n}" ${(s.lesson?.length || 30) === n ? 'selected' : ''}>${n} min</option>`).join('')}</select></label>
+      </div>
+      <div class="gateErr" id="fErr"></div>
+    </div>
+    <footer>${sid ? `<button class="danger" id="fArchive">${s.archived ? 'Delete permanently' : 'Archive student'}</button>` : ''}
+      <div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="fSave">${sid ? 'Save' : 'Add student'}</button></div></footer>`, m => {
+    m.querySelectorAll('[data-color]').forEach(b => b.onclick = () => { color = b.dataset.color; m.querySelectorAll('[data-color]').forEach(x => x.classList.toggle('on', x === b)); });
+    m.querySelector('#fSave').onclick = async () => {
+      const name = val('fName'); if (!name) return (m.querySelector('#fErr').textContent = 'Please enter a name.');
+      const day = val('fDay');
+      const data = { name, instrument: val('fInstr'), color, target: Math.max(5, Math.min(180, +val('fTarget') || 20)),
+                     lesson: { day: day === '' ? '' : +day, time: val('fTime'), length: +val('fLen'), start: s.lesson?.start || dayKey() } };
+      if (sid) {
+        if (String(s.lesson?.day) !== String(data.lesson.day) || s.lesson?.time !== data.lesson.time) data.lesson.start = dayKey();
+        await api.patchStudent(sid, data); closeModal(); toast('Saved');
+      } else {
+        const id = randomCode();
+        await api.createStudent(id, { ...data, studioId: me.uid, studioName: studio.studioName, teacherName: studio.teacherName,
+          assignments: {}, upcoming: {}, lessonChanges: {}, created: dayKey(), archived: false });
+        closeModal(); sub = {}; go('student', { id }); setTimeout(() => inviteModal(id), 300);
+      }
+    };
+    const ar = m.querySelector('#fArchive');
+    if (ar) ar.onclick = async () => {
+      if (s.archived) {
+        if (!confirm(`Delete ${s.name} permanently? Their family’s app will be disconnected. This can’t be undone.`)) return;
+        await api.deleteStudent(sid); closeModal(); go('students'); toast('Student deleted');
+      } else { await api.patchStudent(sid, { archived: true }); closeModal(); toast('Archived'); }
+    };
+  });
+}
+
+function inviteLink(sid) { return location.origin + location.pathname.replace(/teacher\.html$/, '') + '#link=' + sid; }
+function inviteModal(sid) {
+  const s = students[sid], link = inviteLink(sid);
+  openModal(`${mhead('Invite ' + esc(firstName(s.name)) + '’s family')}
+    <p>Send this link to the family. They open it on the phone or tablet ${esc(firstName(s.name))} practises with, and the Practice Timer app connects to your studio.</p>
+    <div class="codeBox">${esc(link)}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      ${navigator.share ? `<button class="accent" id="iShare">${icon('share', 'sm')}Share link</button>` : ''}
+      <button class="secondary" id="iCopy">${icon('copy', 'sm')}Copy link</button>
+      <button class="secondary" id="iMsg">${icon('copy', 'sm')}Copy message</button>
+    </div>
+    <p class="small muted">Or they can enter this code in the app under Settings → the player → Connect to teacher: <b style="font-family:ui-monospace,monospace">${sid}</b>.
+      Anyone with the link can see ${esc(firstName(s.name))}’s assignments and lesson times, so send it only to the family.</p>
+    ${s.linkedAt ? `<div class="banner" style="margin:0">${icon('check')}<div class="grow">Connected${s.kidName && s.kidName !== s.name ? ` as “${esc(s.kidName)}”` : ''}.</div></div>` : ''}
+    <footer><div class="right"><button class="primary" data-close>Done</button></div></footer>`, m => {
+    const msg = `Hi! ${studio.teacherName} here. Please open this link on the device ${firstName(s.name)} practises with to connect the Practice Timer app to my studio: ${link}`;
+    const copy = async (t, what) => { try { await navigator.clipboard.writeText(t); toast(what + ' copied'); } catch { prompt('Copy this:', t); } };
+    m.querySelector('#iCopy').onclick = () => copy(link, 'Link');
+    m.querySelector('#iMsg').onclick = () => copy(msg, 'Message');
+    const sh = m.querySelector('#iShare'); if (sh) sh.onclick = () => navigator.share({ title: 'Practice Timer', text: msg.replace(link, '').trim(), url: link }).catch(() => {});
+  });
+}
+
+function assignModal(sid, aid) {
+  const s = students[sid], a = aid ? s.assignments[aid] : { title: '', details: '', bpm: '', minutes: '', due: '' };
+  openModal(`${mhead(aid ? 'Edit assignment' : 'New assignment for ' + esc(firstName(s.name)))}
+    <div class="fields">
+      <label class="field">What to practise <input type="text" id="aTitle" value="${esc(a.title)}" maxlength="80" placeholder="e.g. G major scale, 2 octaves"></label>
+      <label class="field">Details <textarea id="aDet" placeholder="How to practise it, bars to focus on, what to listen for…">${esc(a.details || '')}</textarea></label>
+      <div class="fields three">
+        <label class="field">Tempo (bpm) <input type="number" id="aBpm" min="30" max="250" value="${a.bpm || ''}" placeholder="Optional"></label>
+        <label class="field">Minutes a day <input type="number" id="aMin" min="1" max="120" value="${a.minutes || ''}" placeholder="Optional"></label>
+        <label class="field">Due <input type="date" id="aDue" value="${a.due || ''}"></label>
+      </div>
+      <p class="small muted">If you set a tempo, the student can tap it to set their metronome.</p>
+      <div class="gateErr" id="aErr"></div>
+    </div>
+    <footer>${aid ? '<button class="danger" id="aDel">Delete</button>' : ''}<div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="aSave">${aid ? 'Save' : 'Assign'}</button></div></footer>`, m => {
+    m.querySelector('#aSave').onclick = async () => {
+      const title = val('aTitle'); if (!title) return (m.querySelector('#aErr').textContent = 'Please say what to practise.');
+      const id = aid || newId();
+      const data = { ...a, id, title, details: val('aDet'), bpm: +val('aBpm') || null, minutes: +val('aMin') || null, due: val('aDue') || null,
+                     status: a.status || 'active', created: a.created || dayKey() };
+      await api.patchStudent(sid, { [`assignments.${id}`]: data }); closeModal(); toast(aid ? 'Saved' : 'Assigned');
+    };
+    const d = m.querySelector('#aDel'); if (d) d.onclick = async () => { if (!confirm('Delete this assignment?')) return; await api.patchStudent(sid, { [`assignments.${aid}`]: DEL, [`progress.${aid}`]: DEL }); closeModal(); };
+  });
+}
+
+// Lesson changes families should see (cancelled / moved / extra) are mirrored onto the student record
+function mirrorLesson(sid, date, change) { return api.patchStudent(sid, { [`lessonChanges.${date}`]: change || DEL }); }
+
+function lessonModal(id) {
+  const t = today(), all = lessonsBetween(addDays(t, -400), addDays(t, 400)), l = all.find(x => x.id === id) || lessons[id];
+  if (!l) return;
+  const s = students[l.sid];
+  let status = l.status || 'scheduled', ratings = { ...(l.ratings || {}) };
+  openModal(`${mhead(esc(s.name) + ' · ' + fmtDate(l.date, { weekday: 'long', day: 'numeric', month: 'long' }))}
+    <div class="muted" style="margin-top:-8px">${fmtTime(l.time)} · ${l.length} min${l.extra ? ' · extra lesson' : ''}</div>
+    <div class="field">Status <div class="seg" id="lStatus">${['scheduled', 'done', 'cancelled', 'noshow'].map(k => `<button type="button" data-st="${k}" class="${status === k ? 'on' : ''}">${STATUS[k][0]}</button>`).join('')}</div></div>
+    <label class="field">Lesson notes <textarea id="lNotes" placeholder="What you worked on, what to focus on next…">${esc(l.notes || '')}</textarea></label>
+    <div class="field">Ratings <span class="small muted" style="font-weight:500">1 = needs work · 5 = excellent</span>
+      ${RATINGS.map(([k, label]) => `<div class="rate"><span style="color:var(--ink);font-size:14.5px">${label}</span><div class="dots">${[1, 2, 3, 4, 5].map(n => `<button type="button" data-rate="${k}" data-n="${n}" class="${(ratings[k] || 0) >= n ? 'on' : ''}">${n}</button>`).join('')}</div></div>`).join('')}</div>
+    <details><summary style="cursor:pointer;font-weight:600;font-size:14px">Move this lesson</summary>
+      <div class="fields two" style="margin-top:10px"><label class="field">New date <input type="date" id="lDate" value="${l.date}"></label><label class="field">New time <input type="time" id="lTime" value="${l.time}"></label></div>
+      <button class="secondary" id="lMove" style="margin-top:10px">Move lesson</button></details>
+    <footer>${l.extra ? '<button class="danger" id="lDel">Delete lesson</button>' : ''}<div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="lSave">Save</button></div></footer>`, m => {
+    m.querySelectorAll('[data-st]').forEach(b => b.onclick = () => { status = b.dataset.st; m.querySelectorAll('[data-st]').forEach(x => x.classList.toggle('on', x === b)); });
+    m.querySelectorAll('[data-rate]').forEach(b => b.onclick = () => {
+      const k = b.dataset.rate, n = +b.dataset.n; ratings[k] = ratings[k] === n ? 0 : n;
+      m.querySelectorAll(`[data-rate="${k}"]`).forEach(x => x.classList.toggle('on', +x.dataset.n <= ratings[k]));
+    });
+    m.querySelector('#lSave').onclick = async () => {
+      const r = Object.fromEntries(Object.entries(ratings).filter(([, v]) => v));
+      await api.saveLesson(id, { sid: l.sid, date: l.date, time: l.time, length: l.length, status, notes: val('lNotes'), ratings: r, ...(l.extra ? { extra: true } : {}) });
+      await mirrorLesson(l.sid, l.date, status === 'cancelled' ? { status: 'cancelled' } : l.extra ? { status: 'extra', time: l.time } : null);
+      closeModal(); toast('Lesson saved');
+    };
+    m.querySelector('#lMove').onclick = async () => {
+      const nd = val('lDate'), nt = val('lTime'); if (!nd || !nt) return;
+      if (nd === l.date) {        // same day, new time
+        await api.saveLesson(id, { sid: l.sid, date: l.date, time: nt, length: l.length, status: 'scheduled', ...(l.extra ? { extra: true } : {}) });
+        await mirrorLesson(l.sid, l.date, { status: 'extra', time: nt });
+      } else {
+        const nid = `${l.sid}_${nd}`;
+        if (l.extra) await api.deleteLesson(id); else await api.saveLesson(id, { sid: l.sid, date: l.date, time: l.time, length: l.length, status: 'moved', movedTo: nd });
+        await api.saveLesson(nid, { sid: l.sid, date: nd, time: nt, length: l.length, status: 'scheduled', extra: true, notes: l.notes || '' });
+        await mirrorLesson(l.sid, l.date, l.extra ? null : { status: 'moved', to: nd });
+        await mirrorLesson(l.sid, nd, { status: 'extra', time: nt });
+      }
+      closeModal(); toast('Lesson moved');
+    };
+    const d = m.querySelector('#lDel'); if (d) d.onclick = async () => { await api.deleteLesson(id); await mirrorLesson(l.sid, l.date, null); closeModal(); };
+  });
+}
+
+function extraLessonModal(sid) {
+  const list = active();
+  if (!list.length) return toast('Add a student first');
+  openModal(`${mhead('Add a lesson')}
+    <div class="fields">
+      <label class="field">Student <select id="xS">${list.map(s => `<option value="${s.id}" ${s.id === sid ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
+      <div class="fields three"><label class="field">Date <input type="date" id="xD" value="${dayKey()}"></label><label class="field">Time <input type="time" id="xT" value="16:00"></label>
+        <label class="field">Length <select id="xL">${[20, 30, 45, 60, 90].map(n => `<option value="${n}" ${n === 30 ? 'selected' : ''}>${n} min</option>`).join('')}</select></label></div>
+      <p class="small muted">For a regular weekly slot, set the lesson day and time on the student instead.</p>
+    </div>
+    <footer><div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="xSave">Add lesson</button></div></footer>`, m => {
+    m.querySelector('#xSave').onclick = async () => {
+      const s = val('xS'), d = val('xD'), t = val('xT'); if (!d || !t) return;
+      await api.saveLesson(`${s}_${d}`, { sid: s, date: d, time: t, length: +val('xL'), status: 'scheduled', extra: true });
+      await mirrorLesson(s, d, { status: 'extra', time: t });
+      closeModal(); toast('Lesson added');
+    };
+  });
+}
+
+function eventModal(eid, preselect) {
+  const e = eid ? events[eid] : { type: 'recital', title: '', date: dayKey(addDays(today(), 30)), time: '', location: '', participants: preselect ? { [preselect]: { piece: '', result: '' } } : {} };
+  const list = active().concat(Object.keys(e.participants).filter(id => students[id]?.archived).map(id => students[id]));
+  openModal(`${mhead(eid ? 'Edit event' : 'Add recital or exam')}
+    <div class="fields">
+      <div class="fields two">
+        <label class="field">Type <select id="eType">${Object.entries(EVENT_TYPES).map(([k, v]) => `<option value="${k}" ${e.type === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+        <label class="field">Title <input type="text" id="eTitle" value="${esc(e.title)}" maxlength="80" placeholder="e.g. Winter Recital"></label>
+      </div>
+      <div class="fields three">
+        <label class="field">Date <input type="date" id="eDate" value="${e.date}"></label>
+        <label class="field">Time <input type="time" id="eTime" value="${e.time || ''}"></label>
+        <label class="field">Location <input type="text" id="eLoc" value="${esc(e.location || '')}" maxlength="80"></label>
+      </div>
+      <div class="field">Students taking part <span class="small muted" style="font-weight:500">Add the piece, and the result afterwards (e.g. “Merit”, “2nd place”).</span></div>
+      <div>${list.map(s => { const p = e.participants[s.id]; return `<div class="participant">
+        <input type="checkbox" data-part="${s.id}" ${p ? 'checked' : ''} aria-label="${esc(s.name)}"><label class="chk" for="">${esc(s.name)}</label>
+        <div class="more" data-more="${s.id}" ${p ? '' : 'hidden'}><input type="text" data-piece="${s.id}" value="${esc(p?.piece || '')}" placeholder="Piece"><input type="text" data-result="${s.id}" value="${esc(p?.result || '')}" placeholder="Result"></div></div>`; }).join('')}</div>
+      <div class="gateErr" id="eErr"></div>
+    </div>
+    <footer>${eid ? '<button class="danger" id="eDel">Delete</button>' : ''}<div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="eSave">Save</button></div></footer>`, m => {
+    m.querySelectorAll('[data-part]').forEach(c => {
+      c.onchange = () => { m.querySelector(`[data-more="${c.dataset.part}"]`).hidden = !c.checked; };
+      c.nextElementSibling.onclick = () => { c.checked = !c.checked; c.onchange(); };
+    });
+    m.querySelector('#eSave').onclick = async () => {
+      const title = val('eTitle'), date = val('eDate');
+      if (!title || !date) return (m.querySelector('#eErr').textContent = 'Please add a title and date.');
+      const participants = {};
+      m.querySelectorAll('[data-part]').forEach(c => { if (c.checked) participants[c.dataset.part] = { piece: m.querySelector(`[data-piece="${c.dataset.part}"]`).value.trim(), result: m.querySelector(`[data-result="${c.dataset.part}"]`).value.trim() }; });
+      const id = eid || newId(), data = { type: val('eType'), title, date, time: val('eTime'), location: val('eLoc'), participants };
+      await api.saveEvent(id, data);
+      // Families see upcoming events for their child (without other students' names)
+      const before = Object.keys(e.participants || {});
+      for (const sid of new Set([...before, ...Object.keys(participants)])) {
+        if (!students[sid]) continue;
+        const p = participants[sid];
+        await api.patchStudent(sid, { [`upcoming.${id}`]: p ? { type: data.type, title, date, time: data.time, location: data.location, piece: p.piece, result: p.result } : DEL });
+      }
+      closeModal(); toast('Saved');
+    };
+    const d = m.querySelector('#eDel'); if (d) d.onclick = async () => {
+      if (!confirm('Delete this event?')) return;
+      for (const sid of Object.keys(e.participants || {})) if (students[sid]) await api.patchStudent(sid, { [`upcoming.${eid}`]: DEL });
+      await api.deleteEvent(eid); closeModal();
+    };
+  });
+}
+
+function studioModal() {
+  openModal(`${mhead('Studio settings')}
+    <div class="fields">
+      <label class="field">Studio name <input type="text" id="sName" value="${esc(studio.studioName)}" maxlength="60"></label>
+      <label class="field">Your name, as students know you <input type="text" id="sTeacher" value="${esc(studio.teacherName)}" maxlength="60"></label>
+      <p class="small muted">Signed in as ${esc(me.email || me.displayName || '')}.</p>
+    </div>
+    <footer><button class="danger" id="sOut">Sign out</button><div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="sSave">Save</button></div></footer>`, m => {
+    m.querySelector('#sSave').onclick = async () => {
+      const n = val('sName') || studio.studioName, t = val('sTeacher') || studio.teacherName;
+      studio.studioName = n; studio.teacherName = t;
+      await api.updateStudio({ studioName: n, teacherName: t });
+      for (const s of Object.values(students)) await api.patchStudent(s.id, { studioName: n, teacherName: t });   // families see the new names
+      closeModal(); render(); toast('Saved');
+    };
+    m.querySelector('#sOut').onclick = () => api.signOut();
+  });
+}
+$('studioBtn').onclick = studioModal;
+$('signOutBtn').onclick = () => api.signOut();
+
+// ============================================================================================
+// Start-up
+// ============================================================================================
+function showOnly(id) { for (const x of ['signin', 'setup', 'shell']) $(x).hidden = x !== id; }
+
+async function start() {
+  try { api = DEMO ? demoApi() : await firebaseApi(); }
+  catch (e) { console.error(e); showOnly('signin'); $('signinErr').textContent = 'Couldn’t load. Check your internet connection and reload.'; return; }
+  $('googleBtn').onclick = async () => {
+    $('signinErr').textContent = '';
+    try { await api.signIn(); } catch (e) { console.error(e); $('signinErr').textContent = e.code === 'auth/popup-closed-by-user' ? '' : 'Sign-in didn’t work. Please try again.'; }
+  };
+  $('setupSignOut').onclick = () => api.signOut();
+  api.onAuth(async user => {
+    if (!user) { me = null; studio = null; showOnly('signin'); return; }
+    me = user;
+    $('meName').textContent = user.displayName || 'Teacher';
+    $('meEmail').textContent = user.email || '';
+    studio = await api.getStudio(user.uid);
+    if (!studio) {
+      showOnly('setup');
+      $('setupTeacher').value = user.displayName || '';
+      $('setupBtn').onclick = async () => {
+        const n = $('setupStudio').value.trim(), t = $('setupTeacher').value.trim();
+        if (!n || !t) return ($('setupErr').textContent = 'Please fill in both names.');
+        $('setupBtn').disabled = true;
+        try { await api.createStudio({ studioName: n, teacherName: t }); studio = { studioName: n, teacherName: t }; enter(); }
+        catch (e) { console.error(e); $('setupErr').textContent = 'Couldn’t create the studio. Please try again.'; $('setupBtn').disabled = false; }
+      };
+      return;
+    }
+    enter();
+  });
+}
+function enter() { showOnly('shell'); parseRoute(); api.watch(render); render(); }
+
+// ---------- Demo data ----------
+function seedDemo() {
+  studio = { studioName: 'Riverside Strings & Keys', teacherName: 'Ms. Alvarez' };
+  const t = today(), rnd = (a, b) => a + Math.random() * (b - a);
+  const kids = [
+    ['Maya Chen', 'violin', 0, 2, '16:00', 30, 25, .9], ['Leo Park', 'cello', 1, 2, '16:45', 45, 30, .7], ['Sam Rivera', 'piano', 3, 3, '15:30', 30, 20, .5],
+    ['Ava Johnson', 'violin', 5, 4, '17:00', 30, 20, .85], ['Noah Williams', 'piano', 2, 1, '16:00', 45, 30, .3], ['Zoe Martin', 'viola', 7, 4, '16:00', 30, 20, 0]
+  ];
+  kids.forEach(([name, instrument, ci, day, time, length, target, keen], i) => {
+    const id = 'demo-student-' + i + '-xxxxxxxxxxxx', log = {}, st = {};
+    if (keen > 0) for (let d = 0; d < 120; d++) {
+      const date = addDays(t, -d), k = dayKey(date);
+      if (Math.random() < keen - (d < 5 && keen < .4 ? .3 : 0)) {
+        const ms = Math.round(rnd(.5, 1.4) * target * 60000), active = ms * rnd(1.05, 1.5);
+        log[k] = ms;
+        st[k] = { active, longest: ms * rnd(.3, .7), notes: instrument === 'piano' ? 0 : Math.round(ms / 2500),
+                  inTune: 0, beats: Math.random() < .5 ? Math.round(ms / 4000) : 0, steady: 0 };
+        st[k].inTune = Math.round(st[k].notes * Math.min(.97, rnd(.55, .8) + keen * .15 + (120 - d) / 1200));
+        st[k].steady = Math.round(st[k].beats * rnd(.5, .9));
+      }
+    }
+    students[id] = { id, name, instrument, color: COLORS[ci], target, studioId: 'demo', lesson: { day, time, length, start: '2025-01-01' },
+      practice: keen > 0 ? { log, stats: st } : null, linkedAt: keen > 0 ? '2026-01-10' : null, kidName: firstName(name),
+      assignments: {}, progress: {}, upcoming: {}, lessonChanges: {}, archived: false };
+    const L = students[id].lesson;
+    for (let w = 1; w <= 16; w++) {             // past lessons with notes and ratings
+      const d = addDays(t, -(((t.getDay() - day + 7) % 7) || 7) - 7 * (w - 1)), k = dayKey(d), lid = `${id}_${k}`;
+      const r = Math.random();
+      lessons[lid] = { id: lid, sid: id, date: k, time: L.time, length, status: r < .08 ? 'cancelled' : r < .11 ? 'noshow' : 'done',
+        notes: ['Worked on bow distribution in the Allegro. Keep the wrist loose.', 'Scales much cleaner! Next: shifting to 3rd position.', 'Great progress on the recital piece – memorise bars 1–16.', 'Rhythm in the middle section still rushing; practise with metronome at 72.', 'Lovely tone today. Start the new étude.'][Math.floor(Math.random() * 5)],
+        ratings: { preparation: Math.ceil(rnd(2, 5) * (keen + .3) / 1.2), technique: Math.ceil(rnd(2.5, 5)), musicality: Math.ceil(rnd(2.5, 5)) } };
+      for (const k2 in lessons[lid].ratings) lessons[lid].ratings[k2] = Math.max(1, Math.min(5, lessons[lid].ratings[k2]));
+    }
+  });
+  const ids = Object.keys(students), A = (sid, title, details, bpm, minutes, dueIn, created) => {
+    const aid = newId() + title.length; students[sid].assignments[aid] = { id: aid, title, details, bpm, minutes, due: dueIn == null ? null : dayKey(addDays(t, dueIn)), status: 'active', created: dayKey(addDays(t, -created)) };
+    students[sid].progress[aid] = Object.fromEntries(lastDays(created).filter(() => Math.random() < .7).map(d => [dayKey(d), true]));
+  };
+  A(ids[0], 'G major scale, 2 octaves', 'Slurred, 2 notes per bow. Listen for the 3rd finger on the A string.', 72, 5, 5, 6);
+  A(ids[0], 'Seitz Concerto No. 2, mvt 1', 'Bars 1–24. Slow practice first, then up to tempo.', 88, 15, 12, 6);
+  A(ids[1], 'Bach Minuet No. 1', 'Hands separately in bars 9–16; count out loud.', 80, 15, 3, 9);
+  A(ids[2], 'C major arpeggios', 'Hands together, 2 octaves.', 60, 5, -2, 12);
+  A(ids[3], 'Twinkle Variations A–D', 'Keep bows short and on the string.', 100, 10, 7, 3);
+  A(ids[4], 'Clementi Sonatina Op. 36 No. 1', 'Learn the left hand of the first page.', null, 20, 10, 5);
+  events.e1 = { id: 'e1', type: 'recital', title: 'Winter Recital', date: dayKey(addDays(t, 38)), time: '15:00', location: 'St. John’s Hall',
+    participants: { [ids[0]]: { piece: 'Seitz Concerto No. 2, mvt 1', result: '' }, [ids[1]]: { piece: 'Bach Minuet No. 1', result: '' }, [ids[3]]: { piece: 'Twinkle Variations', result: '' }, [ids[2]]: { piece: 'Burgmüller: Arabesque', result: '' } } };
+  events.e2 = { id: 'e2', type: 'exam', title: 'ABRSM Grade 3 Cello', date: dayKey(addDays(t, 17)), time: '10:20', location: 'Exam centre', participants: { [ids[1]]: { piece: 'Grade 3 list A, B, C', result: '' } } };
+  events.e3 = { id: 'e3', type: 'recital', title: 'Spring Recital', date: dayKey(addDays(t, -120)), time: '14:00', location: 'St. John’s Hall',
+    participants: { [ids[0]]: { piece: 'Suzuki Book 2: Minuet', result: 'Performed' }, [ids[4]]: { piece: 'Für Elise (simplified)', result: 'Performed' } } };
+  events.e4 = { id: 'e4', type: 'exam', title: 'ABRSM Grade 2 Violin', date: dayKey(addDays(t, -60)), time: '11:00', location: 'Exam centre', participants: { [ids[0]]: { piece: 'Grade 2 list A, B, C', result: 'Distinction (132)' } } };
+  notes[ids[0]] = 'Loves playing fast pieces – use that for motivation. Parents keen on exams.';
+}
+
+start();
+</script>
+</body>
+</html>

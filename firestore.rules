@@ -1,0 +1,32 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+
+    // A family's players and practice history. The long random family code is the key.
+    match /families/{family} {
+      allow get, create, update: if family.size() >= 20;
+      allow list, delete: if false;
+    }
+
+    // A teacher's studio and everything private to it (lessons, recitals, notes).
+    // Only the signed-in teacher who owns it can read or write.
+    match /studios/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+      match /{document=**} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+
+    // One student: shared between their teacher and their family.
+    // The student code (sent to the family as an invite link) is long and random.
+    match /students/{sid} {
+      // Teacher: full control of their own students
+      allow read, update, delete: if request.auth != null && resource.data.studioId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.studioId == request.auth.uid && sid.size() >= 20;
+      // Family (holds the code): can read it, and can only update their child's practice data and assignment ticks
+      allow get: if sid.size() >= 20;
+      allow update: if sid.size() >= 20
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['practice', 'progress', 'linkedAt', 'kidName']);
+    }
+  }
+}

@@ -232,6 +232,31 @@
   .pinBox { max-width: 300px; margin: 48px auto 0; text-align: center; display: flex; flex-direction: column; gap: 12px; align-items: stretch; }
   .pinBox .medal { --kid: var(--brand); }
   .pinBox input { text-align: center; font-size: 26px; letter-spacing: 10px; padding: 12px; }
+  /* Teacher connection */
+  .teacherLink { text-align: center; font-size: 13px; color: var(--muted); }
+  .teacherLink a { color: var(--muted); }
+  .tHead { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .aItem { padding: 12px 0; border-top: 1px solid var(--line); display: flex; gap: 12px; align-items: flex-start; }
+  .tHead + .aItem { border-top: 0; }
+  .aItem .grow { flex: 1; min-width: 0; }
+  .aItem b { display: block; font-size: 16px; }
+  .aItem .det { font-size: 14px; color: var(--ink-2); margin-top: 2px; white-space: pre-wrap; }
+  .aItem .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .chipBtn { font-size: 13px; padding: 5px 10px; border-radius: 999px; background: var(--soft); font-weight: 600; color: var(--ink-2);
+             display: inline-flex; align-items: center; gap: 5px; }
+  .chipBtn .ic { width: 14px; height: 14px; }
+  button.chipBtn { border: 1.5px solid color-mix(in srgb, var(--kid) 40%, transparent); color: var(--kid); background: transparent; }
+  .tick { flex: none; width: 40px; height: 40px; border-radius: 12px; border: 2px solid var(--line); background: var(--card); padding: 0; color: transparent; }
+  .tick.on { background: var(--good); border-color: var(--good); color: #fff; }
+  .tick .ic { stroke-width: 2.6; }
+  .tInfo { display: flex; gap: 10px; align-items: center; font-size: 14px; color: var(--ink-2); padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--line); }
+  .tInfo .ic { color: var(--kid); }
+  .tInfo + .tInfo { border-top: 0; padding-top: 8px; margin-top: 0; }
+  .tile .lessonLine { font-size: 13px; color: var(--muted); margin-top: 6px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .tile .lessonLine .ic { width: 14px; height: 14px; }
+  .pickList { display: grid; gap: 8px; margin-top: 14px; }
+  .pickList button { justify-content: flex-start; }
+  .pickList .avatar { width: 30px; height: 30px; font-size: 13px; }
   #pinError { color: var(--danger); min-height: 1.2em; font-size: 14px; }
 </style>
 </head>
@@ -268,6 +293,8 @@
   <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
   <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+ <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21a2 2 0 0 1 2-2h13v2"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"/></symbol>
   <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.2a6.5 6.5 0 0 1 3 5.8"/></symbol>
 </svg>
 
@@ -291,6 +318,7 @@
     </div>
     <button class="secondary block" id="historyBtn"><svg class="ic"><use href="#i-chart"/></svg>Practice history</button>
     <div id="syncStatus"></div>
+    <p class="teacherLink">Are you a teacher? <a href="teacher.html">Sign in to your studio</a></p>
   </section>
 
   <!-- PRACTICE -->
@@ -320,6 +348,7 @@
       <div class="meter"><div class="level"></div><div class="mark"></div></div>
     </div>
     <button class="primary" id="startBtn"></button>
+    <div class="card" id="teacherCard" hidden></div>
     <div class="card">
       <div class="metroHead">
         <div class="label"><svg class="ic"><use href="#i-metronome"/></svg>Metronome</div>
@@ -446,6 +475,7 @@
 
 </main>
 
+<div class="overlay" id="linkDlg" hidden><div class="card" id="linkCard" role="dialog" aria-modal="true"></div></div>
 <canvas id="confetti" hidden></canvas>
 <div class="overlay" id="summary" hidden>
   <div class="card" role="dialog" aria-labelledby="sumTitle">
@@ -489,7 +519,9 @@ function saveSettings() { store.set('pt-settings', settings); pushRemote({ setti
 // ---------- Cloud sync (Firebase Firestore) ----------
 // Each family is one document, families/{family code}. The long random code is the key:
 // the database rules refuse to list families or accept short codes, so only devices that know it can get in.
-const FIREBASE = {
+// ?emulator on localhost talks to the local Firebase emulator instead of the real project (for testing)
+const EMULATOR = ['localhost', '127.0.0.1'].includes(location.hostname) && new URLSearchParams(location.search).has('emulator');
+const FIREBASE = EMULATOR ? { apiKey: 'demo-key', projectId: 'demo-practice' } : {
   apiKey: 'AIzaSyAUn6GqVxRR-m9i5kjTH9dY7-nGWCo1374',
   authDomain: 'music-practice-tracker-d77f7.firebaseapp.com',
   projectId: 'music-practice-tracker-d77f7',
@@ -511,6 +543,7 @@ async function loadFirebase() {
   try {   // offline cache: practice still counts with no internet and syncs later
     db = firestore.initializeFirestore(app, { localCache: firestore.persistentLocalCache({ tabManager: firestore.persistentMultipleTabManager() }) });
   } catch { db = firestore.getFirestore(app); }
+  if (EMULATOR) firestore.connectFirestoreEmulator(db, '127.0.0.1', 8080);
   F = firestore;
 }
 
@@ -537,6 +570,7 @@ function onRemote(snap) {
     if (!kid && screen === 'practice') return show('home');
   }
   setSync(snap.metadata.hasPendingWrites ? 'saving' : snap.metadata.fromCache ? 'offline' : 'synced');
+  watchTeachers();
   if (screen === 'home') renderHome();
   else if (screen === 'history') renderHistory();
   else if (screen === 'practice' && !listening) renderPractice();
@@ -684,7 +718,7 @@ function show(name) {
   if (listening) stopAudio();
   screen = name;
   for (const s of document.querySelectorAll('.screen')) s.hidden = s.id !== name;
-  ({ home: renderHome, history: renderHistory, parent: renderParent, practice: renderPractice }[name] || (() => {}))();
+  ({ home: renderHome, history: renderHistory, parent: renderParent, practice: () => { renderPractice(); renderTeacherCard(); } }[name] || (() => {}))();
   window.scrollTo(0, 0);
 }
 document.querySelectorAll('[data-home]').forEach(b => b.onclick = () => show('home'));
@@ -702,6 +736,11 @@ function renderHome() {
           ${frac >= 1 ? `<span class="badge good">${icon('check')}Done</span>` : ''}
           ${st > 1 ? `<span class="badge">${icon('flame')}${st} days</span>` : ''}</div>
         <div class="sub">${mins(today)} of ${k.goal} min today</div>
+        ${(t => {
+          if (!t || t.missing) return '';
+          const nl = nextLesson(t), ev = upcomingEvents(t).find(e => daysUntil(e.date) <= 30);
+          return nl || ev ? `<div class="lessonLine">${nl ? `${icon('calendar')}Lesson ${lessonLabel(nl)}` : ''}${ev ? `<span class="badge">${icon('trophy')}${esc(ev.title)} ${countdown(ev.date)}</span>` : ''}</div>` : '';
+        })(k.link && teacherData[k.link])}
         <div class="bar"><div style="width:${frac * 100}%"></div></div>
       </div>${icon('chev', 'go')}</button>`;
   }).join('');
@@ -899,6 +938,9 @@ function renderParent() {
           `<option value="${v}" ${(k.instrument || '') === v ? 'selected' : ''} ${v === '' ? 'disabled' : ''}>${l}</option>`).join('')}</select>
         ${hasPitch(k) ? `<label class="opt">Tuner and in-tune score <input type="checkbox" class="toggle" data-tuning="${k.id}" ${k.tuning !== false ? 'checked' : ''}></label>` : ''}
         <label class="opt">Chime at goal <input type="checkbox" class="toggle" data-chime="${k.id}" ${k.chime !== false ? 'checked' : ''}></label>
+        ${k.link ? `<div class="opt"><span class="small">${icon('link', 'sm')} ${(t => t?.missing ? 'Teacher removed this connection' : t ? 'Teacher: ' + esc(t.teacherName) : 'Connected to a teacher')(teacherData[k.link])}</span>
+          <button class="ghost small" data-unlink="${k.id}">Disconnect</button></div>`
+          : `<button class="secondary" data-link="${k.id}">${icon('link', 'sm')}Connect to teacher</button>`}
       </div>
     </div>`).join('') || '<div class="muted">Add each child who practices.</div>';
   document.querySelectorAll('[data-rename]').forEach(i => i.onchange = () => {
@@ -909,6 +951,11 @@ function renderParent() {
   document.querySelectorAll('[data-tuning]').forEach(c => c.onchange = () => {
     kids.find(k => k.id === c.dataset.tuning).tuning = c.checked; saveKids();
   });
+  document.querySelectorAll('[data-link]').forEach(b => b.onclick = () => {
+    const code = prompt('Enter the code your teacher sent you:');
+    if (code) startLink(code, kids.find(k => k.id === b.dataset.link));
+  });
+  document.querySelectorAll('[data-unlink]').forEach(b => b.onclick = () => unlink(kids.find(k => k.id === b.dataset.unlink)));
   document.querySelectorAll('[data-chime]').forEach(c => c.onchange = () => {
     kids.find(k => k.id === c.dataset.chime).chime = c.checked; saveKids();
   });
@@ -935,13 +982,17 @@ function renderParent() {
   $('testArea').hidden = !listening;
   renderDetector();
 }
+function newKid(name, instrument = '') {
+  const used = kids.map(kidColor);
+  const k = { id: Date.now().toString(36), name, goal: 20, bpm: 80, instrument, chime: true,
+              color: COLORS.find(c => !used.includes(c)) || COLORS[kids.length % COLORS.length] };
+  kids.push(k); saveKids();
+  return k;
+}
 $('addBtn').onclick = () => {
   const name = $('newName').value.trim();
   if (!name) return;
-  const used = kids.map(kidColor);
-  kids.push({ id: Date.now().toString(36), name, goal: 20, bpm: 80, instrument: '', chime: true,
-              color: COLORS.find(c => !used.includes(c)) || COLORS[kids.length % COLORS.length] });
-  saveKids(); $('newName').value = ''; renderParent();
+  newKid(name); $('newName').value = ''; renderParent();
 };
 $('createFamilyBtn').onclick = createFamily;
 $('joinBtn').onclick = () => joinFamily($('joinCode').value);
@@ -1246,6 +1297,135 @@ function endStretch() {
   session.stretch = 0;
 }
 
+// ---------- Teacher connection ----------
+// A teacher (teacher.html) creates students/{code} and sends the family an invite link (#link=code).
+// Linking a player here shares that player's practice with the teacher, and shows the teacher's
+// assignments, next lesson and upcoming recitals/exams in the app. Only that one player is shared.
+let teacherData = {}, teacherUnsubs = {}, lastTeacherPush = 0;
+const parseDay = k => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); };
+const daysUntil = k => Math.round((parseDay(k) - parseDay(dayKey())) / 864e5);
+const countdown = k => { const n = daysUntil(k); return n === 0 ? 'today' : n === 1 ? 'tomorrow' : `in ${n} days`; };
+const firstWord = s => (s || '').trim().split(/\s+/)[0];
+
+async function watchTeachers() {
+  const want = new Set(kids.filter(k => k.link).map(k => k.link));
+  for (const sid of Object.keys(teacherUnsubs)) if (!want.has(sid)) { teacherUnsubs[sid](); delete teacherUnsubs[sid]; delete teacherData[sid]; }
+  if (!want.size) return;
+  try { await loadFirebase(); } catch (e) { console.error(e); return; }
+  for (const sid of want) if (!teacherUnsubs[sid])
+    teacherUnsubs[sid] = F.onSnapshot(F.doc(db, 'students', sid), snap => {
+      teacherData[sid] = snap.exists() ? snap.data() : { missing: true };
+      if (screen === 'home') renderHome();
+      else if (screen === 'practice') renderTeacherCard();
+      else if (screen === 'parent' && document.activeElement?.tagName !== 'INPUT') renderParent();
+    }, e => console.error(e));
+}
+
+// Share the last 60 days of this player's practice with their teacher
+function pushTeacher(k) {
+  if (!k?.link || !db || teacherData[k.link]?.missing) return;
+  const log60 = {}, stats60 = {};
+  for (const d of lastDays(60)) {
+    const key = dayKey(d), ms = msOn(k, d), st = statsOn(k, d);
+    if (ms) log60[key] = Math.round(ms);
+    if (Object.keys(st).length) stats60[key] = Object.fromEntries(Object.entries(st).map(([f, v]) => [f, Math.round(v)]));
+  }
+  F.updateDoc(F.doc(db, 'students', k.link), { practice: { log: log60, stats: stats60, goal: k.goal, updated: Date.now() }, kidName: k.name })
+    .catch(e => console.error(e));
+}
+
+async function startLink(code, forKid) {
+  code = code.trim().toLowerCase().replace(/\s+/g, '');
+  let t = null;
+  try {
+    if (code.length >= 20) { await loadFirebase(); const snap = await F.getDoc(F.doc(db, 'students', code)); t = snap.exists() ? snap.data() : null; }
+  } catch (e) { console.error(e); return alert('Couldn’t reach the server. Check the internet connection and try again.'); }
+  if (!t) return alert('That teacher invite isn’t valid. Please check the link or code with your teacher.');
+  if (forKid) return finishLink(forKid, code, t);
+  const card = $('linkCard');
+  card.innerHTML = `<div class="medal" style="--kid:var(--accent)">${icon('users')}</div>
+    <h2 style="text-align:center">Connect to ${esc(t.teacherName)}</h2>
+    <p class="muted" style="text-align:center">${esc(t.studioName)} invited <b>${esc(t.name)}</b>. Which player is this?</p>
+    <div class="pickList">
+      ${kids.map(k => `<button class="secondary block" data-pick="${k.id}"><div class="avatar" style="--kid:${kidColor(k)}">${initial(k)}</div>${esc(k.name)}${k.link === code ? '<span class="muted small">(already connected)</span>' : ''}</button>`).join('')}
+      <button class="secondary block" data-pick="new">${icon('plus', 'sm')}Add ${esc(firstWord(t.name))} as a new player</button>
+      <button class="ghost block" data-pick="cancel">Not now</button>
+    </div>
+    <p class="muted small" style="margin-top:12px;text-align:center">Only this player’s practice is shared with the teacher.</p>`;
+  $('linkDlg').hidden = false;
+  card.querySelectorAll('[data-pick]').forEach(b => b.onclick = async () => {
+    $('linkDlg').hidden = true;
+    if (b.dataset.pick === 'cancel') return;
+    const k = kids.find(x => x.id === b.dataset.pick) || newKid(firstWord(t.name), t.instrument || '');
+    await finishLink(k, code, t);
+  });
+}
+async function finishLink(k, code, t) {
+  for (const other of kids) if (other !== k && other.link === code) other.link = null;   // one player per invite
+  k.link = code;
+  if (!k.instrument && t.instrument) k.instrument = t.instrument;
+  saveKids();
+  try { await F.updateDoc(F.doc(db, 'students', code), { linkedAt: new Date().toISOString(), kidName: k.name }); } catch (e) { console.error(e); }
+  await watchTeachers();
+  pushTeacher(k);
+  const card = $('linkCard');
+  card.innerHTML = `<div class="medal" style="--kid:var(--good)">${icon('check')}</div>
+    <h2 style="text-align:center">${esc(k.name)} is connected</h2>
+    <p class="muted" style="text-align:center">${esc(t.teacherName)} can now see ${esc(k.name)}’s practice, and ${esc(k.name)} will see assignments and lesson times on the practice screen.</p>
+    <button class="primary" id="linkOk" style="margin-top:14px;--kid:var(--brand);color:var(--bg)">Done</button>`;
+  $('linkDlg').hidden = false;
+  $('linkOk').onclick = () => { $('linkDlg').hidden = true; show(screen === 'parent' ? 'parent' : 'home'); };
+}
+function unlink(k) {
+  if (!confirm(`Disconnect ${k.name} from their teacher? The teacher will stop seeing new practice.`)) return;
+  const sid = k.link; k.link = null; saveKids();
+  if (db && !teacherData[sid]?.missing) F.updateDoc(F.doc(db, 'students', sid), { linkedAt: null }).catch(() => {});
+  watchTeachers(); renderParent();
+}
+
+// Next lesson from the weekly slot plus any changes the teacher made (cancelled / moved / extra)
+function nextLesson(t) {
+  const L = t.lesson || {}, ch = t.lessonChanges || {}, now = new Date();
+  for (let i = 0; i < 35; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i), k = dayKey(d), c = ch[k];
+    let time = null;
+    if (c?.status === 'extra') time = c.time;
+    else if (L.day !== '' && L.day != null && L.time && d.getDay() === +L.day && (!L.start || k >= L.start) && !(c && ['cancelled', 'moved'].includes(c.status))) time = L.time;
+    if (!time) continue;
+    const [h, m] = time.split(':').map(Number), when = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m);
+    if (when.getTime() + (L.length || 30) * 60000 > now.getTime()) return when;
+  }
+  return null;
+}
+function lessonLabel(when) {
+  const k = dayKey(when), day = k === dayKey() ? 'today' : daysUntil(k) === 1 ? 'tomorrow' : when.toLocaleDateString(undefined, { weekday: 'long' });
+  return `${day} at ${when.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
+}
+const upcomingEvents = t => Object.values(t.upcoming || {}).filter(e => e.date >= dayKey()).sort((a, b) => a.date.localeCompare(b.date));
+
+function renderTeacherCard() {
+  const card = $('teacherCard'), t = kid?.link && teacherData[kid.link];
+  if (!t || t.missing) { card.hidden = true; return; }
+  card.hidden = false;
+  const today0 = dayKey(), acts = Object.values(t.assignments || {}).filter(a => a.status === 'active').sort((a, b) => (a.created || '').localeCompare(b.created || ''));
+  const nl = nextLesson(t), evs = upcomingEvents(t).slice(0, 2);
+  card.innerHTML = `<div class="tHead"><div class="label">${icon('book')}From ${esc(t.teacherName)}</div></div>
+    ${acts.length ? acts.map(a => { const done = t.progress?.[a.id]?.[today0]; return `<div class="aItem">
+      <button class="tick ${done ? 'on' : ''}" data-tick="${a.id}" aria-pressed="${!!done}" aria-label="Practised ${esc(a.title)} today">${icon('check')}</button>
+      <div class="grow"><b>${esc(a.title)}</b>${a.details ? `<div class="det">${esc(a.details)}</div>` : ''}
+        <div class="chips">${a.bpm ? `<button class="chipBtn" data-bpm="${a.bpm}" title="Set the metronome to ${a.bpm} bpm">${icon('metronome')}${a.bpm} bpm</button>` : ''}
+          ${a.minutes ? `<span class="chipBtn">${icon('clock')}${a.minutes} min a day</span>` : ''}
+          ${a.due ? `<span class="chipBtn">Due ${parseDay(a.due).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}</span>` : ''}</div></div></div>`; }).join('')
+      : '<p class="muted small" style="padding:4px 0 2px">No assignments right now.</p>'}
+    ${nl ? `<div class="tInfo">${icon('calendar')}Next lesson ${lessonLabel(nl)}</div>` : ''}
+    ${evs.map(e => `<div class="tInfo">${icon('trophy')}<span>${esc(e.title)}${e.piece ? ' · ' + esc(e.piece) : ''} · <b>${countdown(e.date)}</b></span></div>`).join('')}`;
+  card.querySelectorAll('[data-tick]').forEach(b => b.onclick = () => {
+    const on = !b.classList.contains('on'); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on);
+    F.updateDoc(F.doc(db, 'students', kid.link), { [`progress.${b.dataset.tick}.${today0}`]: on ? true : F.deleteField() }).catch(e => console.error(e));
+  });
+  card.querySelectorAll('[data-bpm]').forEach(b => b.onclick = () => { setBpm(+b.dataset.bpm); if (!metroOn) $('metroBtn').click(); });
+}
+
 // ---------- Microphone ----------
 let listening = false, mode = 'practice', audioCtx, analyser, stream, buf, timer, wakeLock;
 let lastTick = 0, lastSoundAt = -Infinity, smoothLevel = 0;
@@ -1295,6 +1475,7 @@ function tick() {
       if (now - lastPitchAt > 400) { $('tNote').innerHTML = '&nbsp;'; $('tNeedle').style.left = '50%'; $('tNeedle').className = ''; }
     }
     if (family && now - lastFlush > 10000) { lastFlush = now; flushPractice(); }
+    if (kid.link && now - lastTeacherPush > 30000) { lastTeacherPush = now; pushTeacher(kid); }
     renderPractice(playing, talking);
   } else renderTest(playing, talking);
 }
@@ -1342,6 +1523,7 @@ function stopAudio() {
   listening = false;
   if (mode === 'practice' && session) { metroStop(); endNote(true); endStretch(); session.wasPlaying = false; }
   flushPractice();
+  if (mode === 'practice') pushTeacher(kid);
   clearInterval(timer);
   stream?.getTracks().forEach(t => t.stop());
   audioCtx?.close();
@@ -1405,6 +1587,10 @@ updateMarks();
 show('home');
 if (musicOnly()) loadClassifier();
 if (family) connect();
+watchTeachers().then(() => kids.forEach(pushTeacher));
+// A teacher's invite link: #link=<student code>
+const teacherInvite = location.hash.match(/link=([a-z0-9-]{20,})/);
+if (teacherInvite) { history.replaceState(null, '', location.pathname + location.search); startLink(teacherInvite[1]); }
 // A "Send link to another device" link: #join=<family code>
 const joinLink = location.hash.match(/join=([a-z0-9-]{20,})/);
 if (joinLink) {
