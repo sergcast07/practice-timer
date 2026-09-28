@@ -243,7 +243,7 @@
   .pinBox { max-width: 300px; margin: 48px auto 0; text-align: center; display: flex; flex-direction: column; gap: 12px; align-items: stretch; }
   .pinBox .medal { --kid: var(--brand); }
   .pinBox input { text-align: center; font-size: 26px; letter-spacing: 10px; padding: 12px; }
-  /* Practice logged by hand: drawn as "sketched" hatching instead of solid colour */
+  /* Practice logged by hand: drawn as "sketched" hatching instead of solid color */
   .hatch { background: repeating-linear-gradient(135deg, var(--kid) 0 2.5px, transparent 2.5px 5.5px) !important; opacity: .8; }
   .bar { display: flex; }
   #manualNote { font-size: 12.5px; color: var(--muted); margin-top: 6px; display: flex; align-items: center; gap: 4px; }
@@ -257,6 +257,32 @@
   .mEntry button { padding: 4px; }
   .medal.hatched { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--kid) 22%, var(--card)) 0 4px, var(--card) 4px 8px); }
   .fieldRow { display: grid; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted); text-align: left; margin-top: 12px; }
+  /* Badges */
+  .medalArt.locked { opacity: .8; }
+  .badgeEntry { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; font-weight: 500; padding: 16px 18px; }
+  .badgeEntry .mini { display: flex; }
+  .badgeEntry .mini svg + svg { margin-left: -12px; }
+  .badgeEntry .grow { flex: 1; min-width: 0; }
+  .badgeEntry b { display: block; font-size: 16px; }
+  .badgeEntry span { font-size: 13.5px; color: var(--muted); }
+  .badgeGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+  .badgeCard { background: var(--card); border-radius: 18px; padding: 16px 12px 14px; box-shadow: var(--shadow); text-align: center; display: grid; justify-items: center; gap: 4px; }
+  .badgeCard b { font-size: 14.5px; margin-top: 6px; }
+  .badgeCard .lvl { font-size: 12.5px; color: var(--ink-2); font-weight: 600; }
+  .badgeCard.locked b, .badgeCard.locked .lvl { color: var(--muted); }
+  .badgeCard .nxt { font-size: 11.5px; color: var(--muted); }
+  .bbar { width: 100%; height: 5px; background: var(--track); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+  .bbar div { height: 100%; background: var(--kid); border-radius: 3px; }
+  .challenge { padding: 12px 0; border-top: 1px solid var(--line); }
+  .challenge b { display: flex; justify-content: space-between; gap: 8px; font-size: 15px; }
+  .challenge b span { font-weight: 600; color: var(--muted); font-size: 13px; white-space: nowrap; }
+  .challenge .bbar { height: 7px; }
+  .challenge.done b span { color: var(--good); }
+  .challenge.done .bbar div { background: var(--good); }
+  .cheerNote { background: var(--soft); border-radius: 14px; padding: 14px 16px; font-size: 16px; line-height: 1.5; margin-top: 12px; text-align: left; }
+  .cheerNote .from { display: block; font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .teacherAwards { display: flex; gap: 10px; flex-wrap: wrap; }
+  .teacherAwards > div { display: grid; justify-items: center; gap: 2px; width: 88px; text-align: center; font-size: 12px; font-weight: 600; color: var(--ink-2); }
   /* Weekly recap */
   .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
   .recap { display: grid; gap: 12px; border: 1.5px solid color-mix(in srgb, var(--accent) 22%, transparent); }
@@ -334,6 +360,9 @@
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
   <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
   <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.2a4.3 4.3 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20z"/></symbol>
+  <symbol id="i-award" viewBox="0 0 24 24"><circle cx="12" cy="9" r="6"/><path d="m8.5 14 -1.5 7 5-2.5 5 2.5-1.5-7"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
   <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></symbol>
   <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4"/></symbol>
@@ -397,6 +426,7 @@
     </div>
     <button class="primary" id="startBtn"></button>
     <div class="card" id="teacherCard" hidden></div>
+    <button class="card badgeEntry" id="badgeEntry"></button>
     <div class="card">
       <div class="metroHead">
         <div class="label"><svg class="ic"><use href="#i-metronome"/></svg>Metronome</div>
@@ -434,7 +464,7 @@
     </div>
     <div class="card sketch">
       <div class="rowBetween">
-        <div class="label"><svg class="ic"><use href="#i-pencil"/></svg>Practised without the app?</div>
+        <div class="label"><svg class="ic"><use href="#i-pencil"/></svg>Practiced without the app?</div>
         <button class="secondary" id="manualBtn">Log it</button>
       </div>
       <div id="manualList"></div>
@@ -442,6 +472,14 @@
   </section>
 
   <!-- HISTORY -->
+  <section class="screen" id="badges" hidden>
+    <header><button class="ghost back" id="badgesBack"><svg class="ic"><use href="#i-back"/></svg>Back</button></header>
+    <div class="intro"><h1 id="bTitle"></h1><p id="bSub"></p></div>
+    <div id="bTeacher"></div>
+    <div class="badgeGrid" id="bGrid"></div>
+    <p class="muted small" style="text-align:center;margin-top:4px">Badges come from your own practice – every level shows what’s next.</p>
+  </section>
+
   <section class="screen" id="history" hidden>
     <header>
       <button class="ghost back" data-home><svg class="ic"><use href="#i-back"/></svg>Back</button>
@@ -548,6 +586,7 @@
   </div>
 </div>
 
+<script src="badges.js?v=2"></script>
 <script>
 const $ = id => document.getElementById(id);
 const CIRC = 2 * Math.PI * 52;
@@ -793,7 +832,7 @@ function show(name) {
   if (listening) stopAudio();
   screen = name;
   for (const s of document.querySelectorAll('.screen')) s.hidden = s.id !== name;
-  ({ home: renderHome, history: renderHistory, parent: renderParent, practice: () => { renderPractice(); renderTeacherCard(); renderManualList(); } }[name] || (() => {}))();
+  ({ home: renderHome, history: renderHistory, parent: renderParent, practice: () => { renderPractice(); renderTeacherCard(); renderManualList(); renderBadgeEntry(); setTimeout(showNextCheer, 400); }, badges: renderBadges }[name] || (() => {}))();
   window.scrollTo(0, 0);
 }
 document.querySelectorAll('[data-home]').forEach(b => b.onclick = () => show('home'));
@@ -860,6 +899,7 @@ function renderPractice(playing, talking) {
   $('status').className = 'status ' + kind;
   $('startBtn').innerHTML = listening ? `${icon('pause')}Pause` : `${icon('play')}Start`;
   $('tuner').hidden = !(listening && tracksPitch(kid));
+  $('badgeEntry').hidden = listening;
   $('metroBtn').setAttribute('aria-checked', metroOn);
   if (document.activeElement !== $('bpmVal')) $('bpmVal').value = kid.bpm || 80;
   if (!$('metroSound').options.length)
@@ -872,7 +912,7 @@ function renderPractice(playing, talking) {
   $('metroVol').value = metroVol; $('metroVolVal').textContent = metroVol >= 90 ? 'Max' : metroVol + '%';
   $('metroAccent').value = kid.accent || 0;
 }
-$('startBtn').onclick = () => listening ? (stopAudio(), renderPractice()) : startAudio('practice');
+$('startBtn').onclick = () => listening ? (stopAudio(), renderPractice(), renderBadgeEntry()) : startAudio('practice');
 $('doneBtn').onclick = () => {
   const k = kid, s = session, played = sessionMs;
   show('home');                      // stops the mic and finishes this session's stats
@@ -945,12 +985,12 @@ function manualDialog() {
   card.style.setProperty('--kid', kidColor(k));
   card.innerHTML = `<div class="medal hatched">${icon('pencil')}</div>
     <h2 style="text-align:center">Log practice by hand</h2>
-    <p class="muted" style="text-align:center">For practice the app didn’t hear. It counts toward ${esc(k.name)}’s goal, and shows as sketched lines instead of solid colour.</p>
+    <p class="muted" style="text-align:center">For practice the app didn’t hear. It counts toward ${esc(k.name)}’s goal, and shows as sketched lines instead of solid color.</p>
     <label class="fieldRow">When
       <select id="mDay">${days.map((d, i) => `<option value="${dayKey(d)}">${i === 0 ? 'Today' : i === 1 ? 'Yesterday' : d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short' })}</option>`).join('')}</select></label>
     <div class="fieldRow">How long
       <div class="stepper" style="justify-content:center"><button id="mLess" aria-label="Less">${icon('minus')}</button><span class="val" id="mMins"></span><button id="mMore" aria-label="More">${icon('plus')}</button></div></div>
-    <label class="fieldRow">What did you practise? <span style="font-weight:500">(optional)</span>
+    <label class="fieldRow">What did you practice? <span style="font-weight:500">(optional)</span>
       <input type="text" id="mNote" maxlength="60" placeholder="e.g. Scales at school"></label>
     <p class="small" id="mErr" style="color:var(--danger);min-height:1.2em;margin-top:8px;text-align:center"></p>
     <div class="pickList" style="margin-top:4px">
@@ -967,11 +1007,22 @@ function manualDialog() {
       return (card.querySelector('#mErr').textContent = `That’s more than ${MANUAL_DAY_MAX / 60} hours by hand for one day.`);
     addManual(k, day, minsVal * 60000, card.querySelector('#mNote').value.trim());
     $('linkDlg').hidden = true;
-    renderPractice(); renderManualList();
+    renderPractice(); renderManualList(); renderBadgeEntry();
+    const fresh = newBadges(k), doneC = finishedChallenges(k);
+    if (fresh.length || doneC.length) badgeDialog(fresh, doneC);
   };
   $('linkDlg').hidden = false;
 }
 $('manualBtn').onclick = manualDialog;
+function badgeDialog(fresh, doneC) {
+  const card = $('linkCard'), b = fresh[0];
+  card.innerHTML = `<div style="display:grid;justify-items:center">${b ? medalSvg(b.icon, BADGE_TIERS[b.tier].color, { size: 96 }) : medalSvg('flag', BADGE_TIERS[3].color, { size: 96 })}</div>
+    <h2 style="text-align:center;margin-top:10px">${b ? `New badge: ${esc(b.name)}` : 'Challenge complete!'}</h2>
+    <p class="muted" style="text-align:center">${[...fresh.map(x => `${BADGE_TIERS[x.tier].name} · ${x.unit(x.tiers[x.tier])}`), ...doneC.map(c => esc(challengeTitle(c)))].join('<br>')}</p>
+    <div class="pickList" style="margin-top:14px"><button class="primary" id="bdOk" style="--kid:var(--brand);color:var(--bg);justify-content:center">Nice!</button></div>`;
+  $('linkDlg').hidden = false; confetti(140, kidColor(kid));
+  $('bdOk').onclick = () => { $('linkDlg').hidden = true; renderTeacherCard(); };
+}
 $('goalDown').onclick = () => changeGoal(-5);
 
 function addPractice(ms) {
@@ -987,6 +1038,7 @@ function addPractice(ms) {
     saveLog();
   }
   sessionMs += ms;
+  if (new Date().getHours() < 8) addStat('early', ms);          // for the Early bird badge
   const goal = goalOf(kid) * 60000;
   if (before < goal && before + ms >= goal) {
     celebrate(kid);
@@ -1010,8 +1062,13 @@ function showSummary(k, s, played) {
   $('sumBadge').innerHTML = icon(won ? 'trophy' : great ? 'star' : 'spark');
   $('sumTitle').textContent = won ? `Goal reached, ${k.name}!` : great ? `Great focus, ${k.name}!` : `Nice work, ${k.name}!`;
   $('sumSub').textContent = won ? 'That’s today’s practice done.' : 'Every minute counts.';
-  $('sumRows').innerHTML = rows.map(([ic, big, small]) =>
-    `<div class="sumRow"><div class="tileIc">${icon(ic)}</div><div><b>${big}</b><span>${small}</span></div></div>`).join('');
+  const fresh = newBadges(k), doneC = finishedChallenges(k);
+  $('sumRows').innerHTML = [
+    ...fresh.map(b => `<div class="sumRow">${medalSvg(b.icon, BADGE_TIERS[b.tier].color, { size: 40 })}<div><b>New badge: ${esc(b.name)}</b><span>${BADGE_TIERS[b.tier].name} · ${b.unit(b.tiers[b.tier])}</span></div></div>`),
+    ...doneC.map(c => `<div class="sumRow">${medalSvg(c.icon || 'star', BADGE_TIERS[2].color, { size: 40 })}<div><b>Challenge complete!</b><span>${esc(challengeTitle(c))}</span></div></div>`),
+    ...rows.map(([ic, big, small]) => `<div class="sumRow"><div class="tileIc">${icon(ic)}</div><div><b>${big}</b><span>${small}</span></div></div>`)
+  ].join('');
+  if (fresh.length || doneC.length) { $('sumBadge').innerHTML = icon('award'); $('sumSub').textContent = fresh.length ? 'You earned something new today.' : $('sumSub').textContent; }
   $('summary').hidden = false;
   confetti(won ? 220 : 130, kidColor(k));
 }
@@ -1518,14 +1575,15 @@ async function watchTeachers() {
     teacherUnsubs[sid] = F.onSnapshot(F.doc(db, 'students', sid), snap => {
       teacherData[sid] = snap.exists() ? snap.data() : { missing: true };
       if (screen === 'home') renderHome();
-      else if (screen === 'practice') renderTeacherCard();
+      else if (screen === 'practice') { renderTeacherCard(); if (!listening) { renderBadgeEntry(); showNextCheer(); } }
+      else if (screen === 'badges') renderBadges();
       else if (screen === 'parent' && document.activeElement?.tagName !== 'INPUT') renderParent();
     }, e => console.error(e));
 }
 
 // Share the last 60 days of this player's practice with their teacher
 function pushTeacher(k) {
-  if (!k?.link || !db || teacherData[k.link]?.missing) return;
+  if (!k?.link || !db || !F || teacherData[k.link]?.missing) return;
   const log60 = {}, stats60 = {}, manual60 = {};
   for (const d of lastDays(60)) {
     const key = dayKey(d), ms = recordedOn(k, d), man = manualOn(k, d), st = statsOn(k, d);
@@ -1533,7 +1591,8 @@ function pushTeacher(k) {
     if (man) manual60[key] = Math.round(man);
     if (Object.keys(st).length) stats60[key] = Object.fromEntries(Object.entries(st).map(([f, v]) => [f, Math.round(v)]));
   }
-  F.updateDoc(F.doc(db, 'students', k.link), { practice: { log: log60, manual: manual60, stats: stats60, goal: goalOf(k), updated: Date.now() }, kidName: k.name })
+  F.updateDoc(F.doc(db, 'students', k.link), { practice: { log: log60, manual: manual60, stats: stats60, goal: goalOf(k), updated: Date.now() }, kidName: k.name,
+      badges: Object.fromEntries(kidBadges(k).filter(b => b.tier >= 0).map(b => [b.id, { tier: b.tier, label: `${b.name} – ${BADGE_TIERS[b.tier].name} (${b.unit(b.tiers[b.tier])})`, date: badgeSeen[k.id]?.[b.id]?.date || dayKey() }])) })
     .catch(e => console.error(e));
 }
 
@@ -1586,7 +1645,7 @@ function unlink(k) {
   watchTeachers(); renderParent();
 }
 
-// Next lesson from the weekly slot plus any changes the teacher made (cancelled / moved / extra)
+// Next lesson from the weekly slot plus any changes the teacher made (canceled / moved / extra)
 function nextLesson(t) {
   const L = t.lesson || {}, ch = t.lessonChanges || {}, now = new Date();
   for (let i = 0; i < 35; i++) {
@@ -1614,14 +1673,17 @@ function renderTeacherCard() {
   const nl = nextLesson(t), evs = upcomingEvents(t).slice(0, 2);
   card.innerHTML = `<div class="tHead"><div class="label">${icon('book')}From ${esc(t.teacherName)}</div></div>
     ${acts.length ? acts.map(a => { const done = t.progress?.[a.id]?.[today0]; return `<div class="aItem">
-      <button class="tick ${done ? 'on' : ''}" data-tick="${a.id}" aria-pressed="${!!done}" aria-label="Practised ${esc(a.title)} today">${icon('check')}</button>
+      <button class="tick ${done ? 'on' : ''}" data-tick="${a.id}" aria-pressed="${!!done}" aria-label="Practiced ${esc(a.title)} today">${icon('check')}</button>
       <div class="grow"><b>${esc(a.title)}</b>${a.details ? `<div class="det">${esc(a.details)}</div>` : ''}
         <div class="chips">${a.bpm ? `<button class="chipBtn" data-bpm="${a.bpm}" title="Set the metronome to ${a.bpm} bpm">${icon('metronome')}${a.bpm} bpm</button>` : ''}
           ${a.minutes ? `<span class="chipBtn">${icon('clock')}${a.minutes} min a day</span>` : ''}
           ${a.due ? `<span class="chipBtn">Due ${parseDay(a.due).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}</span>` : ''}</div></div></div>`; }).join('')
       : '<p class="muted small" style="padding:4px 0 2px">No assignments right now.</p>'}
     ${nl ? `<div class="tInfo">${icon('calendar')}<span class="grow">Next lesson ${lessonLabel(nl)}</span><button class="ghost small" data-cal style="padding:4px 6px">Add to calendar</button></div>` : ''}
-    ${evs.map(e => `<div class="tInfo">${icon('trophy')}<span>${esc(e.title)}${e.piece ? ' · ' + esc(e.piece) : ''} · <b>${countdown(e.date)}</b></span></div>`).join('')}`;
+    ${evs.map(e => `<div class="tInfo">${icon('trophy')}<span>${esc(e.title)}${e.piece ? ' · ' + esc(e.piece) : ''} · <b>${countdown(e.date)}</b></span></div>`).join('')}
+    ${activeChallenges(kid, t).map(({ c, p }) => `<div class="challenge ${p.done ? 'done' : ''}"><b>${esc(challengeTitle(c))}<span>${p.done ? 'Done!' : `${Math.min(p.value, c.target)} of ${c.target}`}</span></b>
+      <div class="bbar"><div style="width:${Math.min(p.value / c.target, 1) * 100}%"></div></div>
+      <div class="muted small" style="margin-top:4px">Challenge from ${esc(t.teacherName)} · ${p.done ? 'nice work!' : c.end === dayKey() ? 'ends today' : 'ends ' + parseDay(c.end).toLocaleDateString(undefined, { weekday: 'long' })}</div></div>`).join('')}`;
   card.querySelectorAll('[data-tick]').forEach(b => b.onclick = () => {
     const on = !b.classList.contains('on'); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on);
     F.updateDoc(F.doc(db, 'students', kid.link), { [`progress.${b.dataset.tick}.${today0}`]: on ? true : F.deleteField() }).catch(e => console.error(e));
@@ -1659,7 +1721,7 @@ function downloadFile(name, text, type) {
 }
 const at = (key, time) => { const [h, m] = (time || '12:00').split(':').map(Number), d = parseDay(key); return new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m); };
 
-// This player's lessons and recitals, as calendar events (a weekly repeating lesson, minus cancelled/moved dates)
+// This player's lessons and recitals, as calendar events (a weekly repeating lesson, minus canceled/moved dates)
 function lessonCalendar(k, t) {
   const evs = [], L = t.lesson || {}, ch = t.lessonChanges || {}, len = L.length || 30;
   const title = `${(INSTRUMENTS[k.instrument] || 'Music').replace(/ \(.*/, '')} lesson – ${k.name}`, desc = `With ${t.teacherName}, ${t.studioName}`;
@@ -1690,13 +1752,13 @@ function calendarDialog(k) {
   card.innerHTML = `<div class="medal" style="--kid:${kidColor(k)}">${icon('calendar')}</div>
     <h2 style="text-align:center">Add ${esc(k.name)}’s lessons to your calendar</h2>
     <div class="calOpts">
-      ${live ? `<a class="primary" href="${live}" style="--kid:var(--brand);color:var(--bg);font-size:16px;padding:14px">${icon('refresh')}<span class="txt">Subscribe<small style="color:inherit;opacity:.8">Updates automatically when lessons move or are cancelled</small></span></a>
+      ${live ? `<a class="primary" href="${live}" style="--kid:var(--brand);color:var(--bg);font-size:16px;padding:14px">${icon('refresh')}<span class="txt">Subscribe<small style="color:inherit;opacity:.8">Updates automatically when lessons move or are canceled</small></span></a>
         <button class="secondary block" data-copy>${icon('link', 'sm')}<span class="txt">Copy subscription link<small>For Google Calendar: Other calendars → From URL</small></span></button>` : ''}
       <button class="secondary block" data-ics>${icon('download', 'sm')}<span class="txt">Apple or Outlook calendar<small>Lessons${Object.keys(t.upcoming || {}).length ? ' and recitals' : ''} as they stand today</small></span></button>
       ${weekly ? `<a class="secondary block" style="display:inline-flex;gap:8px;align-items:center;padding:11px 16px;border-radius:14px;font-weight:600;color:var(--ink)" href="${googleCalUrl(weekly)}" target="_blank" rel="noopener">${icon('calendar', 'sm')}<span class="txt">Google Calendar<small>Adds the weekly lesson</small></span></a>` : ''}
       <button class="ghost block" data-close>Close</button>
     </div>
-    ${live ? '' : '<p class="muted small" style="margin-top:10px;text-align:center">These add a copy. If a lesson is moved or cancelled later, the app will have the latest time.</p>'}`;
+    ${live ? '' : '<p class="muted small" style="margin-top:10px;text-align:center">These add a copy. If a lesson is moved or canceled later, the app will have the latest time.</p>'}`;
   $('linkDlg').hidden = false;
   card.querySelector('[data-close]').onclick = () => { $('linkDlg').hidden = true; };
   card.querySelector('[data-ics]').onclick = () => downloadFile(`${k.name} lessons.ics`, buildIcs(`${k.name} – music lessons`, evs), 'text/calendar');
@@ -1719,7 +1781,7 @@ function kidRecap(k, w) {
   const sc = statsOver(k, w.days), sp = statsOver(k, w.prev);
   const longest = Math.max(0, ...w.days.map(d => statsOn(k, d).longest || 0)), best = Math.max(0, ...w.before.map(d => statsOn(k, d).longest || 0));
   const wins = [];
-  if (practiced >= 5) wins.push([90, `Practised ${practiced} of 7 days – brilliant consistency.`]);
+  if (practiced >= 5) wins.push([90, `Practiced ${practiced} of 7 days – brilliant consistency.`]);
   if (tracksPitch(k) && sc.tune != null && sp.tune != null && sc.tune - sp.tune >= 0.05) wins.push([80, `Tuning improved from ${pct(sp.tune)} to ${pct(sc.tune)}.`]);
   if (sc.rhythm != null && sp.rhythm != null && sc.rhythm - sp.rhythm >= 0.05) wins.push([75, `Steadier rhythm: ${pct(sp.rhythm)} → ${pct(sc.rhythm)}.`]);
   if (longest >= 5 * 60000 && longest > best) wins.push([70, `Longest focused stretch yet: ${mins(longest)}.`]);
@@ -1748,6 +1810,113 @@ function renderRecap() {
       <div><b>${esc(k.name)}</b> <span class="muted small">· ${mins(r.minutes)}</span><p>${esc(r.win)}</p><p class="muted">${esc(r.focus)} ${esc(r.next)}</p></div></div>`; }).join('')}
     <button class="secondary block" data-recap-close>Got it</button>`;
   el.querySelectorAll('[data-recap-close]').forEach(b => b.onclick = () => { store.set('pt-recap-seen', w.key); el.hidden = true; });
+}
+
+// ---------- Badges, stars and challenges ----------
+// Badges are earned automatically from practice (badges.js). Teachers can send stars/notes, award their own
+// badges, and set challenges; those arrive through the connected student record (teacherData).
+let badgeSeen = store.get('pt-badge-seen', {});          // {kidId: {badgeId: {tier, date}}} – levels already celebrated
+function kidDays(k) {
+  const keys = new Set([...Object.keys(log[k.id] || {}), ...Object.keys(pend[k.id] || {}), ...Object.keys(stats[k.id] || {}),
+                        ...Object.keys(pendStats[k.id] || {}), ...Object.values(manual[k.id] || {}).map(e => e.day)]);
+  return [...keys].map(key => { const d = parseDay(key); return { key, ms: msOn(k, d), stats: statsOn(k, d) }; });
+}
+const teacherOf = k => k?.link && teacherData[k.link] && !teacherData[k.link].missing ? teacherData[k.link] : null;
+function tickDays(k) {
+  const out = new Set(), t = teacherOf(k);
+  for (const days of Object.values(t?.progress || {})) for (const d of Object.keys(days)) out.add(d);
+  return out;
+}
+const kidBadges = k => badgeLevels(badgeMetrics({ days: kidDays(k), goalMs: goalOf(k) * 60000, tickDays: tickDays(k) }), teacherOf(k)?.badgeRules || {}, { strings: tracksPitch(k) });
+
+// Badge levels reached since we last looked. The very first time, it just records what's already earned.
+function newBadges(k) {
+  const first = !badgeSeen[k.id], seen = (badgeSeen[k.id] ??= {}), out = [];
+  for (const b of kidBadges(k)) {
+    if (b.tier > (seen[b.id]?.tier ?? -1)) { seen[b.id] = { tier: b.tier, date: dayKey() }; if (!first) out.push(b); }
+  }
+  store.set('pt-badge-seen', badgeSeen);
+  if (out.length) pushTeacher(k);
+  return out;
+}
+function activeChallenges(k, t = teacherOf(k)) {
+  if (!t) return [];
+  const days = kidDays(k), ticks = tickDays(k), today0 = dayKey();
+  return Object.entries(t.challenges || {}).map(([id, c]) => ({ c: { ...c, id }, p: challengeProgress(c, days, goalOf(k) * 60000, ticks) }))
+    .filter(({ c }) => c.start <= today0 && (c.end >= today0 || (t.challengeDone?.[c.id] && daysUntil(t.challengeDone[c.id]) >= -2)))
+    .sort((a, b) => a.c.end.localeCompare(b.c.end));
+}
+// Challenges that were just completed: record them for the teacher and return them for celebrating
+function finishedChallenges(k) {
+  const t = teacherOf(k); if (!t) return [];
+  const out = activeChallenges(k, t).filter(({ c, p }) => p.done && !t.challengeDone?.[c.id]).map(({ c }) => c);
+  for (const c of out) {
+    (t.challengeDone ??= {})[c.id] = dayKey();
+    if (F && db) F.updateDoc(F.doc(db, 'students', k.link), { [`challengeDone.${c.id}`]: dayKey() }).catch(e => console.error(e));
+  }
+  return out;
+}
+
+function renderBadgeEntry() {
+  const el = $('badgeEntry');
+  if (!kid || listening) { el.hidden = true; return; }
+  el.hidden = false;
+  const bs = kidBadges(kid), earned = bs.filter(b => b.tier >= 0).sort((a, b) => b.tier - a.tier);
+  const close = bs.filter(b => b.next != null).map(b => ({ b, f: (b.value - b.prev) / (b.next - b.prev) })).sort((a, b) => b.f - a.f)[0];
+  el.innerHTML = `<div class="mini">${(earned.length ? earned.slice(0, 3) : bs.slice(0, 3)).map(b => medalSvg(b.icon, BADGE_TIERS[Math.max(b.tier, 0)].color, { size: 38, locked: b.tier < 0 })).join('')}</div>
+    <div class="grow"><b>${earned.length ? `${earned.length} ${earned.length === 1 ? 'badge' : 'badges'}` : 'Badges'}</b>
+      <span>${close ? `Next: ${esc(close.b.name)} – ${close.b.unit(close.b.next)}` : 'All badges at the top level!'}</span></div>${icon('chev', 'go')}`;
+  el.onclick = () => show('badges');
+}
+function renderBadges() {
+  const k = kid; if (!k) return show('home');
+  document.body.style.setProperty('--kid', kidColor(k));
+  const bs = kidBadges(k), earned = bs.filter(b => b.tier >= 0).length, t = teacherOf(k);
+  $('bTitle').textContent = `${k.name}’s badges`;
+  $('bSub').textContent = earned ? `${earned} of ${bs.length} earned so far.` : 'Your first badge is one practice away.';
+  const awards = Object.entries(t?.cheers || {}).filter(([, c]) => c.kind === 'badge').sort((a, b) => b[1].date.localeCompare(a[1].date));
+  const stars = Object.values(t?.cheers || {}).filter(c => c.kind === 'star').length;
+  const doneCh = Object.entries(t?.challenges || {}).filter(([id]) => t.challengeDone?.[id]);
+  $('bTeacher').innerHTML = t && (awards.length || stars || doneCh.length) ? `<div class="card"><h2 style="margin-bottom:12px">From ${esc(t.teacherName)}</h2>
+    <div class="teacherAwards">
+      ${stars ? `<div>${medalSvg('star', BADGE_TIERS[2].color, { size: 56 })}${stars} ${stars === 1 ? 'star' : 'stars'}</div>` : ''}
+      ${awards.map(([, a]) => `<div>${medalSvg(a.icon || 'award', BADGE_TIERS[4].color, { size: 56 })}${esc(a.title)}</div>`).join('')}
+      ${doneCh.map(([, c]) => `<div>${medalSvg(c.icon || 'flag', BADGE_TIERS[3].color, { size: 56 })}${esc(challengeTitle(c))}</div>`).join('')}
+    </div></div>` : '';
+  $('bGrid').innerHTML = bs.map(b => {
+    const locked = b.tier < 0, color = BADGE_TIERS[Math.max(b.tier, 0)].color, nextTier = BADGE_TIERS[b.tier + 1];
+    const f = b.next != null ? Math.max(0, Math.min(1, (b.value - b.prev) / (b.next - b.prev))) : 1;
+    return `<div class="badgeCard ${locked ? 'locked' : ''}" title="${esc(b.about)}">
+      ${medalSvg(b.icon, color, { locked, size: 64 })}
+      <b>${esc(b.name)}</b>
+      <span class="lvl">${locked ? 'Not yet' : `${BADGE_TIERS[b.tier].name} · ${b.unit(b.tiers[b.tier])}`}</span>
+      ${b.next != null ? `<div class="bbar"><div style="width:${f * 100}%"></div></div><span class="nxt">${nextTier.name}: ${b.unit(b.next)}</span>` : '<span class="nxt">Top level!</span>'}
+    </div>`;
+  }).join('');
+}
+$('badgesBack').onclick = () => show('practice');
+
+// Stars, notes and badges the teacher sent, shown one at a time the next time the child opens their practice screen
+function showNextCheer() {
+  if (screen !== 'practice' || listening || !$('linkDlg').hidden || !$('summary').hidden) return;
+  const t = teacherOf(kid); if (!t) return;
+  const [id, c] = Object.entries(t.cheers || {}).filter(([id]) => !t.cheersSeen?.[id]).sort((a, b) => a[1].date.localeCompare(b[1].date))[0] || [];
+  if (!id) return;
+  const isBadge = c.kind === 'badge', card = $('linkCard');
+  card.style.setProperty('--kid', kidColor(kid));
+  card.innerHTML = `<div style="display:grid;justify-items:center">${medalSvg(isBadge ? (c.icon || 'award') : 'star', isBadge ? BADGE_TIERS[4].color : BADGE_TIERS[2].color, { size: 96 })}</div>
+    <h2 style="text-align:center;margin-top:10px">${isBadge ? esc(c.title) : `${esc(t.teacherName)} sent you a star!`}</h2>
+    ${isBadge ? `<p class="muted" style="text-align:center">A badge from ${esc(t.teacherName)}</p>` : ''}
+    ${c.note ? `<div class="cheerNote">“${esc(c.note)}”<span class="from">– ${esc(t.teacherName)}</span></div>` : ''}
+    <div class="pickList" style="margin-top:16px"><button class="primary" id="cheerOk" style="--kid:var(--brand);color:var(--bg);justify-content:center">Thank you!</button></div>`;
+  $('linkDlg').hidden = false;
+  confetti(isBadge ? 160 : 90, kidColor(kid));
+  $('cheerOk').onclick = () => {
+    $('linkDlg').hidden = true;
+    (t.cheersSeen ??= {})[id] = dayKey();
+    if (F && db) F.updateDoc(F.doc(db, 'students', kid.link), { [`cheersSeen.${id}`]: dayKey() }).catch(e => console.error(e));
+    setTimeout(showNextCheer, 600);
+  };
 }
 
 // ---------- Microphone ----------

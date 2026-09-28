@@ -149,7 +149,7 @@ function calendarText(name, tz, events) {
 }
 const ics = text => new Response(text, { headers: { 'Content-Type': 'text/calendar; charset=utf-8', 'Cache-Control': 'max-age=900', ...CORS } });
 
-// Lessons for one student: a weekly repeating event (skipping cancelled/moved dates) plus one-off extra lessons
+// Lessons for one student: a weekly repeating event (skipping canceled/moved dates) plus one-off extra lessons
 function studentLessonEvents(s, title, desc, fromKey) {
   const out = [], L = s.lesson || {}, ch = s.lessonChanges || {}, len = L.length || 30;
   if (L.day !== '' && L.day != null && L.time) {
@@ -203,6 +203,8 @@ function lastPracticed(s, todayKey) {
   for (let i = 0; i < 60; i++) { const k = addKey(todayKey, -i); if ((s.practice?.log?.[k] || 0) + (s.practice?.manual?.[k] || 0) >= 60000) return i; }
   return null;
 }
+const CHALLENGE_LABELS = { days: 'Practice on {n} days', minutes: 'Practice {n} minutes in total', goals: 'Reach the daily goal {n} times',
+  streak: 'Practice {n} days in a row', metronome: 'Use the metronome on {n} days', homework: 'Tick off assignments on {n} days' };
 const currentAssignment = s => Object.values(s.assignments || {}).filter(a => a.status === 'active').sort((a, b) => (a.due || '9').localeCompare(b.due || '9'))[0];
 const first = n => (n || '').split(' ')[0];
 function nextLessonAfter(s, fromKey, days = 14) {
@@ -264,7 +266,7 @@ function briefEmail(env, feed, students, now, test) {
     const lp = s.linkedAt ? lastPracticed(s, now.key) : null;
     return row(fmtTime(time), `${esc(s.name)} <span style="font-weight:500;color:#6e7385">· ${esc(INSTRUMENTS[s.instrument] || '')} · ${length} min</span>`, [
       weekLine(s, now.key), assignmentLine(s, now.key),
-      s.linkedAt && (lp == null || lp >= 4) ? `<span style="color:#c0612b">Hasn’t practised for ${lp == null ? 'a while' : lp + ' days'} – worth a gentle check-in.</span>` : ''
+      s.linkedAt && (lp == null || lp >= 4) ? `<span style="color:#c0612b">Hasn’t practiced for ${lp == null ? 'a while' : lp + ' days'} – worth a gentle check-in.</span>` : ''
     ]);
   }).join('') : '<p style="color:#6e7385">No lessons scheduled in the next week.</p>';
   const n = lessons.length;
@@ -284,13 +286,17 @@ function digestEmail(env, feed, students, now, test) {
   const total = weeks.reduce((a, w) => a + w.c.total, 0), prevTotal = weeks.reduce((a, w) => a + w.p.total, 0);
   const wins = [];
   for (const { s, c, p } of weeks) {
-    if (c.days >= 6) wins.push([90, `${esc(first(s.name))} practised ${c.days} of 7 days.`]);
+    if (c.days >= 6) wins.push([90, `${esc(first(s.name))} practiced ${c.days} of 7 days.`]);
     if (s.instrument !== 'piano' && c.tune != null && p.tune != null && c.tune - p.tune >= 0.05) wins.push([80, `${esc(first(s.name))}’s tuning improved from ${pct(p.tune)} to ${pct(c.tune)}.`]);
     if (c.rhythm != null && p.rhythm != null && c.rhythm - p.rhythm >= 0.05) wins.push([75, `${esc(first(s.name))}’s rhythm got steadier: ${pct(p.rhythm)} → ${pct(c.rhythm)}.`]);
-    if (p.total > 0 && c.total >= p.total * 1.5 && c.total - p.total >= 20 * 60000) wins.push([65, `${esc(first(s.name))} practised ${minsText(c.total - p.total)} more than last week.`]);
+    if (p.total > 0 && c.total >= p.total * 1.5 && c.total - p.total >= 20 * 60000) wins.push([65, `${esc(first(s.name))} practiced ${minsText(c.total - p.total)} more than last week.`]);
+    // badges and teacher challenges completed this week (reported by the family app)
+    for (const b of Object.values(s.badges || {})) if (b.date > addKey(now.key, -7) && b.tier >= 1) wins.push([70 + 3 * b.tier, `${esc(first(s.name))} earned ${esc(b.label)}.`]);
+    for (const [id, d] of Object.entries(s.challengeDone || {})) if (d > addKey(now.key, -7) && s.challenges?.[id])
+      wins.push([88, `${esc(first(s.name))} completed your challenge “${esc(s.challenges[id].title || CHALLENGE_LABELS[s.challenges[id].kind]?.replace('{n}', s.challenges[id].target) || 'Challenge')}”.`]);
     const done = Object.values(s.assignments || {}).filter(a => a.status === 'done' && a.completed && a.completed > addKey(now.key, -7));
     for (const a of done) wins.push([60, `${esc(first(s.name))} finished “${esc(a.title)}”.`]);
-    if (c.days === 5) wins.push([50, `${esc(first(s.name))} practised 5 of 7 days.`]);
+    if (c.days === 5) wins.push([50, `${esc(first(s.name))} practiced 5 of 7 days.`]);
   }
   const topWins = wins.sort((a, b) => b[0] - a[0]).slice(0, 3).map(w => w[1]);
   const nudges = weeks.filter(({ c }) => c.days <= 1).sort((a, b) => a.c.total - b.c.total).slice(0, 3);
@@ -316,7 +322,7 @@ function digestEmail(env, feed, students, now, test) {
   const change = prevTotal ? (total >= prevTotal ? ` (up from ${minsText(prevTotal)})` : '') : '';
   return {
     subject: `${test ? '[Test] ' : ''}Your studio this week: ${minsText(total)} of practice`,
-    html: layout(env, feed, 'Your week in the studio', `${linked.length ? `Your students practised <b>${minsText(total)}</b> this week${change}.` : 'Once families connect the app, their practice shows up here.'}`, body,
+    html: layout(env, feed, 'Your week in the studio', `${linked.length ? `Your students practiced <b>${minsText(total)}</b> this week${change}.` : 'Once families connect the app, their practice shows up here.'}`, body,
                  'You get this on Sunday evenings.')
   };
 }

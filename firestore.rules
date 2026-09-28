@@ -32,10 +32,11 @@ service cloud.firestore {
       // Teacher: full control of their own students
       allow read, update, delete: if request.auth != null && resource.data.studioId == request.auth.uid;
       allow create: if request.auth != null && request.resource.data.studioId == request.auth.uid && sid.size() >= 20;
-      // Family (holds the code): can read it, and can only update their child's practice data and assignment ticks
+      // Family (holds the code): can read it, and can only update their child's practice data, assignment ticks,
+      // earned badges, which stars they've seen and which challenges they've finished
       allow get: if sid.size() >= 20;
       allow update: if sid.size() >= 20
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['practice', 'progress', 'linkedAt', 'kidName']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['practice', 'progress', 'linkedAt', 'kidName', 'badges', 'cheersSeen', 'challengeDone']);
     }
   }
 }

@@ -267,6 +267,22 @@
            padding: 10px 16px; border-radius: 12px; font-weight: 600; font-size: 14px; opacity: 0; transition: .25s; z-index: 30; pointer-events: none; }
   #toast.show { opacity: 1; transform: translateX(-50%); }
 
+  /* Badges & stars */
+  .medalGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
+  .medalGrid > div { display: grid; justify-items: center; text-align: center; gap: 3px; font-size: 13px; }
+  .medalGrid b { font-size: 13.5px; }
+  .medalGrid span { color: var(--muted); font-size: 12px; }
+  .pbar { height: 7px; background: var(--track); border-radius: 4px; overflow: hidden; margin-top: 8px; }
+  .pbar div { height: 100%; background: var(--accent); border-radius: 4px; }
+  .pbar.done div { background: var(--good); }
+  .suggest { display: flex; gap: 6px; flex-wrap: wrap; }
+  .suggest button { font-size: 13px; padding: 6px 10px; font-weight: 500; background: var(--soft); border-radius: 999px; }
+  .iconPick { display: flex; gap: 8px; flex-wrap: wrap; }
+  .iconPick button { padding: 2px; border-radius: 50%; background: none; border: 3px solid transparent; }
+  .iconPick button.on { border-color: var(--accent); }
+  .ruleRow { display: grid; grid-template-columns: auto 1fr 150px; gap: 10px 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+  .ruleRow .grow b { display: block; font-size: 14.5px; } .ruleRow .grow span { font-size: 12.5px; color: var(--muted); }
+  @media (max-width: 520px) { .ruleRow { grid-template-columns: auto 1fr; } .ruleRow input[type=text] { grid-column: 2; } }
   /* Report */
   .report { max-width: 760px; }
   .report .rhead { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border-bottom: 2px solid var(--ink); padding-bottom: 16px; margin-bottom: 18px; flex-wrap: wrap; }
@@ -312,6 +328,14 @@
   <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s7-6.2 7-11.5a7 7 0 0 0-14 0C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></symbol>
   <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21a2 2 0 0 1 2-2h13v2"/></symbol>
   <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol>
+  <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4"/><path d="M5 4.5h12l-2.5 4 2.5 4H5"/></symbol>
+  <symbol id="i-tune" viewBox="0 0 24 24"><path d="M3 12h3l2.5-6 4 12 3-9 2 3h3.5"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></symbol>
+  <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M8 21h8M12 16.5V21M7 3.5h10V9a5 5 0 0 1-10 0z"/><path d="M17 5h3v1.5A3.5 3.5 0 0 1 16.8 10M7 5H4v1.5A3.5 3.5 0 0 0 7.2 10"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.2a4.3 4.3 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20z"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"/></symbol>
   <symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 21.5c3.9 0 6.5-2.7 6.5-6.4 0-3.9-2.8-5.9-4.2-9.1-1 2-2 3-3.5 3.6.2-2.2-.7-4.3-2.6-6.1.2 4-4.7 6.6-4.7 11.6 0 3.7 2.6 6.4 6.5 6.4z"/></symbol>
 </svg>
 
@@ -371,6 +395,7 @@
 <div class="overlay" id="modal" hidden><div class="card modal" id="modalCard" role="dialog" aria-modal="true"></div></div>
 <div id="toast"></div>
 
+<script src="badges.js?v=2"></script>
 <script>
 // ============================================================================================
 // Practice Timer for Teachers
@@ -426,7 +451,7 @@ const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2
 const INSTRUMENTS = { piano: 'Piano', violin: 'Violin', viola: 'Viola', cello: 'Cello', other: 'Other' };
 const COLORS = ['#cf5c3c', '#1f8a7e', '#6a55c8', '#2f6bcc', '#b3821c', '#c2457a', '#4b7f3a', '#8a5a44'];
 const EVENT_TYPES = { recital: 'Recital', exam: 'Exam', competition: 'Competition', masterclass: 'Masterclass', other: 'Other' };
-const STATUS = { scheduled: ['Scheduled', ''], done: ['Done', 'good'], cancelled: ['Cancelled', 'bad'], noshow: ['No-show', 'warn'], moved: ['Moved', ''] };
+const STATUS = { scheduled: ['Scheduled', ''], done: ['Done', 'good'], cancelled: ['Canceled', 'bad'], noshow: ['No-show', 'warn'], moved: ['Moved', ''] };
 const RATINGS = [['preparation', 'Preparation'], ['technique', 'Technique'], ['musicality', 'Musicality']];
 function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2200); }
 
@@ -712,7 +737,7 @@ function vStudent() {
   const s = students[route.id];
   if (!s) return `<div class="emptyBig">${icon('users', 'lg')}<p>This student isn’t in your studio.</p><button class="secondary" data-go2="students">Back to students</button></div>`;
   const tab = sub.tab || 'progress';
-  const tabs = [['progress', 'Progress'], ['assignments', 'Assignments'], ['lessons', 'Lessons'], ['events', 'Recitals & exams'], ['notes', 'Notes']];
+  const tabs = [['progress', 'Progress'], ['assignments', 'Assignments'], ['rewards', 'Badges & stars'], ['lessons', 'Lessons'], ['events', 'Recitals & exams'], ['notes', 'Notes']];
   return `<div style="--kid:${s.color}">
     <button class="ghost" data-go2="students" style="margin-left:-10px;margin-bottom:10px">${icon('back', 'sm')}Students</button>
     <div class="studentHead">
@@ -722,12 +747,13 @@ function vStudent() {
         <button class="secondary" data-act="invite">${icon('link', 'sm')}${s.linkedAt ? 'Invite link' : 'Invite family'}</button>
         <button class="secondary" data-act="editStudent">${icon('edit', 'sm')}Edit</button>
         <button class="secondary" data-act="report">${icon('report', 'sm')}Report</button>
+        <button class="accent" data-act="star">${icon('star', 'sm')}Send a star</button>
       </div>
     </div>
     ${s.archived ? `<div class="banner">${icon('alert')}<div class="grow">This student is archived.</div><button class="secondary" data-act="unarchive">Restore</button></div>` : ''}
     ${!s.linkedAt && !s.archived ? `<div class="banner">${icon('link')}<div class="grow"><b>Not connected yet.</b> Send the family the invite link so ${esc(firstName(s.name))}’s practice shows up here and your assignments appear in their app.</div><button class="accent" data-act="invite">Send invite</button></div>` : ''}
     <div class="tabs noprint">${tabs.map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
-    ${{ progress: tProgress, assignments: tAssignments, lessons: tLessons, events: tEvents, notes: tNotes }[tab](s)}
+    ${{ progress: tProgress, assignments: tAssignments, rewards: tRewards, lessons: tLessons, events: tEvents, notes: tNotes }[tab](s)}
   </div>`;
 }
 
@@ -776,7 +802,7 @@ function tAssignments(s) {
   return `<div class="stack"><div class="card">
     <h2>Current assignments <button class="accent" data-act="addAssign">${icon('plus', 'sm')}New assignment</button></h2>
     ${act.length ? act.map(item).join('') : `<div class="empty">No current assignments. ${s.linkedAt ? '' : 'They’ll appear in the student’s app once the family connects.'}</div>`}
-    <p class="small muted" style="margin-top:12px">Assignments appear on ${esc(firstName(s.name))}’s practice screen. They tick off each day they practise it.</p>
+    <p class="small muted" style="margin-top:12px">Assignments appear on ${esc(firstName(s.name))}’s practice screen. They tick off each day they practice it.</p>
   </div>
   ${done.length ? `<details class="card"><summary style="cursor:pointer;font-weight:700">Completed (${done.length})</summary><div style="margin-top:8px">${done.map(item).join('')}</div></details>` : ''}</div>`;
 }
@@ -902,7 +928,7 @@ function vReports() {
       : '<p class="muted">Not connected to the Practice Timer app, so no practice data.</p>'}
     </section>
     <section><h3>Lessons</h3>
-      <div class="stats"><div class="stat"><b>${doneL.length}</b><span>attended</span></div><div class="stat"><b>${cancelled.length}</b><span>cancelled</span></div><div class="stat"><b>${noshow.length}</b><span>missed</span></div></div>
+      <div class="stats"><div class="stat"><b>${doneL.length}</b><span>attended</span></div><div class="stat"><b>${cancelled.length}</b><span>canceled</span></div><div class="stat"><b>${noshow.length}</b><span>missed</span></div></div>
       ${rated.length ? `<div style="margin-top:12px">${ratingSummary(rated)}</div>` : ''}
     </section>
     <section><h3>Assignments</h3>
@@ -935,7 +961,9 @@ function bindView() {
     addLesson: () => extraLessonModal(route.view === 'student' ? route.id : null),
     calendar: () => calendarEmailModal(),
     addEvent: () => eventModal(null, route.view === 'student' ? route.id : null),
-    unarchive: () => api.patchStudent(route.id, { archived: false })
+    unarchive: () => api.patchStudent(route.id, { archived: false }),
+    star: () => cheerModal(route.id, 'star'), award: () => cheerModal(route.id, 'badge'), challenge: () => challengeModal(route.id),
+    badgeRules: () => badgeRulesModal()
   })[b.dataset.act]());
   V.querySelectorAll('[data-assign-done]').forEach(b => b.onclick = () => api.patchStudent(route.id, { [`assignments.${b.dataset.assignDone}.status`]: 'done', [`assignments.${b.dataset.assignDone}.completed`]: dayKey() }).then(() => toast('Marked complete')));
   V.querySelectorAll('[data-assign-reopen]').forEach(b => b.onclick = () => api.patchStudent(route.id, { [`assignments.${b.dataset.assignReopen}.status`]: 'active' }));
@@ -944,6 +972,7 @@ function bindView() {
   if (search) search.oninput = () => { sub.q = search.value; const pos = search.selectionStart; search.dataset.keep = ''; render(); const s2 = $('search'); s2.focus(); s2.setSelectionRange(pos, pos); s2.dataset.keep = '1'; };
   const nb = $('noteBox');
   if (nb) nb.oninput = () => { clearTimeout(nb.t); $('noteState').textContent = 'Saving…'; nb.t = setTimeout(async () => { notes[route.id] = nb.value; await api.saveNote(route.id, nb.value); $('noteState') && ($('noteState').textContent = 'Saved. Only you can see these.'); }, 700); };
+  if (route.view === 'student' && sub.tab === 'rewards') bindRewards();
   if ($('repStudent')) { $('repStudent').onchange = () => { sub.sid = $('repStudent').value; render(); }; $('repRange').onchange = () => { sub.range = $('repRange').value; render(); }; }
 }
 
@@ -970,7 +999,7 @@ function studentModal(sid) {
         <label class="field">Instrument <select id="fInstr"><option value="">Choose…</option>${Object.entries(INSTRUMENTS).map(([k, v]) => `<option value="${k}" ${s.instrument === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
         <label class="field">Daily practice minimum (min) <input type="number" id="fTarget" min="5" max="180" value="${s.target || 20}"></label>
       </div>
-      <div class="field">Colour <div class="swatches">${COLORS.map(c => `<button type="button" data-color="${c}" style="background:${c}" class="${c === color ? 'on' : ''}" aria-label="Colour"></button>`).join('')}</div></div>
+      <div class="field">Color <div class="swatches">${COLORS.map(c => `<button type="button" data-color="${c}" style="background:${c}" class="${c === color ? 'on' : ''}" aria-label="Color"></button>`).join('')}</div></div>
       <div class="fields three">
         <label class="field">Lesson day <select id="fDay"><option value="">No regular lesson</option>${[1, 2, 3, 4, 5, 6, 0].map(d => `<option value="${d}" ${String(s.lesson?.day) === String(d) ? 'selected' : ''}>${DAYS[d]}</option>`).join('')}</select></label>
         <label class="field">Time <input type="time" id="fTime" value="${s.lesson?.time || '16:00'}"></label>
@@ -992,7 +1021,7 @@ function studentModal(sid) {
       } else {
         const id = randomCode();
         await api.createStudent(id, { ...data, tz: TZ, studioId: me.uid, studioName: studio.studioName, teacherName: studio.teacherName,
-          assignments: {}, upcoming: {}, lessonChanges: {}, created: dayKey(), archived: false });
+          assignments: {}, upcoming: {}, lessonChanges: {}, cheers: {}, challenges: {}, badgeRules: studio.badgeRules || {}, created: dayKey(), archived: false });
         closeModal(); sub = {}; go('student', { id }); setTimeout(() => inviteModal(id), 300);
       }
     };
@@ -1010,7 +1039,7 @@ function inviteLink(sid) { return location.origin + location.pathname.replace(/t
 function inviteModal(sid) {
   const s = students[sid], link = inviteLink(sid);
   openModal(`${mhead('Invite ' + esc(firstName(s.name)) + '’s family')}
-    <p>Send this link to the family. They open it on the phone or tablet ${esc(firstName(s.name))} practises with, and the Practice Timer app connects to your studio.</p>
+    <p>Send this link to the family. They open it on the phone or tablet ${esc(firstName(s.name))} practices with, and the Practice Timer app connects to your studio.</p>
     <div class="codeBox">${esc(link)}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       ${navigator.share ? `<button class="accent" id="iShare">${icon('share', 'sm')}Share link</button>` : ''}
@@ -1021,7 +1050,7 @@ function inviteModal(sid) {
       Anyone with the link can see ${esc(firstName(s.name))}’s assignments and lesson times, so send it only to the family.</p>
     ${s.linkedAt ? `<div class="banner" style="margin:0">${icon('check')}<div class="grow">Connected${s.kidName && s.kidName !== s.name ? ` as “${esc(s.kidName)}”` : ''}.</div></div>` : ''}
     <footer><div class="right"><button class="primary" data-close>Done</button></div></footer>`, m => {
-    const msg = `Hi! ${studio.teacherName} here. Please open this link on the device ${firstName(s.name)} practises with to connect the Practice Timer app to my studio: ${link}`;
+    const msg = `Hi! ${studio.teacherName} here. Please open this link on the device ${firstName(s.name)} practices with to connect the Practice Timer app to my studio: ${link}`;
     const copy = async (t, what) => { try { await navigator.clipboard.writeText(t); toast(what + ' copied'); } catch { prompt('Copy this:', t); } };
     m.querySelector('#iCopy').onclick = () => copy(link, 'Link');
     m.querySelector('#iMsg').onclick = () => copy(msg, 'Message');
@@ -1033,8 +1062,8 @@ function assignModal(sid, aid) {
   const s = students[sid], a = aid ? s.assignments[aid] : { title: '', details: '', bpm: '', minutes: '', due: '' };
   openModal(`${mhead(aid ? 'Edit assignment' : 'New assignment for ' + esc(firstName(s.name)))}
     <div class="fields">
-      <label class="field">What to practise <input type="text" id="aTitle" value="${esc(a.title)}" maxlength="80" placeholder="e.g. G major scale, 2 octaves"></label>
-      <label class="field">Details <textarea id="aDet" placeholder="How to practise it, bars to focus on, what to listen for…">${esc(a.details || '')}</textarea></label>
+      <label class="field">What to practice <input type="text" id="aTitle" value="${esc(a.title)}" maxlength="80" placeholder="e.g. G major scale, 2 octaves"></label>
+      <label class="field">Details <textarea id="aDet" placeholder="How to practice it, bars to focus on, what to listen for…">${esc(a.details || '')}</textarea></label>
       <div class="fields three">
         <label class="field">Tempo (bpm) <input type="number" id="aBpm" min="30" max="250" value="${a.bpm || ''}" placeholder="Optional"></label>
         <label class="field">Minutes a day <input type="number" id="aMin" min="1" max="120" value="${a.minutes || ''}" placeholder="Optional"></label>
@@ -1045,7 +1074,7 @@ function assignModal(sid, aid) {
     </div>
     <footer>${aid ? '<button class="danger" id="aDel">Delete</button>' : ''}<div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="aSave">${aid ? 'Save' : 'Assign'}</button></div></footer>`, m => {
     m.querySelector('#aSave').onclick = async () => {
-      const title = val('aTitle'); if (!title) return (m.querySelector('#aErr').textContent = 'Please say what to practise.');
+      const title = val('aTitle'); if (!title) return (m.querySelector('#aErr').textContent = 'Please say what to practice.');
       const id = aid || newId();
       const data = { ...a, id, title, details: val('aDet'), bpm: +val('aBpm') || null, minutes: +val('aMin') || null, due: val('aDue') || null,
                      status: a.status || 'active', created: a.created || dayKey() };
@@ -1055,7 +1084,7 @@ function assignModal(sid, aid) {
   });
 }
 
-// Lesson changes families should see (cancelled / moved / extra) are mirrored onto the student record
+// Lesson changes families should see (canceled / moved / extra) are mirrored onto the student record
 function mirrorLesson(sid, date, change) { return api.patchStudent(sid, { [`lessonChanges.${date}`]: change || DEL }); }
 
 function lessonModal(id) {
@@ -1176,7 +1205,8 @@ function studioModal() {
     <div class="fields">
       <label class="field">Studio name <input type="text" id="sName" value="${esc(studio.studioName)}" maxlength="60"></label>
       <label class="field">Your name, as students know you <input type="text" id="sTeacher" value="${esc(studio.teacherName)}" maxlength="60"></label>
-      <button class="secondary" id="sCal" type="button" style="justify-self:start">${icon('calendar', 'sm')}Calendar &amp; email</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="secondary" id="sCal" type="button">${icon('calendar', 'sm')}Calendar &amp; email</button>
+        <button class="secondary" id="sBadges" type="button">${icon('award', 'sm')}Default badges</button></div>
       <p class="small muted">Signed in as ${esc(me.email || me.displayName || '')}.</p>
     </div>
     <footer><button class="danger" id="sOut">Sign out</button><div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="sSave">Save</button></div></footer>`, m => {
@@ -1189,10 +1219,151 @@ function studioModal() {
     };
     m.querySelector('#sOut').onclick = () => api.signOut();
     m.querySelector('#sCal').onclick = () => calendarEmailModal();
+    m.querySelector('#sBadges').onclick = () => badgeRulesModal();
   });
 }
 $('studioBtn').onclick = studioModal;
 $('signOutBtn').onclick = () => api.signOut();
+
+// ============================================================================================
+// Badges & stars
+// ============================================================================================
+// The student's practice days as badges.js expects them (from the practice data the family app shares)
+function studentDays(s) {
+  const keys = new Set([...Object.keys(s.practice?.log || {}), ...Object.keys(s.practice?.manual || {}), ...Object.keys(s.practice?.stats || {})]);
+  return [...keys].map(key => ({ key, ms: (s.practice?.log?.[key] || 0) + (s.practice?.manual?.[key] || 0), stats: s.practice?.stats?.[key] || {} }));
+}
+const studentTicks = s => new Set(Object.values(s.progress || {}).flatMap(d => Object.keys(d)));
+function tRewards(s) {
+  const first = esc(firstName(s.name)), days = studentDays(s), ticks = studentTicks(s), goalMs = (s.practice?.goal || s.target || 20) * 60000;
+  const ch = Object.entries(s.challenges || {}).map(([id, c]) => ({ id, c, p: challengeProgress(c, days, goalMs, ticks), done: s.challengeDone?.[id] }))
+    .sort((a, b) => b.c.start.localeCompare(a.c.start));
+  const earned = Object.entries(s.badges || {}).map(([id, b]) => ({ ...b, def: BADGES.find(x => x.id === id) })).filter(b => b.def).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const cheers = Object.entries(s.cheers || {}).sort((a, b) => b[1].date.localeCompare(a[1].date));
+  return `<div class="stack">
+    <div class="card"><h2>Encourage ${first}</h2>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="accent" data-act="star">${icon('star', 'sm')}Send a star</button>
+        <button class="secondary" data-act="award">${icon('award', 'sm')}Award a badge</button>
+        <button class="secondary" data-act="challenge">${icon('flag', 'sm')}Set a challenge</button></div>
+      <p class="small muted" style="margin-top:10px">Stars and badges pop up the next time ${first} opens the app. Challenges show on the practice screen and are tracked automatically.${s.linkedAt ? '' : ' (Once the family connects the app.)'}</p></div>
+    <div class="card"><h2>Challenges</h2>
+      ${ch.length ? ch.map(({ id, c, p, done }) => { const over = !done && c.end < dayKey(); return `<div class="assign"><div class="grow">
+        <div class="t">${esc(challengeTitle(c))} ${done ? `<span class="chip good">${icon('check')}Done ${fmtDate(done, { day: 'numeric', month: 'short' })}</span>` : over ? '<span class="chip">Ended</span>' : ''}</div>
+        <div class="det muted">${fmtDate(c.start, { day: 'numeric', month: 'short' })} – ${fmtDate(c.end, { day: 'numeric', month: 'short' })} · ${Math.min(p.value, c.target)} of ${c.target} ${CHALLENGES[c.kind]?.unit || ''}</div>
+        <div class="pbar ${p.done ? 'done' : ''}"><div style="width:${Math.min(p.value / c.target, 1) * 100}%"></div></div></div>
+        <button class="ghost icon" data-ch-edit="${id}" aria-label="Edit challenge">${icon('edit')}</button></div>`; }).join('')
+        : '<div class="empty">No challenges yet. Short ones work best – “Practice on 5 days this week” is a great start.</div>'}</div>
+    <div class="card"><h2>Badges earned <button class="ghost small" data-act="badgeRules">Default badges ${icon('chev', 'sm')}</button></h2>
+      ${earned.length ? `<div class="medalGrid">${earned.map(b => `<div>${medalSvg(b.def.icon, BADGE_TIERS[b.tier].color, { size: 56 })}<b>${esc(b.def.name)}</b>
+        <span>${BADGE_TIERS[b.tier].name} · ${b.def.unit((s.badgeRules?.tiers?.[b.def.id] || b.def.tiers)[b.tier])}</span>${b.date ? `<span>${fmtDate(b.date, { day: 'numeric', month: 'short' })}</span>` : ''}</div>`).join('')}</div>`
+        : `<div class="empty">${s.linkedAt ? `Badges appear here as ${first} earns them.` : 'Badges appear once the family connects the app.'}</div>`}</div>
+    <div class="card"><h2>Stars &amp; awards sent</h2>
+      ${cheers.length ? cheers.map(([id, c]) => `<div class="assign">${medalSvg(c.kind === 'badge' ? c.icon || 'award' : 'star', c.kind === 'badge' ? BADGE_TIERS[4].color : BADGE_TIERS[2].color, { size: 40 })}
+        <div class="grow"><div class="t">${c.kind === 'badge' ? esc(c.title) : 'Star'} <span class="chip ${s.cheersSeen?.[id] ? 'good' : ''}">${s.cheersSeen?.[id] ? `${icon('check')}Seen` : 'Not seen yet'}</span></div>
+        ${c.note ? `<div class="det">“${esc(c.note)}”</div>` : ''}<div class="det muted">${fmtDate(c.date)}</div></div>
+        <button class="ghost icon" data-cheer-del="${id}" aria-label="Remove">${icon('trash')}</button></div>`).join('')
+        : '<div class="empty">Nothing sent yet. A short, specific note (“Your bow hold is so much better!”) means a lot.</div>'}</div>
+  </div>`;
+}
+function bindRewards() {
+  const V = $('view'), sid = route.id;
+  V.querySelectorAll('[data-ch-edit]').forEach(b => b.onclick = () => challengeModal(sid, b.dataset.chEdit));
+  V.querySelectorAll('[data-cheer-del]').forEach(b => b.onclick = async () => {
+    if (!confirm('Remove this from the student’s awards?')) return;
+    await api.patchStudent(sid, { [`cheers.${b.dataset.cheerDel}`]: DEL, [`cheersSeen.${b.dataset.cheerDel}`]: DEL });
+  });
+}
+
+const STAR_IDEAS = ['Great practice this week!', 'I can hear how hard you’ve been working.', 'Your practice is really paying off.', 'Loved your playing in our lesson today!', 'You’re so close – keep going!'];
+function cheerModal(sid, kind) {
+  const s = students[sid], badge = kind === 'badge'; let pick = 'star';
+  openModal(`${mhead(badge ? `Award ${esc(firstName(s.name))} a badge` : `Send ${esc(firstName(s.name))} a star`)}
+    <div class="fields">
+      ${badge ? `<label class="field">Badge name <input type="text" id="cTitle" maxlength="40" placeholder="e.g. Beautiful bow hold"></label>
+        <div class="field">Picture <div class="iconPick">${AWARD_ICONS.map(i => `<button type="button" data-icon="${i}" class="${i === pick ? 'on' : ''}" aria-label="${i}">${medalSvg(i, BADGE_TIERS[4].color, { size: 44 })}</button>`).join('')}</div></div>`
+        : `<div style="display:grid;justify-items:center">${medalSvg('star', BADGE_TIERS[2].color, { size: 72 })}</div>`}
+      <label class="field">${badge ? 'Note (optional)' : 'Note'} <textarea id="cNote" maxlength="200" style="min-height:80px" placeholder="${badge ? 'What earned it?' : 'Something specific you noticed…'}"></textarea></label>
+      ${badge ? '' : `<div class="suggest">${STAR_IDEAS.map(t => `<button type="button" data-idea>${esc(t)}</button>`).join('')}</div>`}
+      <p class="small muted">It pops up with a little celebration the next time ${esc(firstName(s.name))} opens the app.</p>
+      <div class="gateErr" id="cErr"></div>
+    </div>
+    <footer><div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="cSend">${badge ? 'Award badge' : 'Send star'}</button></div></footer>`, m => {
+    m.querySelectorAll('[data-icon]').forEach(b => b.onclick = () => { pick = b.dataset.icon; m.querySelectorAll('[data-icon]').forEach(x => x.classList.toggle('on', x === b)); });
+    m.querySelectorAll('[data-idea]').forEach(b => b.onclick = () => { m.querySelector('#cNote').value = b.textContent; });
+    m.querySelector('#cSend').onclick = async () => {
+      const note = val('cNote'), title = badge ? val('cTitle') : '';
+      if (badge && !title) return (m.querySelector('#cErr').textContent = 'Give the badge a name.');
+      if (!badge && !note) return (m.querySelector('#cErr').textContent = 'Add a short note – or pick one of the ideas.');
+      await api.patchStudent(sid, { [`cheers.${newId()}`]: badge ? { kind: 'badge', title, icon: pick, note, date: dayKey() } : { kind: 'star', note, date: dayKey() } });
+      closeModal(); toast(badge ? 'Badge awarded' : 'Star sent');
+    };
+  });
+}
+
+function challengeModal(sid, cid) {
+  const s = students[sid], c = cid ? s.challenges[cid] : null, t = today();
+  const sunday = addDays(t, (7 - t.getDay()) % 7), nextL = lessonsBetween(addDays(t, 1), addDays(t, 21), sid).filter(countsAsLesson)[0];
+  const ends = [['week', 'This week (until Sunday)', dayKey(sunday)], ['7', 'The next 7 days', dayKey(addDays(t, 6))], ['14', 'The next 2 weeks', dayKey(addDays(t, 13))],
+                ...(nextL ? [['lesson', `Until the next lesson (${fmtDate(nextL.date)})`, dayKey(addDays(parseDay(nextL.date), -1))]] : []), ['custom', 'Pick an end date…', '']];
+  openModal(`${mhead(cid ? 'Edit challenge' : `Set a challenge for ${esc(firstName(s.name))}`)}
+    <div class="fields">
+      <div class="fields two">
+        <label class="field">Challenge <select id="chKind">${Object.entries(CHALLENGES).map(([k, v]) => `<option value="${k}" ${c?.kind === k ? 'selected' : ''}>${v.label.replace('{n}', 'N')}</option>`).join('')}</select></label>
+        <label class="field">N = <input type="number" id="chTarget" min="1" max="600" value="${c?.target || 5}"></label>
+      </div>
+      <label class="field">Until <select id="chEnd">${ends.map(([k, l, d]) => `<option value="${k}" data-date="${d}" ${c && c.end === d ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+      <label class="field" id="chCustomWrap" hidden>End date <input type="date" id="chCustom" value="${c?.end || dayKey(addDays(t, 7))}"></label>
+      <label class="field">Name it (optional) <input type="text" id="chTitle" maxlength="60" value="${esc(c?.title || '')}" placeholder=""></label>
+      <p class="small muted" id="chPreview"></p>
+    </div>
+    <footer>${cid ? '<button class="danger" id="chDel">Delete</button>' : ''}<div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="chSave">${cid ? 'Save' : 'Set challenge'}</button></div></footer>`, m => {
+    const endDate = () => { const o = m.querySelector('#chEnd').selectedOptions[0]; return o.value === 'custom' ? val('chCustom') : o.dataset.date; };
+    const preview = () => {
+      m.querySelector('#chCustomWrap').hidden = m.querySelector('#chEnd').value !== 'custom';
+      const x = { kind: val('chKind'), target: +val('chTarget') || 1, title: val('chTitle') };
+      m.querySelector('#chTitle').placeholder = challengeTitle({ ...x, title: '' });
+      m.querySelector('#chPreview').textContent = `${firstName(s.name)} sees: “${challengeTitle(x)}”, with a progress bar, until ${endDate() ? fmtDate(endDate(), { weekday: 'long', day: 'numeric', month: 'short' }) : '…'}. Finishing it earns a badge.`;
+    };
+    if (c && !ends.some(e => e[2] === c.end)) m.querySelector('#chEnd').value = 'custom';
+    m.querySelectorAll('select, input').forEach(i => i.addEventListener('input', preview)); preview();
+    m.querySelector('#chSave').onclick = async () => {
+      const end = endDate(); if (!end || end < dayKey()) return toast('Pick an end date from today on');
+      const data = { kind: val('chKind'), target: Math.max(1, +val('chTarget') || 1), title: val('chTitle'), start: c?.start || dayKey(), end, icon: 'flag' };
+      await api.patchStudent(sid, { [`challenges.${cid || newId()}`]: data }); closeModal(); toast(cid ? 'Saved' : 'Challenge set');
+    };
+    m.querySelector('#chDel')?.addEventListener('click', async () => {
+      if (!confirm('Delete this challenge?')) return;
+      await api.patchStudent(sid, { [`challenges.${cid}`]: DEL, [`challengeDone.${cid}`]: DEL }); closeModal();
+    });
+  });
+}
+
+// Studio-wide badge settings: switch badges off, or change the levels (copied onto every student)
+function badgeRulesModal() {
+  const rules = structuredClone(studio.badgeRules || {});
+  openModal(`${mhead('Default badges')}
+    <p class="small muted" style="margin-top:-6px">Students earn these automatically from their practice. Switch off any you don’t want, or change the levels (up to 5, lowest first).</p>
+    <div>${BADGES.map(b => `<div class="ruleRow">
+      <input type="checkbox" data-on="${b.id}" ${rules.off?.[b.id] ? '' : 'checked'} aria-label="${esc(b.name)}">
+      <div class="grow">${medalSvg(b.icon, BADGE_TIERS[2].color, { size: 28 })} <b style="display:inline">${esc(b.name)}</b><span style="display:block">${esc(b.about)}</span></div>
+      <input type="text" data-tiers="${b.id}" value="${(rules.tiers?.[b.id] || b.tiers).join(', ')}" aria-label="Levels for ${esc(b.name)}"></div>`).join('')}</div>
+    <footer><button class="ghost" id="brReset">Reset to defaults</button><div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="brSave">Save</button></div></footer>`, m => {
+    m.querySelector('#brReset').onclick = () => { m.querySelectorAll('[data-on]').forEach(c => c.checked = true); BADGES.forEach(b => m.querySelector(`[data-tiers="${b.id}"]`).value = b.tiers.join(', ')); };
+    m.querySelector('#brSave').onclick = async () => {
+      const out = { off: {}, tiers: {} };
+      for (const b of BADGES) {
+        if (!m.querySelector(`[data-on="${b.id}"]`).checked) out.off[b.id] = true;
+        const t = m.querySelector(`[data-tiers="${b.id}"]`).value.split(/[,\s]+/).map(Number).filter(n => n > 0).sort((a, c) => a - c).slice(0, 5);
+        if (t.length && t.join() !== b.tiers.join()) out.tiers[b.id] = t;
+      }
+      studio.badgeRules = out;
+      await api.updateStudio({ badgeRules: out });
+      for (const s of Object.values(students)) await api.patchStudent(s.id, { badgeRules: out });
+      closeModal(); toast('Badges updated for all students');
+    };
+  });
+}
 
 // ============================================================================================
 // Calendar & email
@@ -1202,7 +1373,7 @@ const icsLocal = (key, time) => key.replace(/-/g, '') + 'T' + (time || '12:00').
 const icsFold = line => { const out = []; while (line.length > 74) { out.push(line.slice(0, 74)); line = ' ' + line.slice(74); } out.push(line); return out.join('\r\n'); };
 const plusMin = (key, time, m) => { const [h, mm] = (time || '12:00').split(':').map(Number), d = parseDay(key); d.setHours(h, mm + m); return icsLocal(dayKey(d), `${pad(d.getHours())}:${pad(d.getMinutes())}`); };
 
-// A one-time copy of the studio calendar: each student's weekly lesson (minus cancelled/moved dates),
+// A one-time copy of the studio calendar: each student's weekly lesson (minus canceled/moved dates),
 // extra lessons, and recitals/exams
 function studioIcs() {
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, ''), from = dayKey(addDays(today(), -28)), ev = [];
@@ -1269,7 +1440,7 @@ async function calendarEmailModal() {
     <section class="fields">
       <h3>Calendar</h3>
       ${!live ? `<p class="small muted">Download your lessons and recitals and import them into Google, Apple or Outlook Calendar. It’s a copy: changes you make here later won’t update it.</p>`
-        : feed ? `<p class="small muted">Subscribe once and your calendar keeps itself up to date – including moved and cancelled lessons.</p>
+        : feed ? `<p class="small muted">Subscribe once and your calendar keeps itself up to date – including moved and canceled lessons.</p>
           <div class="codeBox" style="font-size:13px">${esc(url)}</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <a class="accent" href="${url.replace(/^https?:/, 'webcal:')}" style="display:inline-flex;gap:7px;align-items:center;padding:9px 14px;border-radius:12px;text-decoration:none;font-weight:600;color:#fff">${icon('calendar', 'sm')}Subscribe on this device</a>
@@ -1381,7 +1552,7 @@ function seedDemo() {
       const d = addDays(t, -(((t.getDay() - day + 7) % 7) || 7) - 7 * (w - 1)), k = dayKey(d), lid = `${id}_${k}`;
       const r = Math.random();
       lessons[lid] = { id: lid, sid: id, date: k, time: L.time, length, status: r < .08 ? 'cancelled' : r < .11 ? 'noshow' : 'done',
-        notes: ['Worked on bow distribution in the Allegro. Keep the wrist loose.', 'Scales much cleaner! Next: shifting to 3rd position.', 'Great progress on the recital piece – memorise bars 1–16.', 'Rhythm in the middle section still rushing; practise with metronome at 72.', 'Lovely tone today. Start the new étude.'][Math.floor(Math.random() * 5)],
+        notes: ['Worked on bow distribution in the Allegro. Keep the wrist loose.', 'Scales much cleaner! Next: shifting to 3rd position.', 'Great progress on the recital piece – memorise bars 1–16.', 'Rhythm in the middle section still rushing; practice with metronome at 72.', 'Lovely tone today. Start the new étude.'][Math.floor(Math.random() * 5)],
         ratings: { preparation: Math.ceil(rnd(2, 5) * (keen + .3) / 1.2), technique: Math.ceil(rnd(2.5, 5)), musicality: Math.ceil(rnd(2.5, 5)) } };
       for (const k2 in lessons[lid].ratings) lessons[lid].ratings[k2] = Math.max(1, Math.min(5, lessons[lid].ratings[k2]));
     }
@@ -1398,11 +1569,22 @@ function seedDemo() {
   A(ids[4], 'Clementi Sonatina Op. 36 No. 1', 'Learn the left hand of the first page.', null, 20, 10, 5);
   events.e1 = { id: 'e1', type: 'recital', title: 'Winter Recital', date: dayKey(addDays(t, 38)), time: '15:00', location: 'St. John’s Hall',
     participants: { [ids[0]]: { piece: 'Seitz Concerto No. 2, mvt 1', result: '' }, [ids[1]]: { piece: 'Bach Minuet No. 1', result: '' }, [ids[3]]: { piece: 'Twinkle Variations', result: '' }, [ids[2]]: { piece: 'Burgmüller: Arabesque', result: '' } } };
-  events.e2 = { id: 'e2', type: 'exam', title: 'ABRSM Grade 3 Cello', date: dayKey(addDays(t, 17)), time: '10:20', location: 'Exam centre', participants: { [ids[1]]: { piece: 'Grade 3 list A, B, C', result: '' } } };
+  events.e2 = { id: 'e2', type: 'exam', title: 'ABRSM Grade 3 Cello', date: dayKey(addDays(t, 17)), time: '10:20', location: 'Exam center', participants: { [ids[1]]: { piece: 'Grade 3 list A, B, C', result: '' } } };
   events.e3 = { id: 'e3', type: 'recital', title: 'Spring Recital', date: dayKey(addDays(t, -120)), time: '14:00', location: 'St. John’s Hall',
     participants: { [ids[0]]: { piece: 'Suzuki Book 2: Minuet', result: 'Performed' }, [ids[4]]: { piece: 'Für Elise (simplified)', result: 'Performed' } } };
-  events.e4 = { id: 'e4', type: 'exam', title: 'ABRSM Grade 2 Violin', date: dayKey(addDays(t, -60)), time: '11:00', location: 'Exam centre', participants: { [ids[0]]: { piece: 'Grade 2 list A, B, C', result: 'Distinction (132)' } } };
+  events.e4 = { id: 'e4', type: 'exam', title: 'ABRSM Grade 2 Violin', date: dayKey(addDays(t, -60)), time: '11:00', location: 'Exam center', participants: { [ids[0]]: { piece: 'Grade 2 list A, B, C', result: 'Distinction (132)' } } };
   notes[ids[0]] = 'Loves playing fast pieces – use that for motivation. Parents keen on exams.';
+  // rewards: badges the family app would have reported, a challenge, and some stars
+  for (const id of ids) {
+    const s = students[id]; if (!s.practice) continue;
+    const lv = badgeLevels(badgeMetrics({ days: studentDays(s), goalMs: s.target * 60000, tickDays: studentTicks(s) }), {}, { strings: s.instrument !== 'piano' });
+    s.badges = Object.fromEntries(lv.filter(b => b.tier >= 0).map((b, i) => [b.id, { tier: b.tier, date: dayKey(addDays(t, -i * 3)), label: b.name }]));
+  }
+  const sun = dayKey(addDays(t, (7 - t.getDay()) % 7)), mon = dayKey(addDays(t, -((t.getDay() + 6) % 7)));
+  students[ids[0]].challenges = { c1: { kind: 'days', target: 5, start: mon, end: sun, icon: 'flag' } };
+  students[ids[4]].challenges = { c2: { kind: 'minutes', target: 60, start: mon, end: sun, icon: 'flag', title: 'One hour this week' } };
+  students[ids[0]].cheers = { s1: { kind: 'star', note: 'Your shifting is so much smoother!', date: dayKey(addDays(t, -2)) }, b1: { kind: 'badge', title: 'Recital ready', icon: 'trophy', note: 'You know the Seitz by heart now.', date: dayKey(addDays(t, -9)) } };
+  students[ids[0]].cheersSeen = { b1: dayKey(addDays(t, -8)) };
 }
 
 start();
