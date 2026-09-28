@@ -156,7 +156,8 @@
   .avatar.lg { width: 60px; height: 60px; font-size: 25px; }
   .list { display: grid; }
   .rowLink { display: flex; align-items: center; gap: 12px; padding: 12px 6px; border-top: 1px solid var(--line); cursor: pointer; border-radius: 10px;
-             background: none; width: 100%; text-align: left; font-weight: 500; color: var(--ink); font-size: 15px; }
+             background: none; width: 100%; text-align: left; font-weight: 500; color: var(--ink); font-size: 15px;
+             white-space: normal; }  /* rows are buttons: let their text wrap instead of widening the page */
   .list > .rowLink:first-child { border-top: 0; }
   .rowLink:hover { background: var(--soft); }
   .list > * { min-width: 0; }                       /* let rows shrink to the screen instead of widening the page */
