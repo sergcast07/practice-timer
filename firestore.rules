@@ -17,6 +17,15 @@ service cloud.firestore {
       }
     }
 
+    // A teacher's calendar & email settings, read by the calendar/email service using the long random token.
+    match /feeds/{token} {
+      allow get: if token.size() >= 20;
+      allow create: if request.auth != null && request.resource.data.studioId == request.auth.uid && token.size() >= 20;
+      allow update, delete: if request.auth != null && resource.data.studioId == request.auth.uid
+        && (!('studioId' in request.resource.data) || request.resource.data.studioId == request.auth.uid);
+      allow list: if false;
+    }
+
     // One student: shared between their teacher and their family.
     // The student code (sent to the family as an invite link) is long and random.
     match /students/{sid} {

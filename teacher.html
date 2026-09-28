@@ -48,7 +48,7 @@
   button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible, .rowLink:focus-visible {
     outline: 3px solid color-mix(in srgb, var(--accent) 40%, transparent); outline-offset: 2px; }
   button.primary { background: var(--brand); color: var(--bg); }
-  button.accent { background: var(--accent); color: #fff; }
+  button.accent, a.accent { background: var(--accent); color: #fff; }
   button.secondary { background: var(--card); border: 1.5px solid var(--line); }
   button.ghost { background: transparent; color: var(--ink-2); }
   button.ghost:hover, button.secondary:hover { background: var(--soft); }
@@ -392,6 +392,9 @@ const FIREBASE = EMULATOR ? { apiKey: 'demo-key', authDomain: 'localhost', proje
   appId: '1:933602552014:web:1b19df5cc27f55fc58c89f'
 };
 const FB = 'https://www.gstatic.com/firebasejs/12.19.0';
+// The calendar & email service (worker/worker.js on Cloudflare). Empty until it's deployed.
+const WORKER_URL = EMULATOR ? 'http://127.0.0.1:8787' : '';
+const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 // ---------- Helpers ----------
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -506,7 +509,9 @@ async function firebaseApi() {
     deleteLesson: id => F.deleteDoc(F.doc(db, 'studios', me.uid, 'lessons', id)).catch(fail),
     saveEvent: (id, data) => F.setDoc(F.doc(db, 'studios', me.uid, 'events', id), data).catch(fail),
     deleteEvent: id => F.deleteDoc(F.doc(db, 'studios', me.uid, 'events', id)).catch(fail),
-    saveNote: (sid, text) => F.setDoc(F.doc(db, 'studios', me.uid, 'notes', sid), { text }).catch(fail)
+    saveNote: (sid, text) => F.setDoc(F.doc(db, 'studios', me.uid, 'notes', sid), { text }).catch(fail),
+    getFeed: async token => { const s = await F.getDoc(F.doc(db, 'feeds', token)); return s.exists() ? s.data() : null; },
+    saveFeed: (token, data) => F.setDoc(F.doc(db, 'feeds', token), data, { merge: true })
   };
 }
 
@@ -527,7 +532,9 @@ function demoApi() {
     deleteLesson: async id => { delete lessons[id]; later(); },
     saveEvent: async (id, d) => { events[id] = { id, ...structuredClone(d) }; later(); },
     deleteEvent: async id => { delete events[id]; later(); },
-    saveNote: async (sid, t) => { notes[sid] = t; }
+    saveNote: async (sid, t) => { notes[sid] = t; },
+    getFeed: async () => null,
+    saveFeed: async () => {}
   };
 }
 
@@ -819,7 +826,7 @@ function vSchedule() {
   const total = list.filter(countsAsLesson);
   return `
   <div class="pageHead"><div><div class="eyebrow">${total.length} lessons · ${mins(total.reduce((a, l) => a + l.length * 60000, 0))} teaching</div><h1>Schedule</h1></div>
-    <div class="actions"><button class="accent" data-act="addLesson">${icon('plus', 'sm')}Add lesson</button></div></div>
+    <div class="actions"><button class="secondary" data-act="calendar">${icon('calendar', 'sm')}Add to calendar</button><button class="accent" data-act="addLesson">${icon('plus', 'sm')}Add lesson</button></div></div>
   <div class="card">
     <div class="rowBetween" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
       <div class="weekNav"><button class="secondary icon" data-week="-7" aria-label="Previous week">${icon('back')}</button>
@@ -916,6 +923,7 @@ function bindView() {
     addStudent: () => studentModal(), editStudent: () => studentModal(route.id), invite: () => inviteModal(route.id),
     report: () => { sub = { sid: route.id }; go('reports'); }, addAssign: () => assignModal(route.id),
     addLesson: () => extraLessonModal(route.view === 'student' ? route.id : null),
+    calendar: () => calendarEmailModal(),
     addEvent: () => eventModal(null, route.view === 'student' ? route.id : null),
     unarchive: () => api.patchStudent(route.id, { archived: false })
   })[b.dataset.act]());
@@ -973,7 +981,7 @@ function studentModal(sid) {
         await api.patchStudent(sid, data); closeModal(); toast('Saved');
       } else {
         const id = randomCode();
-        await api.createStudent(id, { ...data, studioId: me.uid, studioName: studio.studioName, teacherName: studio.teacherName,
+        await api.createStudent(id, { ...data, tz: TZ, studioId: me.uid, studioName: studio.studioName, teacherName: studio.teacherName,
           assignments: {}, upcoming: {}, lessonChanges: {}, created: dayKey(), archived: false });
         closeModal(); sub = {}; go('student', { id }); setTimeout(() => inviteModal(id), 300);
       }
@@ -1158,6 +1166,7 @@ function studioModal() {
     <div class="fields">
       <label class="field">Studio name <input type="text" id="sName" value="${esc(studio.studioName)}" maxlength="60"></label>
       <label class="field">Your name, as students know you <input type="text" id="sTeacher" value="${esc(studio.teacherName)}" maxlength="60"></label>
+      <button class="secondary" id="sCal" type="button" style="justify-self:start">${icon('calendar', 'sm')}Calendar &amp; email</button>
       <p class="small muted">Signed in as ${esc(me.email || me.displayName || '')}.</p>
     </div>
     <footer><button class="danger" id="sOut">Sign out</button><div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="sSave">Save</button></div></footer>`, m => {
@@ -1169,10 +1178,127 @@ function studioModal() {
       closeModal(); render(); toast('Saved');
     };
     m.querySelector('#sOut').onclick = () => api.signOut();
+    m.querySelector('#sCal').onclick = () => calendarEmailModal();
   });
 }
 $('studioBtn').onclick = studioModal;
 $('signOutBtn').onclick = () => api.signOut();
+
+// ============================================================================================
+// Calendar & email
+// ============================================================================================
+const icsEsc = s => String(s ?? '').replace(/\\/g, '\\\\').replace(/\r?\n/g, '\\n').replace(/([,;])/g, '\\$1');
+const icsLocal = (key, time) => key.replace(/-/g, '') + 'T' + (time || '12:00').replace(':', '') + '00';
+const icsFold = line => { const out = []; while (line.length > 74) { out.push(line.slice(0, 74)); line = ' ' + line.slice(74); } out.push(line); return out.join('\r\n'); };
+const plusMin = (key, time, m) => { const [h, mm] = (time || '12:00').split(':').map(Number), d = parseDay(key); d.setHours(h, mm + m); return icsLocal(dayKey(d), `${pad(d.getHours())}:${pad(d.getMinutes())}`); };
+
+// A one-time copy of the studio calendar: each student's weekly lesson (minus cancelled/moved dates),
+// extra lessons, and recitals/exams
+function studioIcs() {
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, ''), from = dayKey(addDays(today(), -28)), ev = [];
+  for (const s of active()) {
+    const L = s.lesson || {}, ch = s.lessonChanges || {}, len = L.length || 30, title = `${s.name} – ${INSTRUMENTS[s.instrument] || 'Music'} lesson`;
+    if (L.day !== '' && L.day != null && L.time) {
+      let d = parseDay(L.start && L.start > from ? L.start : from);
+      while (d.getDay() !== +L.day) d = addDays(d, 1);
+      const first = dayKey(d), ex = Object.keys(ch).filter(k => k >= first && parseDay(k).getDay() === +L.day);
+      ev.push([`lesson-${s.id}-${first}`, first, L.time, len, title, 'FREQ=WEEKLY', ex, '', '']);
+    }
+    for (const [k, c] of Object.entries(ch)) if (c.status === 'extra' && k >= from) ev.push([`extra-${s.id}-${k}`, k, c.time, len, title, '', [], '', '']);
+  }
+  for (const e of Object.values(events)) if (e.date >= from)
+    ev.push([`event-${e.id}`, e.date, e.time || '12:00', 120, e.title, '', [], e.location || '',
+             Object.entries(e.participants || {}).map(([sid, p]) => `${students[sid]?.name || ''}${p.piece ? ': ' + p.piece : ''}`).join('\n')]);
+  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Practice Timer//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:' + icsEsc(studio.studioName + ' – lessons')];
+  for (const [uid, key, time, len, title, rrule, ex, loc, desc] of ev) {
+    L.push('BEGIN:VEVENT', `UID:${uid}@practice-timer`, 'DTSTAMP:' + stamp, 'DTSTART:' + icsLocal(key, time), 'DTEND:' + plusMin(key, time, len), 'SUMMARY:' + icsEsc(title));
+    if (rrule) L.push('RRULE:' + rrule);
+    for (const x of ex) L.push('EXDATE:' + icsLocal(x, time));
+    if (loc) L.push('LOCATION:' + icsEsc(loc));
+    if (desc) L.push('DESCRIPTION:' + icsEsc(desc));
+    L.push('END:VEVENT');
+  }
+  L.push('END:VCALENDAR');
+  return L.map(icsFold).join('\r\n') + '\r\n';
+}
+function downloadIcs() {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([studioIcs()], { type: 'text/calendar' })); a.download = `${studio.studioName} lessons.ics`;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+// The feed: a small settings record the calendar/email service reads (feeds/{token}); the token is the private key
+function feedData(extra = {}) {
+  return { studioId: me.uid, studioName: studio.studioName, teacherName: studio.teacherName, tz: TZ,
+           students: active().map(s => s.id).sort(), ...extra };
+}
+let lastFeedSync = '';
+function syncFeed() {
+  if (!studio?.feedToken || DEMO) return;
+  const d = feedData(), sig = JSON.stringify(d);
+  if (sig === lastFeedSync) return;
+  lastFeedSync = sig;
+  api.saveFeed(studio.feedToken, d).catch(e => console.error(e));
+  for (const s of active()) if (!s.tz) api.patchStudent(s.id, { tz: TZ });      // lets family calendars show the right time zone
+}
+async function ensureFeed() {
+  if (studio.feedToken) return studio.feedToken;
+  const token = randomCode();
+  await api.saveFeed(token, feedData({ email: me.email || '', brief: true, digest: true }));
+  await api.updateStudio({ feedToken: token });
+  studio.feedToken = token;
+  await fetch(WORKER_URL + '/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) }).catch(() => {});
+  return token;
+}
+
+async function calendarEmailModal() {
+  const live = !!WORKER_URL && !DEMO;
+  const feed = live && studio.feedToken ? await api.getFeed(studio.feedToken) : null;
+  const url = feed ? `${WORKER_URL}/cal/t/${studio.feedToken}.ics` : '';
+  openModal(`${mhead('Calendar &amp; email')}
+    <section class="fields">
+      <h3>Calendar</h3>
+      ${!live ? `<p class="small muted">Download your lessons and recitals and import them into Google, Apple or Outlook Calendar. It’s a copy: changes you make here later won’t update it.</p>`
+        : feed ? `<p class="small muted">Subscribe once and your calendar keeps itself up to date – including moved and cancelled lessons.</p>
+          <div class="codeBox" style="font-size:13px">${esc(url)}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <a class="accent" href="${url.replace(/^https?:/, 'webcal:')}" style="display:inline-flex;gap:7px;align-items:center;padding:9px 14px;border-radius:12px;text-decoration:none;font-weight:600;color:#fff">${icon('calendar', 'sm')}Subscribe on this device</a>
+            <button class="secondary" id="cCopy">${icon('copy', 'sm')}Copy link</button></div>
+          <p class="small muted"><b>Google Calendar:</b> on a computer, Other calendars → + → From URL, paste the link. <b>iPhone:</b> tap Subscribe. Updates appear within about an hour (Google can take longer).</p>`
+        : `<p class="small muted">Get a calendar that updates itself when lessons move, plus a short email before you teach and on Sunday evenings.</p>
+          <button class="accent" id="cOn">${icon('calendar', 'sm')}Turn on live calendar &amp; email</button>`}
+      <button class="secondary" id="cDownload" style="justify-self:start">${icon('report', 'sm')}Download a copy (.ics)</button>
+    </section>
+    ${feed ? `<section class="fields" style="border-top:1px solid var(--line);padding-top:16px">
+      <h3>Email</h3>
+      <label class="field">Send to <input type="text" id="cEmail" value="${esc(feed.email || '')}" placeholder="you@example.com" inputmode="email"></label>
+      <label class="participant" style="grid-template-columns:auto 1fr;border:0;padding:0"><input type="checkbox" id="cBrief" ${feed.brief ? 'checked' : ''}>
+        <span><b style="color:var(--ink)">Teaching-day brief</b><br><span class="small muted">About an hour before your first lesson, only on days you teach: one or two lines per student.</span></span></label>
+      <label class="participant" style="grid-template-columns:auto 1fr;border:0;padding:0"><input type="checkbox" id="cDigest" ${feed.digest ? 'checked' : ''}>
+        <span><b style="color:var(--ink)">Sunday studio digest</b><br><span class="small muted">Sunday at 6 pm: the week’s wins, who could use a nudge, and what’s coming up.</span></span></label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="secondary" data-test="brief">Send a test brief</button><button class="secondary" data-test="digest">Send a test digest</button></div>
+      <p class="small muted" id="cMsg">Emails come from Practice Timer. While it uses the free test sender, they can only go to the email address the service was set up with.</p>
+    </section>` : ''}
+    <footer><div class="right"><button class="${feed ? 'secondary' : 'primary'}" data-close>${feed ? 'Cancel' : 'Done'}</button>${feed ? '<button class="primary" id="cSave">Save</button>' : ''}</div></footer>`, m => {
+    m.querySelector('#cDownload').onclick = downloadIcs;
+    m.querySelector('#cOn')?.addEventListener('click', async e => { e.target.disabled = true; await ensureFeed(); calendarEmailModal(); });
+    m.querySelector('#cCopy')?.addEventListener('click', async () => { try { await navigator.clipboard.writeText(url); toast('Link copied'); } catch { prompt('Copy this link:', url); } });
+    const save = async () => {
+      await api.saveFeed(studio.feedToken, { email: val('cEmail'), brief: m.querySelector('#cBrief').checked, digest: m.querySelector('#cDigest').checked });
+    };
+    m.querySelector('#cSave')?.addEventListener('click', async () => { await save(); closeModal(); toast('Saved'); });
+    m.querySelectorAll('[data-test]').forEach(b => b.onclick = async () => {
+      if (!val('cEmail')) return (m.querySelector('#cMsg').textContent = 'Add an email address first.');
+      b.disabled = true; await save();
+      try {
+        const r = await fetch(WORKER_URL + '/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: studio.feedToken, kind: b.dataset.test }) });
+        const j = await r.json();
+        m.querySelector('#cMsg').textContent = r.ok ? `Sent “${j.subject}” to ${j.to}.` : (j.error || 'Couldn’t send.');
+      } catch { m.querySelector('#cMsg').textContent = 'Couldn’t reach the email service.'; }
+      b.disabled = false;
+    });
+  });
+}
 
 // ============================================================================================
 // Start-up
@@ -1208,7 +1334,11 @@ async function start() {
     enter();
   });
 }
-function enter() { showOnly('shell'); parseRoute(); api.watch(render); render(); }
+function enter() {
+  showOnly('shell'); parseRoute();
+  let t; api.watch(() => { render(); clearTimeout(t); t = setTimeout(syncFeed, 1500); });
+  render();
+}
 
 // ---------- Demo data ----------
 function seedDemo() {

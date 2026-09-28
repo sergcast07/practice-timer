@@ -1,0 +1,22 @@
+name = "practice-timer"
+main = "worker.js"
+compatibility_date = "2026-09-01"
+
+# Hourly: teaching-day briefs go out 30–90 minutes before the first lesson; the digest on Sunday at 6 pm
+[triggers]
+crons = ["0 * * * *"]
+
+[vars]
+PROJECT_ID = "music-practice-tracker-d77f7"
+API_KEY = "AIzaSyAUn6GqVxRR-m9i5kjTH9dY7-nGWCo1374"   # public web key (same as in the apps)
+APP_URL = "https://sergcast07.github.io/practice-timer/"
+# Resend's shared test sender can only email the address you signed up to Resend with.
+# Once you have your own domain, verify it in Resend and change this.
+FROM_EMAIL = "Practice Timer <onboarding@resend.dev>"
+
+# KV stores which studios to email and which emails were already sent. Filled in by `wrangler kv namespace create`.
+[[kv_namespaces]]
+binding = "KV"
+id = "REPLACE_WITH_KV_ID"
+
+# The RESEND_API_KEY secret is set separately: npx wrangler secret put RESEND_API_KEY
