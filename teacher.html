@@ -958,7 +958,7 @@ function studentModal(sid) {
       <label class="field">Name <input type="text" id="fName" value="${esc(s.name)}" maxlength="40" placeholder="Student’s name"></label>
       <div class="fields two">
         <label class="field">Instrument <select id="fInstr"><option value="">Choose…</option>${Object.entries(INSTRUMENTS).map(([k, v]) => `<option value="${k}" ${s.instrument === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
-        <label class="field">Daily practice target (min) <input type="number" id="fTarget" min="5" max="180" value="${s.target || 20}"></label>
+        <label class="field">Daily practice minimum (min) <input type="number" id="fTarget" min="5" max="180" value="${s.target || 20}"></label>
       </div>
       <div class="field">Colour <div class="swatches">${COLORS.map(c => `<button type="button" data-color="${c}" style="background:${c}" class="${c === color ? 'on' : ''}" aria-label="Colour"></button>`).join('')}</div></div>
       <div class="fields three">
