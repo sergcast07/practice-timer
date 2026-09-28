@@ -223,6 +223,13 @@ function lastPracticed(s, todayKey) {
   for (let i = 0; i < 60; i++) { const k = addKey(todayKey, -i); if ((s.practice?.log?.[k] || 0) + (s.practice?.manual?.[k] || 0) >= 60000) return i; }
   return null;
 }
+// Music theory (the family app's theory.js): names for level-ups in emails
+const THEORY_NAMES = { notes: 'Note names', rhythm: 'Rhythm', symbols: 'Symbols & terms', keys: 'Key signatures', echo: 'Echo' };
+function theoryWeek(t, todayKey) {
+  const since = addKey(todayKey, -6), T = t?.practice?.theory || t?.theory || {};
+  const rounds = (T.rounds || []).filter(r => r.at.slice(0, 10) >= since), ups = (T.ups || []).filter(u => u.at.slice(0, 10) >= since);
+  return { rounds: rounds.length, passed: rounds.filter(r => r.right >= 8 * r.total / 10).length, ups };
+}
 const CHALLENGE_LABELS = { days: 'Practice on {n} days', minutes: 'Practice {n} minutes in total', goals: 'Reach the daily goal {n} times',
   streak: 'Practice {n} days in a row', metronome: 'Use the metronome on {n} days', homework: 'Tick off assignments on {n} days' };
 // Weekly plan (minutes per weekday, Sunday first; 0 = rest). The family's shared plan wins, then the teacher's.
@@ -322,6 +329,7 @@ function digestEmail(env, feed, students, now, test) {
     for (const b of Object.values(s.badges || {})) if (b.date > addKey(now.key, -7) && b.tier >= 1) wins.push([70 + 3 * b.tier, `${esc(first(s.name))} earned ${esc(b.label)}.`]);
     for (const [id, d] of Object.entries(s.challengeDone || {})) if (d > addKey(now.key, -7) && s.challenges?.[id])
       wins.push([88, `${esc(first(s.name))} completed your challenge “${esc(s.challenges[id].title || CHALLENGE_LABELS[s.challenges[id].kind]?.replace('{n}', s.challenges[id].target) || 'Challenge')}”.`]);
+    for (const u of theoryWeek(s, now.key).ups) wins.push([72, `${esc(first(s.name))} reached ${esc(THEORY_NAMES[u.deck] || 'theory')} level ${u.level} in music theory.`]);
     const done = Object.values(s.assignments || {}).filter(a => a.status === 'done' && a.completed && a.completed > addKey(now.key, -7));
     for (const a of done) wins.push([60, `${esc(first(s.name))} finished “${esc(a.title)}”.`]);
     if (planned && c.days === planned - 1 && c.days >= 3) wins.push([50, `${esc(first(s.name))} practiced ${c.days} of ${planned} planned days.`]);
@@ -574,6 +582,9 @@ async function familyEmail(env, parent, { test } = {}) {
       const a = currentAssignment(t); if (a) lines.push(`Working on: ${esc(a.title)}${a.due ? ` (due ${fmtDay(a.due)})` : ''}`);
       const nl = nextLessonAfter(t, now.key, 10); if (nl) { const l = lessonsOn(t, nl)[0]; lines.push(`Next lesson: ${fmtDay(nl)}${l?.time ? ' at ' + fmtTime(l.time) : ''}`); }
     }
+    const th = theoryWeek({ theory: fam.theory?.[k.id] }, now.key);
+    if (th.ups.length) lines.push(good(`Music theory: reached ${th.ups.map(u => `${esc(THEORY_NAMES[u.deck] || '')} level ${u.level}`).join(', ')}`));
+    else if (th.rounds) lines.push(`Music theory: ${th.rounds} ${th.rounds === 1 ? 'round' : 'rounds'} played, ${th.passed} passed`);
     rows.push(row('', `${esc(k.name)} · ${minsText(c.total)}${p.total ? ` <span style="font-weight:500;color:#6e7385">(${minsText(p.total)} the week before)</span>` : ''}`, lines));
   }
   if (!rows.length) rows.push('<p style="font-size:15px;color:#3d4760">No players yet – add them in the app under Parents → Settings.</p>');

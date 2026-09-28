@@ -25,6 +25,7 @@ const BADGE_METRICS = {
   early:    { label: 'Mornings before 8 am', unit: n => `${n} ${n === 1 ? 'morning' : 'mornings'} before 8 am`, about: 'Practice before 8 in the morning.' },
   weekend:  { label: 'Full weekends', unit: n => `${n} full ${n === 1 ? 'weekend' : 'weekends'}`, about: 'Practice on both Saturday and Sunday.' },
   comeback: { label: 'Comebacks after a break', unit: n => n === 1 ? 'came back after a break' : `${n} comebacks`, about: 'Start again after a few days off – that takes grit.' },
+  theory:   { label: 'Theory rounds passed', unit: n => `${n} theory ${n === 1 ? 'round' : 'rounds'} passed`, about: 'Pass music theory rounds (8 out of 10 or better).' },
   homework: { label: 'Days of assignments ticked', unit: n => `${n} days of assignments`, about: 'Tick off the teacher’s assignments.' }
 };
 
@@ -39,7 +40,8 @@ const BADGES = [
   { id: 'early', metric: 'early', name: 'Early bird', icon: 'sun', tiers: [1, 5, 20] },
   { id: 'weekend', metric: 'weekend', name: 'Weekend warrior', icon: 'calendar', tiers: [1, 4, 12] },
   { id: 'comeback', metric: 'comeback', name: 'Comeback', icon: 'refresh', tiers: [1, 5] },
-  { id: 'homework', metric: 'homework', name: 'Homework hero', icon: 'book', tiers: [5, 20, 50, 100] }
+  { id: 'homework', metric: 'homework', name: 'Homework hero', icon: 'book', tiers: [5, 20, 50, 100] },
+  { id: 'theory', metric: 'theory', name: 'Theory whiz', icon: 'note', tiers: [3, 10, 25, 60] }
 ];
 // Pictures for badges (auto or awarded by hand)
 const BADGE_ICONS = ['star', 'trophy', 'award', 'flame', 'flag', 'clock', 'target', 'tune', 'metronome', 'sun', 'calendar', 'refresh', 'book', 'heart', 'spark', 'note'];
@@ -132,13 +134,14 @@ function badgeMetrics({ days, goalFor, goalMs, tickDays = new Set() }) {
   let weekends = 0;
   for (const k of on) if (_dow(k) === 6 && set.has(_addKey(k, 1))) weekends++;
   const m = { streak: best, goals: days.filter(d => g(d.key) > 0 && d.ms >= g(d.key)).length, hours: Math.floor(days.reduce((a, d) => a + d.ms, 0) / 36e5),
-              days: on.length, focus: 0, tune: 0, rhythm: 0, early: 0, weekend: weekends, comeback: comebacks, homework: tickDays.size };
+              days: on.length, focus: 0, tune: 0, rhythm: 0, early: 0, weekend: weekends, comeback: comebacks, homework: tickDays.size, theory: 0 };
   for (const d of days) {
     const s = d.stats || {};
     m.focus = Math.max(m.focus, Math.floor((s.longest || 0) / 60000));
     if (s.notes >= 50) m.tune = Math.max(m.tune, Math.floor(100 * s.inTune / s.notes));
     if (s.beats >= 40) m.rhythm = Math.max(m.rhythm, Math.floor(100 * s.steady / s.beats));
     if ((s.early || 0) >= 5 * 60000) m.early++;
+    m.theory += s.theory || 0;                                        // theory rounds passed that day
   }
   return m;
 }

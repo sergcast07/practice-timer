@@ -18,7 +18,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Noto+Music&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #f6f3ee; --card: #ffffff; --ink: #1e2a44; --ink-2: #3d4760; --muted: #6e7385;
@@ -340,6 +340,39 @@
   .fieldRow { display: grid; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted); text-align: left; margin-top: 12px; }
   /* Badges */
   .medalArt.locked { opacity: .8; }
+  /* Music theory */
+  .theoryEntry .thMini { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; flex: none;
+    background: color-mix(in srgb, var(--kid) 14%, transparent); color: var(--kid); font-family: 'Noto Music', serif; font-size: 30px; line-height: 1; }
+  .deck { display: grid; gap: 10px; }
+  .deck .top { display: flex; align-items: center; gap: 12px; }
+  .deck .top .grow { flex: 1; min-width: 0; } .deck .top b { font-size: 17px; display: block; } .deck .top span { font-size: 13.5px; color: var(--muted); }
+  .lvl { font-weight: 700; font-size: 13px; padding: 4px 10px; border-radius: 999px; background: color-mix(in srgb, var(--kid) 13%, transparent); color: var(--kid); white-space: nowrap; }
+  .pips { display: flex; gap: 5px; } .pips i { width: 9px; height: 9px; border-radius: 50%; background: var(--track); } .pips i.on { background: var(--kid); }
+  .deck .modes { display: flex; gap: 8px; flex-wrap: wrap; } .deck .modes button { flex: 1 1 auto; padding: 10px 12px; font-size: 15px; }
+  .thGoal { display: flex; gap: 12px; align-items: center; border: 1.5px solid color-mix(in srgb, var(--kid) 40%, transparent); }
+  .qProg { display: flex; gap: 4px; align-items: center; } .qProg i { width: 16px; height: 6px; border-radius: 3px; background: var(--track); }
+  .qProg i.ok { background: var(--good); } .qProg i.no { background: var(--danger); } .qProg i.now { background: var(--kid); }
+  .quizCard { display: grid; gap: 16px; text-align: center; padding: 22px 18px; }
+  .quizCard .ask { font-weight: 600; color: var(--ink-2); }
+  .prompt { min-height: 150px; display: grid; place-items: center; }
+  .staff { width: 100%; max-width: 360px; height: auto; color: var(--ink); overflow: visible; }
+  .staff line { stroke: currentColor; stroke-width: 1.3; } .staff .ledger { stroke-width: 1.5; } .staff .stem { stroke-width: 1.7; }
+  .staff .head { fill: currentColor; } .staff text { fill: currentColor; font-family: 'Noto Music', serif; }
+  .glyph { font-family: 'Noto Music', serif; font-size: 96px; line-height: 1.1; } .glyph .dot { font-family: var(--sans); font-size: 40px; vertical-align: 12px; margin-left: -6px; }
+  .dyn { font-family: 'Times New Roman', Georgia, serif; font-style: italic; font-weight: 700; font-size: 76px; letter-spacing: -.02em; }
+  .term { font-family: var(--serif); font-style: italic; font-size: 42px; }
+  .answers { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .answers.letters { grid-template-columns: repeat(7, 1fr); gap: 6px; } .answers.letters button { padding: 14px 0; font-size: 20px; }
+  .answers button { padding: 14px 10px; font-size: 16px; background: var(--card); border: 1.5px solid var(--line); }
+  .answers button.right { background: var(--good); border-color: var(--good); color: #fff; }
+  .answers button.wrong { background: var(--danger); border-color: var(--danger); color: #fff; }
+  .feedback { min-height: 1.4em; font-weight: 700; } .feedback.ok { color: var(--good); } .feedback.no { color: var(--danger); }
+  .listenBox { display: grid; gap: 10px; justify-items: center; }
+  .heard { font-size: 44px; font-weight: 700; min-height: 1.2em; font-variant-numeric: tabular-nums; }
+  .micLevel { width: 180px; height: 8px; border-radius: 4px; background: var(--track); overflow: hidden; } .micLevel i { display: block; height: 100%; width: 0; background: var(--kid); transition: width .08s; }
+  .result { display: grid; gap: 12px; justify-items: center; }
+  .result .stars { display: flex; gap: 6px; color: var(--track); } .result .stars .ic { width: 42px; height: 42px; } .result .stars .on { color: #cf9f2e; fill: #cf9f2e; }
+  @media (max-width: 380px) { .answers.letters { grid-template-columns: repeat(4, 1fr); } }
   .badgeEntry { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; font-weight: 500; padding: 16px 18px; }
   .badgeEntry .mini { display: flex; }
   .badgeEntry .mini svg + svg { margin-left: -12px; }
@@ -527,6 +560,7 @@
     <div class="pSide">
     <div class="card" id="teacherCard" hidden></div>
     <button class="card badgeEntry" id="badgeEntry"></button>
+    <button class="card badgeEntry theoryEntry" id="theoryEntry"></button>
     <div class="card">
       <div class="metroHead">
         <div class="label"><svg class="ic"><use href="#i-metronome"/></svg>Metronome</div>
@@ -571,6 +605,18 @@
       <div id="manualList"></div>
     </div>
     </div>
+  </section>
+
+  <!-- MUSIC THEORY -->
+  <section class="screen" id="theory" hidden>
+    <header><button class="ghost back" id="theoryBack"><svg class="ic"><use href="#i-back"/></svg>Back</button></header>
+    <div class="intro"><h1 id="thTitle">Music theory</h1><p>Short games – 10 questions each. Get 8 right to pass a round; pass 2 rounds to level up.</p></div>
+    <div id="thGoal"></div>
+    <div id="thDecks" class="stack"></div>
+  </section>
+  <section class="screen" id="quiz" hidden>
+    <header><button class="ghost back" id="quizStop"><svg class="ic"><use href="#i-x"/></svg>Stop</button><div class="qProg" id="qProg"></div></header>
+    <div class="card quizCard" id="quizCard"></div>
   </section>
 
   <!-- HISTORY -->
@@ -711,8 +757,9 @@
   </div>
 </div>
 
-<script src="badges.js?v=7"></script>
+<script src="badges.js?v=8"></script>
 <script src="signin.js?v=1"></script>
+<script src="theory.js?v=1"></script>
 <script>
 const $ = id => document.getElementById(id);
 const CIRC = 2 * Math.PI * 52;
@@ -752,6 +799,7 @@ const store = {
 let kids = store.get('pt-kids', []);            // [{id, name, color, goal (minutes)}]
 let log = store.get('pt-log', {});              // {kidId: {'YYYY-MM-DD': ms}}
 let manual = store.get('pt-manual', {});        // practice logged by hand: {kidId: {entryId: {day, ms, note, at}}}
+let theory = store.get('pt-theory', {});        // music theory progress: {kidId: {levels, passes, setAt, rounds, ups}} (theory.js)
 let stats = store.get('pt-stats', {});          // {kidId: {'YYYY-MM-DD': {active, breaks, longest, notes, inTune, beats, steady}}}
 let settings = Object.assign(
   { sens: +store.get('sens', 60), grace: +store.get('grace', 3), musicOnly: store.get('musicOnly', true), pin: null },
@@ -812,6 +860,7 @@ function onRemote(snap) {
   log = d.log || {};
   stats = d.stats || {};
   manual = d.manual || {}; store.set('pt-manual', manual);
+  if (!pendingFields.theory && d.theory) { theory = d.theory; store.set('pt-theory', theory); }
   store.set('pt-kids', kids); store.set('pt-log', log); store.set('pt-settings', settings); store.set('pt-stats', stats);
   if (kid) {
     kid = kids.find(k => k.id === kid.id) || null;
@@ -932,7 +981,7 @@ async function createFamily() {
   setSync('connecting');
   try { await loadFirebase(); } catch (e) { console.error(e); return setSync('error'); }
   family = familyCode();
-  const saved = F.setDoc(F.doc(db, 'families', family), { kids, log, stats, manual, settings, created: F.serverTimestamp() })
+  const saved = F.setDoc(F.doc(db, 'families', family), { kids, log, stats, manual, settings, theory, created: F.serverTimestamp() })
     .catch(e => { console.error(e); setSync('error'); });
   store.set('pt-family', family);
   await connect(); renderParent();
@@ -1047,9 +1096,10 @@ const initial = k => esc([...k.name.trim()][0]?.toUpperCase() || '?');
 let screen = 'home';
 function show(name) {
   if (listening) stopAudio();
+  if (name !== 'quiz' && quiz) endQuiz(true);
   screen = name;
   for (const s of document.querySelectorAll('.screen')) s.hidden = s.id !== name;
-  ({ home: renderHome, history: renderHistory, parent: renderParent, practice: () => { renderPractice(); renderTeacherCard(); renderManualList(); renderBadgeEntry(); setTimeout(showNextCheer, 400); }, badges: renderBadges }[name] || (() => {}))();
+  ({ home: renderHome, history: renderHistory, parent: renderParent, practice: () => { renderPractice(); renderTeacherCard(); renderManualList(); renderBadgeEntry(); setTimeout(showNextCheer, 400); }, badges: renderBadges, theory: renderTheory }[name] || (() => {}))();
   window.scrollTo(0, 0);
   if (name === 'parent' && afterPin) { $(afterPin).scrollIntoView({ block: 'start' }); afterPin = null; }
   if (name === 'home') afterPin = null;
@@ -2077,7 +2127,9 @@ function pushTeacher(k) {
     if (man) manual60[key] = Math.round(man);
     if (Object.keys(st).length) stats60[key] = Object.fromEntries(Object.entries(st).map(([f, v]) => [f, Math.round(v)]));
   }
-  F.updateDoc(F.doc(db, 'students', k.link), { practice: { log: log60, manual: manual60, stats: stats60, goal: goalOf(k), plan: planFor(k), updated: Date.now() }, kidName: k.name,
+  const tt = theory[k.id], since = dayKey(lastDays(60)[0]);
+  const theory60 = tt ? { levels: tt.levels || {}, passes: tt.passes || {}, rounds: (tt.rounds || []).filter(r => r.at.slice(0, 10) >= since), ups: (tt.ups || []).filter(u => u.at.slice(0, 10) >= since) } : null;
+  F.updateDoc(F.doc(db, 'students', k.link), { practice: { log: log60, manual: manual60, stats: stats60, goal: goalOf(k), plan: planFor(k), theory: theory60, updated: Date.now() }, kidName: k.name,
       ...((safePhoto(k.photo) || null) !== (teacherData[k.link]?.photo || null) ? { photo: safePhoto(k.photo) || null } : {}),
       badges: Object.fromEntries(kidBadges(k).filter(b => b.tier >= 0).map(b => [b.id, { tier: b.tier, label: `${b.name} – ${BADGE_TIERS[b.tier].name} (${b.unit(b.tiers[b.tier])})`, date: badgeSeen[k.id]?.[b.id]?.date || dayKey() }])) })
     .catch(e => console.error(e));
@@ -2390,6 +2442,7 @@ function finishedChallenges(k) {
 }
 
 function renderBadgeEntry() {
+  renderTheoryEntry();
   const el = $('badgeEntry');
   if (!kid || listening) { el.hidden = true; return; }
   const bs = kidBadges(kid), earned = bs.filter(b => b.tier >= 0).sort((a, b) => b.tier - a.tier);
@@ -2401,6 +2454,151 @@ function renderBadgeEntry() {
       <span>${close ? `Next: ${esc(close.b.name)} – ${close.b.unit(close.b.next)}` : 'All badges at the top level!'}</span></div>${icon('chev', 'go')}`;
   el.onclick = () => show('badges');
 }
+// ---------- Music theory (games and levels in theory.js) ----------
+const kidTheory = k => (theory[k.id] ??= {});
+function saveTheory() { store.set('pt-theory', theory); pushRemote({ theory }); }
+const theoryPlanOf = k => teacherOf(k)?.theoryPlan || {};
+const theoryClef = k => theoryPlanOf(k).clef || defaultClef(k.instrument);
+const deckOn = (k, d) => theoryPlanOf(k).decks?.[d] !== false && !(d === 'echo' && k.instrument === 'drums');
+const THEORY_MODE_BTN = { cards: ['play', 'Flash cards'], play: ['mic', 'Play it'], echo: ['mic', 'Hear &amp; play back'] };
+
+function renderTheoryEntry() {
+  const el = $('theoryEntry');
+  if (!kid || listening || !THEORY_ORDER.some(d => deckOn(kid, d))) { el.hidden = true; return; }
+  el.hidden = false;
+  const st = kidTheory(kid), goal = theoryPlanOf(kid).goal, played = THEORY_ORDER.filter(d => deckOn(kid, d) && st.levels?.[d] > 1);
+  el.innerHTML = `<div class="thMini" aria-hidden="true">𝅘𝅥𝅮</div><div class="grow"><b>Music theory</b>
+    <span>${goal && THEORY_DECKS[goal.deck] && theoryLevel(st, goal.deck) < goal.level ? `Goal: ${esc(THEORY_DECKS[goal.deck].name)} level ${goal.level}`
+      : played.length ? played.slice(0, 2).map(d => `${THEORY_DECKS[d].name} level ${theoryLevel(st, d)}`).join(' · ') : 'Note flash cards, rhythm and ear games'}</span></div>${icon('chev', 'go')}`;
+  el.onclick = () => show('theory');
+}
+function renderTheory() {
+  const k = kid; if (!k) return show('home');
+  document.body.style.setProperty('--kid', kidColor(k));
+  const st = kidTheory(k), plan = theoryPlanOf(k), t = teacherOf(k);
+  if (applyTheoryPlan(st, plan)) saveTheory();
+  $('thTitle').textContent = `${k.name}’s music theory`;
+  const g = plan.goal, clef = theoryClef(k);
+  $('thGoal').innerHTML = g && THEORY_DECKS[g.deck] ? `<div class="card thGoal">${icon('flag')}<div class="grow"><b>Goal from ${esc(t.teacherName)}</b>
+      <div class="small muted">Reach ${esc(THEORY_DECKS[g.deck].name)} level ${g.level}${g.due ? ` by ${parseDay(g.due).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}` : ''}</div></div>
+      <span class="lvl">${theoryLevel(st, g.deck) >= g.level ? 'Done!' : `Level ${theoryLevel(st, g.deck)} now`}</span></div>` : '';
+  $('thDecks').innerHTML = THEORY_ORDER.filter(d => deckOn(k, d)).map(d => {
+    const D = THEORY_DECKS[d], lv = theoryLevel(st, d), max = D.levels.length, passes = st.passes?.[d] || 0;
+    const modes = D.modes.filter(m => m !== 'play' || k.instrument !== 'drums');
+    return `<div class="card deck"><div class="top"><div class="grow"><b>${esc(D.name)}</b><span>${esc(D.levels[lv - 1])}${d === 'notes' ? ` · ${clef === 'mixed' ? 'treble and bass' : CLEFS[clef].name.toLowerCase()} clef` : ''}</span></div>
+        <span class="lvl">Level ${lv}${lv < max ? ` of ${max}` : ' · top'}</span></div>
+      ${lv < max ? `<div class="pips">${Array.from({ length: PASSES_TO_LEVEL }, (_, i) => `<i class="${i < passes ? 'on' : ''}"></i>`).join('')}
+        <span class="small muted" style="margin-left:6px">${passes} of ${PASSES_TO_LEVEL} rounds passed toward level ${lv + 1}</span></div>` : '<div class="small muted">Top level – keep playing to stay sharp.</div>'}
+      <div class="modes">${modes.map(m => `<button class="secondary" data-play="${d}:${m}">${icon(THEORY_MODE_BTN[m][0], 'sm')}${THEORY_MODE_BTN[m][1]}</button>`).join('')}</div></div>`;
+  }).join('') || '<div class="card empty muted">Your teacher hasn’t turned on any theory games yet.</div>';
+  $('thDecks').querySelectorAll('[data-play]').forEach(b => b.onclick = () => { const [d, m] = b.dataset.play.split(':'); startQuiz(d, m); });
+}
+$('theoryBack').onclick = () => show('practice');
+$('quizStop').onclick = () => endQuiz();
+
+// A round: 10 questions. Flash cards are tapped; Play it and Echo listen for the note (on the device – nothing is recorded).
+let quiz = null;
+async function startQuiz(deck, mode) {
+  if (quiz) endQuiz(true);
+  const k = kid, st = kidTheory(k);
+  const z = quiz = { k, deck, mode, level: theoryLevel(st, deck), i: 0, right: 0, results: [], miss: [], started: performance.now(), q: null, listener: null };
+  show('quiz');
+  if (mode !== 'cards') {
+    $('quizCard').innerHTML = '<p class="muted">Getting the microphone ready…</p>';
+    try {
+      z.listener = await theoryListen(onHeard, { pitchOf: yin, minF: 55, onLevel: v => { const m = $('qMic'); if (m) m.style.width = Math.min(100, v * 700) + '%'; } });
+    } catch (e) {
+      console.error(e);
+      $('quizCard').innerHTML = `<p>This game listens to your instrument, so it needs the microphone. Allow it for this site in your browser settings, then try again.</p><button class="secondary" id="qBack">Back</button>`;
+      $('qBack').onclick = () => endQuiz(); return;
+    }
+    if (quiz !== z) return z.listener.stop();
+  }
+  nextQuestion();
+}
+function endQuiz(silent) {
+  if (quiz) { quiz.listener?.stop(); clearTimeout(quiz.timeout); }
+  quiz = null;
+  if (!silent) show('theory');
+}
+function drawProg() {
+  const z = quiz;
+  $('qProg').innerHTML = Array.from({ length: THEORY_ROUND }, (_, i) => `<i class="${i < z.results.length ? (z.results[i] ? 'ok' : 'no') : i === z.i ? 'now' : ''}"></i>`).join('');
+}
+function nextQuestion() {
+  const z = quiz; if (!z) return;
+  if (z.i >= THEORY_ROUND) return finishQuiz();
+  z.q = theoryQuestion(z.deck, z.level, { clef: theoryClef(z.k), instrument: z.k.instrument, mode: z.mode, last: z.q?.id });
+  z.tries = 0; z.done = false;
+  drawProg();
+  const q = z.q, p = q.prompt;
+  const prompt = p.staff || (p.glyph ? `<div class="glyph">${p.glyph}${p.dot ? '<span class="dot">•</span>' : ''}</div>` : p.dyn ? `<div class="dyn">${esc(p.dyn)}</div>`
+    : p.text ? `<div class="term">${esc(p.text)}</div>` : `<div class="glyph" aria-hidden="true">𝄞</div>`);
+  const body = z.mode === 'cards'
+    ? `<div class="answers ${q.grid ? 'letters' : ''}">${q.choices.map(c => `<button data-a="${esc(c)}">${esc(c)}</button>`).join('')}</div>`
+    : `<div class="listenBox"><div class="heard" id="qHeard">&nbsp;</div><div class="micLevel"><i id="qMic"></i></div>
+        <div class="small muted" id="qHint">${z.mode === 'echo' ? 'Listen…' : 'Play the note on your instrument'}</div>
+        <div style="display:flex;gap:8px">${z.mode === 'echo' ? `<button class="secondary" id="qReplay">${icon('play', 'sm')}Hear it again</button>` : ''}<button class="ghost" id="qSkip">Skip</button></div></div>`;
+  $('quizCard').innerHTML = `<div class="ask">${esc(q.ask)}</div><div class="prompt">${prompt}</div>${body}<div class="feedback" id="qFb" role="status"></div>`;
+  $('quizCard').querySelectorAll('[data-a]').forEach(b => b.onclick = () => {
+    if (z.done) return;
+    const ok = b.dataset.a === q.answer;
+    b.classList.add(ok ? 'right' : 'wrong');
+    if (!ok) $('quizCard').querySelectorAll('[data-a]').forEach(x => { if (x.dataset.a === q.answer) x.classList.add('right'); });
+    judge(ok);
+  });
+  $('qSkip')?.addEventListener('click', () => judge(false));
+  $('qReplay')?.addEventListener('click', playEcho);
+  if (z.mode !== 'cards') z.timeout = setTimeout(() => judge(false, 'No note heard'), 20000);
+  if (z.mode === 'echo') playEcho();
+}
+function judge(ok, why = '') {
+  const z = quiz; if (!z || z.done) return;
+  z.done = true; clearTimeout(z.timeout); z.listener?.pause();
+  z.results.push(ok); if (ok) z.right++; else z.miss.push(z.q.id);
+  const fb = $('qFb'); fb.className = 'feedback ' + (ok ? 'ok' : 'no');
+  fb.textContent = ok ? pick(['Yes!', 'Nice!', 'That’s it!', 'Great!']) : `${why ? why + ' – ' : ''}it was ${z.q.answer}`;
+  if (z.mode !== 'cards') $('qHeard').textContent = z.q.answer;
+  z.i++; drawProg();
+  setTimeout(() => { if (quiz === z) { z.listener?.resume(); nextQuestion(); } }, ok ? 900 : 1900);
+}
+// A steady note was heard (Play it / Echo)
+function onHeard(pc) {
+  const z = quiz; if (!z || z.done || !z.q || z.echoing) return;
+  const shift = z.mode === 'play' ? (TRANSPOSE[z.k.instrument] || 0) : 0;   // compare what they read with what their instrument sounds
+  const expect = mod(z.q.pc + shift, 12), shown = PC_NAMES[mod(pc - shift, 12)];
+  $('qHeard').textContent = shown;
+  if (pc === expect) return judge(true);
+  if (++z.tries >= 3) return judge(false, `Heard ${shown}`);
+  $('qHint').textContent = `That was ${shown} – try again`;
+}
+async function playEcho() {
+  const z = quiz; if (!z?.listener || z.done) return;
+  z.echoing = true; z.listener.pause(); $('qHint').textContent = 'Listen…';
+  await theoryTone(z.listener.ctx, z.q.midi);
+  if (quiz !== z) return;
+  z.echoing = false;
+  if (!z.done) { z.listener.resume(); $('qHint').textContent = 'Now play or sing it back'; }
+}
+function finishQuiz() {
+  const z = quiz; z.listener?.stop(); z.listener = null;
+  const st = kidTheory(z.k), before = theoryLevel(st, z.deck), D = THEORY_DECKS[z.deck];
+  const r = recordTheoryRound(st, { deck: z.deck, mode: z.mode, right: z.right, total: THEORY_ROUND, ms: performance.now() - z.started, miss: z.miss });
+  if (r.passed) addStat('theory', 1);                 // counts toward the "Theory whiz" badge
+  saveTheory(); pushTeacher(z.k);
+  const stars = theoryStars(z.right);
+  $('qProg').innerHTML = '';
+  $('quizCard').innerHTML = `<div class="result">
+    <div class="stars">${[0, 1, 2].map(i => `<svg class="ic ${i < stars ? 'on' : ''}"><use href="#i-star"/></svg>`).join('')}</div>
+    <h2 style="margin:0">${r.levelUp ? `Level up! ${esc(D.name)} level ${r.level}` : r.passed ? 'Round passed!' : 'Good practice!'}</h2>
+    <p class="muted">${z.right} of ${THEORY_ROUND} right${r.levelUp ? ` – next up: ${esc(theoryLevelName(z.deck, r.level))}`
+      : r.passed ? (before < D.levels.length ? ` – ${st.passes?.[z.deck] || 0} of ${PASSES_TO_LEVEL} rounds toward level ${before + 1}` : '') : ` – get ${THEORY_PASS} right to pass a round`}</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center"><button class="secondary" id="qAgain">${icon('refresh', 'sm')}Play again</button><button class="secondary" id="qDone">Done</button></div></div>`;
+  if (r.levelUp) confetti(160, kidColor(z.k)); else if (stars === 3) confetti(70, kidColor(z.k));
+  $('qAgain').onclick = () => startQuiz(z.deck, z.mode);
+  $('qDone').onclick = () => { quiz = null; show('theory'); };
+}
+
 function renderBadges() {
   const k = kid; if (!k) return show('home');
   document.body.style.setProperty('--kid', kidColor(k));

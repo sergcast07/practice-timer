@@ -240,6 +240,10 @@
   .stat b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
   .stat span { font-size: 12.5px; color: var(--muted); font-weight: 600; }
   .trend { font-size: 12px; font-weight: 700; margin-left: 4px; }
+  .thRow { display: grid; grid-template-columns: 1fr auto auto; gap: 8px 14px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
+  .thRow.off .grow { opacity: .5; } .thRow select { width: auto; max-width: 210px; } .thOn { display: flex; gap: 6px; align-items: center; }
+  @container (max-width: 620px) { .thRow { grid-template-columns: 1fr auto; } .thRow .grow { grid-column: 1 / -1; } }
+  .thScore { font-weight: 700; white-space: nowrap; color: #b88a1e; } .thScore .muted { color: var(--line); }
   .tword { font-size: 13.5px; font-weight: 700; color: var(--ink-2); } .tword.up { color: var(--good); } .tword.down { color: var(--warn); }
   .stat .tword { font-size: 17px; }
   .infoBtn { width: 17px; height: 17px; min-height: 0; padding: 0; border-radius: 50%; display: inline-grid; place-items: center; vertical-align: 1px;
@@ -492,7 +496,8 @@
 <div class="overlay" id="modal" hidden><div class="card modal" id="modalCard" role="dialog" aria-modal="true"></div></div>
 <div id="toast"></div>
 
-<script src="badges.js?v=7"></script>
+<script src="badges.js?v=8"></script>
+<script src="theory.js?v=1"></script>
 <script src="signin.js?v=1"></script>
 <script>
 // ============================================================================================
@@ -1032,7 +1037,7 @@ function vStudent() {
   const s = students[route.id];
   if (!s) return `<div class="emptyBig">${icon('users', 'lg')}<p>This student isn’t in your studio.</p><button class="secondary" data-go2="students">Back to students</button></div>`;
   const tab = sub.tab || 'progress';
-  const tabs = [['progress', 'Progress'], ['assignments', 'Assignments'], ['rewards', 'Badges & stars'], ['lessons', 'Lessons'], ['events', 'Performances'], ['notes', 'Notes']];
+  const tabs = [['progress', 'Progress'], ['assignments', 'Assignments'], ['rewards', 'Badges & stars'], ['lessons', 'Lessons'], ['events', 'Performances'], ['theory', 'Theory'], ['notes', 'Notes']];
   return `<div style="--kid:${s.color}">
     <button class="ghost" data-go2="students" style="margin-left:-10px;margin-bottom:10px">${icon('back', 'sm')}Students</button>
     <div class="studentHead">
@@ -1050,7 +1055,7 @@ function vStudent() {
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="secondary" data-act="archiveLeft">Archive student</button><button class="secondary" data-act="invite">New invite</button></div></div>` : ''}
     ${!s.linkedAt && !leftAt(s) && !s.archived ? `<div class="banner">${icon('link')}<div class="grow"><b>Not connected yet.</b> Send the family the invite link so ${esc(firstName(s.name))}’s practice shows up here and your assignments appear in their app.</div><button class="accent" data-act="invite">Send invite</button></div>` : ''}
     <div class="tabs noprint">${tabs.map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
-    ${{ progress: tProgress, assignments: tAssignments, rewards: tRewards, lessons: tLessons, events: tEvents, notes: tNotes }[tab](s)}
+    ${{ progress: tProgress, assignments: tAssignments, rewards: tRewards, lessons: tLessons, events: tEvents, theory: tTheory, notes: tNotes }[tab](s)}
   </div>`;
 }
 
@@ -1141,6 +1146,68 @@ function tEvents(s) {
         <div class="grow"><div class="t">${esc(e.title)} ${eventChip(e)}${p.result ? `<span class="chip good">${esc(p.result)}</span>` : ''}</div>
         <div class="d">${p.piece ? esc(p.piece) : 'Piece not set'}</div></div>${icon('chev', 'muted')}</button>`;
     }).join('') : '<div class="empty">No performances or exams yet.</div>'}</div></div>`;
+}
+
+// ---------- Music theory (games and levels in theory.js; results come from the family app in practice.theory) ----------
+function tTheory(s) {
+  const T = s.practice?.theory || {}, plan = s.theoryPlan || {}, first = esc(firstName(s.name));
+  const clef = plan.clef || defaultClef(s.instrument), rounds = (T.rounds || []).slice().sort((a, b) => b.at.localeCompare(a.at));
+  const since14 = dayKey(addDays(today(), -13)), since30 = dayKey(addDays(today(), -29));
+  const g = plan.goal && THEORY_DECKS[plan.goal.deck] ? plan.goal : null, lv = d => Math.min(Math.max(T.levels?.[d] || 1, 1), THEORY_DECKS[d].levels.length);
+  const miss = {}; rounds.filter(r => r.at.slice(0, 10) >= since30).forEach(r => (r.miss || []).forEach(id => miss[id] = (miss[id] || 0) + 1));
+  const trouble = Object.entries(miss).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const clefOpts = { treble: 'Treble', bass: 'Bass', alto: 'Alto', mixed: 'Treble and bass' };
+  const deckRow = d => {
+    const D = THEORY_DECKS[d], on = plan.decks?.[d] !== false, cur = lv(d), max = D.levels.length, passes = T.passes?.[d] || 0;
+    const r14 = rounds.filter(r => r.deck === d && r.at.slice(0, 10) >= since14), right = r14.reduce((a, r) => a + r.right, 0), total = r14.reduce((a, r) => a + r.total, 0);
+    const set = plan.levels?.[d], pending = set && +set.level !== cur;
+    return `<div class="thRow ${on ? '' : 'off'}">
+      <div class="grow"><b>${esc(D.name)}</b> <span class="chip ${cur >= max ? 'good' : ''}">Level ${cur} of ${max}</span>
+        <div class="small muted">${esc(D.levels[cur - 1])}${d === 'notes' ? ` · ${clefOpts[clef].toLowerCase()} clef` : ''}${cur < max ? ` · ${passes} of ${PASSES_TO_LEVEL} rounds toward level ${cur + 1}` : ''}</div>
+        <div class="small">${r14.length ? `Last 2 weeks: ${r14.length} ${r14.length === 1 ? 'round' : 'rounds'} · ${pct(right / total)} right` : '<span class="muted">Not played in the last 2 weeks</span>'}
+          ${pending ? `<span class="muted"> · you set level ${set.level} – it applies next time ${first} opens theory</span>` : ''}</div></div>
+      <label class="small">Level <select data-thlevel="${d}">${D.levels.map((n, i) => `<option value="${i + 1}" ${i + 1 === (pending ? +set.level : cur) ? 'selected' : ''}>${i + 1} · ${esc(n)}</option>`).join('')}</select></label>
+      <label class="small thOn"><input type="checkbox" data-thdeck="${d}" ${on ? 'checked' : ''}> On</label></div>`;
+  };
+  return `<div class="stack">
+    ${!s.linkedAt ? `<div class="banner">${icon('link')}<div class="grow">Theory results appear here once ${first}’s family connects the app. You can set levels and goals now.</div></div>` : ''}
+    <div class="card"><h2>Theory goal ${g ? `<button class="ghost small" data-act="thGoal">Change</button>` : `<button class="accent" data-act="thGoal">${icon('flag', 'sm')}Set a goal</button>`}</h2>
+      ${g ? (() => { const now = lv(g.deck), done = now >= g.level; return `<div class="assign"><div class="grow"><div class="t">Reach ${esc(THEORY_DECKS[g.deck].name)} level ${g.level} <span class="chip ${done ? 'good' : 'info'}">${done ? `${icon('check')}Reached` : `Level ${now} now`}</span></div>
+          <div class="d">${esc(theoryLevelName(g.deck, g.level))}${g.due ? ` · by ${fmtDate(g.due)}` : ''} · ${first} sees this on their theory screen</div></div>
+          <button class="ghost small" data-act="thGoalClear">Remove</button></div>`; })()
+        : `<p class="muted">Give ${first} a target, like “Note names level 4 by Friday”. It shows on their theory screen and ticks itself off.</p>`}</div>
+    <div class="card"><h2>Levels <label class="small" style="font-weight:600">Note names clef <select id="thClef" style="width:auto;margin-left:6px">${Object.entries(clefOpts).map(([v, l]) => `<option value="${v}" ${v === clef ? 'selected' : ''}>${l}</option>`).join('')}</select></label></h2>
+      <p class="small muted" style="margin:-6px 0 10px">Levels go up by themselves: 8 of 10 right passes a round, and ${PASSES_TO_LEVEL} passed rounds unlock the next level. You can move ${first} up or down, or switch a game off.</p>
+      ${THEORY_ORDER.map(deckRow).join('')}</div>
+    <div class="grid2">
+      <div class="card"><h2>Trouble spots</h2>
+        ${trouble.length ? `<div class="list">${trouble.map(([id, n]) => `<div class="assign"><div class="grow"><div class="t">${esc(theoryItemLabel(id))}</div></div><span class="chip bad">missed ${n}×</span></div>`).join('')}</div>
+          <p class="small muted" style="margin-top:8px">From the last 30 days.</p>` : `<div class="empty">Nothing ${first} keeps missing in the last 30 days.</div>`}</div>
+      <div class="card"><h2>Recent rounds</h2>
+        ${rounds.length ? `<div class="list">${rounds.slice(0, 10).map(r => { const st = theoryStars(r.right, r.total);
+          return `<div class="assign"><div class="grow"><div class="t">${esc(THEORY_DECKS[r.deck]?.name || r.deck)} · ${THEORY_MODES[r.mode] || ''} <span class="muted small">level ${r.level}</span></div>
+            <div class="d">${new Date(r.at).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} · ${Math.max(1, Math.round(r.ms / 60000))} min</div></div>
+            <span class="thScore">${r.right}/${r.total} ${'★'.repeat(st)}<span class="muted">${'★'.repeat(3 - st)}</span></span></div>`; }).join('')}</div>`
+          : `<div class="empty">No rounds yet. ${first} finds Music theory on their practice screen.</div>`}
+        ${(T.ups || []).length ? `<p class="small muted" style="margin-top:10px">Level-ups: ${(T.ups || []).slice(-4).reverse().map(u => `${esc(THEORY_DECKS[u.deck]?.name || '')} ${u.level} (${fmtDate(u.at.slice(0, 10), { month: 'short', day: 'numeric' })})`).join(' · ')}</p>` : ''}</div>
+    </div></div>`;
+}
+function theoryGoalModal(sid) {
+  const s = students[sid], g = s.theoryPlan?.goal, lvNow = d => s.practice?.theory?.levels?.[d] || 1;
+  const levelOpts = d => THEORY_DECKS[d].levels.map((n, i) => `<option value="${i + 1}" ${(g?.deck === d ? g.level : Math.min(lvNow(d) + 1, THEORY_DECKS[d].levels.length)) === i + 1 ? 'selected' : ''}>${i + 1} · ${esc(n)}</option>`).join('');
+  openModal(`${mhead('Theory goal for ' + esc(firstName(s.name)))}
+    <div class="fields">
+      <label class="field">Game <select id="tgDeck">${THEORY_ORDER.map(d => `<option value="${d}" ${(g?.deck || 'notes') === d ? 'selected' : ''}>${esc(THEORY_DECKS[d].name)} (now level ${lvNow(d)})</option>`).join('')}</select></label>
+      <label class="field">Reach level <select id="tgLevel">${levelOpts(g?.deck || 'notes')}</select></label>
+      <label class="field">By (optional) <input type="date" id="tgDue" value="${g?.due || ''}"></label>
+    </div>
+    <footer><div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="tgSave">Save</button></div></footer>`, m => {
+    m.querySelector('#tgDeck').onchange = () => { m.querySelector('#tgLevel').innerHTML = levelOpts(val('tgDeck')); };
+    m.querySelector('#tgSave').onclick = async () => {
+      await api.patchStudent(sid, { 'theoryPlan.goal': { deck: val('tgDeck'), level: +val('tgLevel'), due: val('tgDue') || '', set: dayKey() } });
+      closeModal(); toast('Goal set');
+    };
+  });
 }
 
 function tNotes(s) {
@@ -1242,6 +1309,9 @@ function bindView() {
   V.querySelectorAll('[data-student]').forEach(b => b.onclick = () => { sub = {}; go('student', { id: b.dataset.student }); });
   V.querySelectorAll('[data-go2]').forEach(b => b.onclick = () => { sub = {}; go(b.dataset.go2); });
   V.querySelectorAll('[data-lesson]').forEach(b => b.onclick = () => lessonModal(b.dataset.lesson));
+  V.querySelectorAll('[data-thlevel]').forEach(sel => sel.onchange = () => api.patchStudent(route.id, { [`theoryPlan.levels.${sel.dataset.thlevel}`]: { level: +sel.value, at: new Date().toISOString() } }).then(() => toast('Level set')));
+  V.querySelectorAll('[data-thdeck]').forEach(c => c.onchange = () => api.patchStudent(route.id, { [`theoryPlan.decks.${c.dataset.thdeck}`]: c.checked }));
+  const thClef = V.querySelector('#thClef'); if (thClef) thClef.onchange = () => api.patchStudent(route.id, { 'theoryPlan.clef': thClef.value }).then(() => toast('Clef set'));
   V.querySelectorAll('[data-insight]').forEach(b => b.onclick = e => { e.stopPropagation(); insightInfoModal(b.dataset.insight, b.dataset.sid); });
   V.querySelectorAll('[data-event]').forEach(b => b.onclick = () => eventModal(b.dataset.event));
   V.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { sub.tab = b.dataset.tab; render(); });
@@ -1256,6 +1326,8 @@ function bindView() {
     calendar: () => calendarEmailModal(),
     addEvent: () => eventModal(null, route.view === 'student' ? route.id : null),
     unarchive: () => api.patchStudent(route.id, { archived: false }),
+    thGoal: () => theoryGoalModal(route.id),
+    thGoalClear: () => api.patchStudent(route.id, { 'theoryPlan.goal': DEL }),
     archiveLeft: () => { if (confirm(`Archive ${students[route.id].name}? You can restore them any time from the Students page.`)) api.patchStudent(route.id, { archived: true }).then(() => toast('Archived')); },
     star: () => cheerModal(route.id, 'star'), award: () => cheerModal(route.id, 'badge'), challenge: () => challengeModal(route.id),
     badgeRules: () => badgeRulesModal(), settings: () => studioModal(), feedback: () => feedbackModal(),
@@ -2319,6 +2391,21 @@ function seedDemo() {
   students[ids[0]].challenges = { c1: { kind: 'days', target: 5, start: mon, end: sun, icon: 'flag' } };
   students[ids[4]].challenges = { c2: { kind: 'minutes', target: 60, start: mon, end: sun, icon: 'flag', title: 'One hour this week' } };
   // Per-student practice insights: tuning as a trend for Ava, focus off for Noah (a young beginner)
+  // Music theory: a few weeks of rounds for connected students, and a goal for Maya
+  ids.forEach((id, n) => {
+    const st = students[id]; if (!st.practice) return;
+    const levels = { notes: 2 + (n % 3), rhythm: 1 + (n % 2), symbols: 1 + (n % 3 === 0 ? 1 : 0), keys: 1, echo: 1 + (n % 2) }, rounds = [], ups = [];
+    for (let i = 20; i >= 0; i--) {
+      if ((i + n) % 3 === 1) continue;
+      const deck = ['notes', 'rhythm', 'notes', 'symbols', 'echo'][(i + n) % 5], mode = deck === 'echo' ? 'echo' : deck === 'notes' && i % 4 === 0 ? 'play' : 'cards';
+      const level = Math.max(1, levels[deck] - (i > 10 ? 1 : 0)), right = 6 + ((i * 7 + n * 3) % 5), miss = [];
+      for (let m = 0; m < 10 - right; m++) miss.push(theoryQuestion(deck, level, { clef: defaultClef(st.instrument), instrument: st.instrument }).id);
+      rounds.push({ at: new Date(addDays(t, -i).getTime() + (16 + (i % 3)) * 36e5).toISOString(), deck, mode, level, right, total: 10, ms: 150000 + i * 9000, miss });
+      if (i === 11) ups.push({ at: new Date(addDays(t, -i)).toISOString(), deck, level: levels[deck] });
+    }
+    st.practice.theory = { levels, passes: { notes: 1 }, rounds, ups };
+  });
+  students[ids[0]].theoryPlan = { goal: { deck: 'notes', level: 4, due: dayKey(addDays(t, 5)), set: dayKey(t) } };
   students[ids[3]].insightOverride = { tune: 'trend' }; students[ids[4]].insightOverride = { focus: 'off' };
   for (const id of ids) students[id].insights = insightsFor(null, students[id].insightOverride);
   students[ids[0]].cheers = { s1: { kind: 'star', note: 'Your shifting is so much smoother!', date: dayKey(addDays(t, -2)) }, b1: { kind: 'badge', title: 'Recital ready', icon: 'trophy', note: 'You know the Seitz by heart now.', date: dayKey(addDays(t, -9)) } };
