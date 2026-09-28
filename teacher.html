@@ -322,6 +322,27 @@
   .planBox:empty { display: none; }
   @media (max-width: 860px) { .planBox { display: none; } }
   .adminList .assign code { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 14px; font-weight: 700; letter-spacing: .03em; }
+  /* Getting started + import */
+  .welcome { border: 1.5px solid color-mix(in srgb, var(--leaf) 30%, transparent); }
+  .steps { display: grid; gap: 4px; margin-top: 8px; }
+  .step { display: flex; gap: 14px; padding: 12px 0; border-top: 1px solid var(--line); }
+  .step:first-child { border-top: 0; }
+  .step .num { width: 30px; height: 30px; border-radius: 50%; flex: none; display: grid; place-items: center; font-weight: 700; font-size: 14px;
+               background: var(--soft); color: var(--ink-2); }
+  .step.done .num { background: var(--good); color: #fff; } .step.done .num .ic { width: 16px; height: 16px; stroke-width: 2.6; }
+  .step.done b { color: var(--muted); text-decoration: line-through; }
+  .step .grow { flex: 1; min-width: 0; } .step p { margin-top: 2px; }
+  .step .btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .modal.wide { max-width: 860px; }
+  .impTable { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .impTable th, .impTable td { text-align: left; padding: 7px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .impTable th { font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  .impTable tr.skip td { opacity: .45; }
+  .impTable .warn { color: var(--warn); font-size: 12px; }
+  .tableWrap { overflow-x: auto; max-height: 52vh; overflow-y: auto; border: 1px solid var(--line); border-radius: 12px; }
+  .pasteBox { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13px; min-height: 150px; }
+  .colsHelp { font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+  .colsHelp code { background: var(--soft); padding: 1px 6px; border-radius: 6px; font-size: 12px; color: var(--ink-2); }
   /* Report */
   .report { max-width: 760px; }
   .report .rhead { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border-bottom: 2px solid var(--ink); padding-bottom: 16px; margin-bottom: 18px; flex-wrap: wrap; }
@@ -586,6 +607,13 @@ async function firebaseApi() {
       }, fail));
     },
     createStudent: (sid, data) => F.setDoc(F.doc(db, 'students', sid), data).catch(fail),
+    createStudents: async list => {                      // [[sid, data], …] – written in batches
+      for (let i = 0; i < list.length; i += 400) {
+        const b = F.writeBatch(db);
+        for (const [sid, data] of list.slice(i, i + 400)) b.set(F.doc(db, 'students', sid), data);
+        await b.commit();
+      }
+    },
     patchStudent: (sid, patch) => F.updateDoc(F.doc(db, 'students', sid), conv(patch)).catch(fail),
     deleteStudent: sid => F.deleteDoc(F.doc(db, 'students', sid)).catch(fail),
     saveLesson: (id, data) => F.setDoc(F.doc(db, 'studios', me.uid, 'lessons', id), data, { merge: true }).catch(fail),
@@ -631,6 +659,7 @@ function demoApi() {
     updateStudio: async p => { applyPatch(studio, p); later(); },
     watch(render) { rerender = render; seedDemo(); render(); },
     createStudent: async (sid, data) => { students[sid] = { id: sid, ...structuredClone(data) }; later(); },
+    createStudents: async list => { for (const [sid, data] of list) students[sid] = { id: sid, ...structuredClone(data) }; later(); },
     patchStudent: async (sid, p) => { applyPatch(students[sid], p); later(); },
     deleteStudent: async sid => { delete students[sid]; later(); },
     saveLesson: async (id, d) => { lessons[id] = { id, ...(lessons[id] || {}), ...structuredClone(d) }; later(); },
@@ -826,6 +855,7 @@ function vOverview() {
       <button class="secondary mobileOnly" data-act="feedback">${icon('heart', 'sm')}Feedback</button></div>
   </div>
   <div class="stack">
+    ${gettingStarted()}
     <div class="kpis">
       <div class="kpi"><div class="l">Students</div><div class="v">${all.length}</div><div class="s">${linked.length} connected to the app</div></div>
       <div class="kpi"><div class="l">Practice this week</div><div class="v">${mins(weekTotal)}</div><div class="s">across connected students</div></div>
@@ -848,8 +878,27 @@ function vOverview() {
   </div>`;
 }
 
+// Getting started: shown on the overview for a new studio until it's done or dismissed
+function gettingStarted() {
+  if (!studio || studio.onboarded || DEMO) return '';
+  const all = active(), steps = [
+    [all.length > 0, 'Add your students', all.length ? `${all.length} ${all.length === 1 ? 'student' : 'students'} added.` : 'Import your whole list from a spreadsheet, or add students one at a time.',
+      `<button class="accent" data-act="import">${icon('report', 'sm')}Import a list</button><button class="secondary" data-act="addStudent">${icon('plus', 'sm')}Add one</button>`],
+    [(studio.terms || []).length > 0, 'Set up your terms <span class="muted small">(optional)</span>', 'Name your semesters once, so lesson times start and stop on the right dates.',
+      `<button class="secondary" data-act="terms">${icon('calendar', 'sm')}Set up terms</button>`],
+    [!!studio.invitesSent || all.some(s => s.linkedAt), 'Invite families', 'Each student has an invite link that connects their family’s Allegrow app to your studio.',
+      `<button class="secondary" data-act="invites" ${all.length ? '' : 'disabled'}>${icon('link', 'sm')}Invite families</button>`]
+  ];
+  const done = steps.filter(x => x[0]).length;
+  if (done === steps.length) return '';
+  return `<section class="card welcome"><h2>Welcome to Allegrow Studio <button class="ghost icon" data-act="dismissWelcome" aria-label="Dismiss" title="Hide this">${icon('x')}</button></h2>
+    <p class="muted" style="margin-top:-6px">Three quick steps to get your studio going · ${done} of 3 done</p>
+    <div class="steps">${steps.map(([ok, title, text, btns], i) => `<div class="step ${ok ? 'done' : ''}"><div class="num">${ok ? icon('check') : i + 1}</div>
+      <div class="grow"><b>${title}</b><p class="small muted">${text}</p>${ok && i !== 0 ? '' : `<div class="btns">${ok ? btns.replace('class="accent"', 'class="secondary"') : btns}</div>`}</div></div>`).join('')}</div></section>`;
+}
+
 function practiceTable(list) {
-  if (!list.length) return '<div class="emptyBig">' + icon('users', 'lg') + '<p>Add your first student to get started.</p><button class="accent" data-act="addStudent">' + icon('plus', 'sm') + 'Add student</button></div>';
+  if (!list.length) return '<div class="emptyBig">' + icon('users', 'lg') + '<p>Add your first student to get started.</p><div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><button class="accent" data-act="import">' + icon('report', 'sm') + 'Import a list</button><button class="secondary" data-act="addStudent">' + icon('plus', 'sm') + 'Add one student</button></div></div>';
   const wk = lastDays(7), prev = lastDays(7, addDays(today(), -7));
   return `<div class="ptable">
     <div class="ptr head"><div>Student</div><div>Minutes vs target</div><div>Days</div><div>Focus</div><div>In tune</div><div>Rhythm</div><div>Last practiced</div></div>
@@ -895,7 +944,7 @@ function vStudents() {
   const archived = Object.values(students).filter(s => s.archived);
   return `
   <div class="pageHead"><div><div class="eyebrow">${active().length} active</div><h1>Students</h1></div>
-    <div class="actions"><button class="accent" data-act="addStudent">${icon('plus', 'sm')}Add student</button></div></div>
+    <div class="actions"><button class="secondary" data-act="invites">${icon('link', 'sm')}Invite families</button><button class="secondary" data-act="import">${icon('report', 'sm')}Import students</button><button class="accent" data-act="addStudent">${icon('plus', 'sm')}Add student</button></div></div>
   <div class="card">
     ${active().length > 6 ? `<input type="search" id="search" placeholder="Search students" value="${esc(sub.q || '')}" data-keep="1" style="margin-bottom:10px">` : ''}
     <div class="list">${list.map(s => {
@@ -1152,7 +1201,9 @@ function bindView() {
     addEvent: () => eventModal(null, route.view === 'student' ? route.id : null),
     unarchive: () => api.patchStudent(route.id, { archived: false }),
     star: () => cheerModal(route.id, 'star'), award: () => cheerModal(route.id, 'badge'), challenge: () => challengeModal(route.id),
-    badgeRules: () => badgeRulesModal(), settings: () => studioModal(), feedback: () => feedbackModal()
+    badgeRules: () => badgeRulesModal(), settings: () => studioModal(), feedback: () => feedbackModal(),
+    import: () => importModal(), invites: () => invitesModal(), terms: () => termsModal(),
+    dismissWelcome: () => { studio.onboarded = true; api.updateStudio({ onboarded: true }); render(); }
   })[b.dataset.act]());
   V.querySelectorAll('[data-assign-done]').forEach(b => b.onclick = () => api.patchStudent(route.id, { [`assignments.${b.dataset.assignDone}.status`]: 'done', [`assignments.${b.dataset.assignDone}.completed`]: dayKey() }).then(() => toast('Marked complete')));
   V.querySelectorAll('[data-assign-reopen]').forEach(b => b.onclick = () => api.patchStudent(route.id, { [`assignments.${b.dataset.assignReopen}.status`]: 'active' }));
@@ -1168,7 +1219,7 @@ function bindView() {
 
 // ---------- Modals ----------
 function openModal(html, bind) {
-  $('modalCard').innerHTML = html; $('modal').hidden = false;
+  $('modalCard').innerHTML = html; $('modalCard').classList.remove('wide'); $('modal').hidden = false;
   $('modalCard').querySelectorAll('[data-close]').forEach(b => b.onclick = closeModal);
   bind?.($('modalCard'));
   setTimeout(() => $('modalCard').querySelector('input:not([type=checkbox]), textarea, select')?.focus(), 50);
@@ -1273,8 +1324,7 @@ function studentModal(sid) {
         await api.patchStudent(sid, data); closeModal(); toast('Saved');
       } else {
         const id = randomCode();
-        await api.createStudent(id, { ...data, tz: TZ, studioId: me.uid, studioName: studio.studioName, teacherName: studio.teacherName,
-          assignments: {}, upcoming: {}, lessonChanges: {}, cheers: {}, challenges: {}, badgeRules: studio.badgeRules || {}, badgeSet: studio.badgeSet || null, created: dayKey(), archived: false });
+        await api.createStudent(id, newStudentRecord(data));
         closeModal(); sub = {}; go('student', { id }); setTimeout(() => inviteModal(id), 300);
       }
     };
@@ -1288,6 +1338,11 @@ function studentModal(sid) {
   });
 }
 
+function newStudentRecord(data) {
+  return { ...data, tz: TZ, studioId: me.uid, studioName: studio.studioName, teacherName: studio.teacherName,
+    assignments: {}, upcoming: {}, lessonChanges: {}, cheers: {}, challenges: {}, badgeRules: studio.badgeRules || {}, badgeSet: studio.badgeSet || null,
+    created: dayKey(), archived: false };
+}
 function inviteLink(sid) { return location.origin + location.pathname.replace(/teacher\.html$/, '') + '#link=' + sid; }
 function inviteModal(sid) {
   const s = students[sid], link = inviteLink(sid);
@@ -1709,6 +1764,197 @@ function termsModal() {
     });
   });
   draw();
+}
+
+// ============================================================================================
+// Import students (paste from a spreadsheet or upload a CSV) and invite families
+// ============================================================================================
+const IMPORT_COLUMNS = ['Name', 'Instrument', 'Lesson day', 'Lesson time', 'Lesson length', 'Practice minutes', 'Practice days per week', 'Parent email'];
+let importEmails = {}, importDraft = '';               // importDraft keeps a pasted list if the teacher steps away (e.g. to enter a beta code)                                   // student id → parent email, only for this session's invite emails (never saved)
+
+// A small CSV / tab-separated parser (handles quotes, commas inside quotes and Windows line endings)
+function parseTable(text) {
+  const first = text.split(/\r?\n/)[0] || '';
+  const delim = first.includes('\t') ? '\t' : (first.split(';').length > first.split(',').length ? ';' : ',');
+  const rows = []; let row = [], field = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else q = false; } else field += c; continue; }
+    if (c === '"' && field === '') q = true;
+    else if (c === delim) { row.push(field.trim()); field = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(field.trim()); rows.push(row); row = []; field = ''; }
+    else field += c;
+  }
+  if (field || row.length) { row.push(field.trim()); rows.push(row); }
+  return rows.filter(r => r.some(x => x));
+}
+const parseLessonDay = v => ({ mo: 1, tu: 2, we: 3, th: 4, fr: 5, sa: 6, su: 0 })[(v || '').trim().toLowerCase().slice(0, 2)] ?? null;
+function parseLessonTime(v) {
+  const m = (v || '').trim().toLowerCase().match(/^(\d{1,2})(?:[:.h](\d{2}))?\s*(am|pm|a|p)?\.?m?\.?$/);
+  if (!m) return '';
+  let h = +m[1]; const min = +(m[2] || 0), ap = m[3];
+  if (h > 23 || min > 59) return '';
+  if (ap?.startsWith('p') && h < 12) h += 12;
+  if (ap?.startsWith('a') && h === 12) h = 0;
+  if (!ap && h >= 1 && h <= 7) h += 12;                  // "4:30" with no am/pm: lessons are usually in the afternoon
+  return `${pad(h)}:${pad(min)}`;
+}
+function parseInstrument(v) {
+  const x = (v || '').toLowerCase().trim();
+  if (!x) return 'other';
+  if (/pian|keyboard|keys/.test(x)) return 'piano';
+  if (/viola|vla/.test(x)) return 'viola';
+  if (/violin|fiddle|vln/.test(x)) return 'violin';
+  if (/cello|vc/.test(x)) return 'cello';
+  return 'other';
+}
+const DAY_PATTERNS = { 7: [0, 1, 2, 3, 4, 5, 6], 6: [1, 2, 3, 4, 5, 6], 5: [1, 2, 3, 4, 5], 4: [1, 2, 4, 5], 3: [1, 3, 5], 2: [2, 4], 1: [3] };
+// Work out which column is which from the headings (or assume the template's order if there are none)
+function columnMap(header) {
+  const find = test => header.findIndex(h => test(h.toLowerCase()));
+  const map = {
+    name: find(h => /name|student/.test(h)),
+    instrument: find(h => /instrument/.test(h)),
+    day: find(h => /^day$|lesson ?day|weekday/.test(h)),
+    time: find(h => /time|start/.test(h)),
+    length: find(h => /length|duration|lesson ?min/.test(h)),
+    minutes: find(h => /practi[cs]e ?min|minutes|daily|goal/.test(h) && !/length|lesson/.test(h)),
+    days: find(h => /days|per ?week|times/.test(h) && !/lesson ?day/.test(h)),
+    email: find(h => /mail/.test(h))
+  };
+  return map.name >= 0 ? map : null;
+}
+function readImport(text) {
+  const rows = parseTable(text);
+  if (!rows.length) return [];
+  let map = columnMap(rows[0]), body = rows.slice(1);
+  if (!map) { map = { name: 0, instrument: 1, day: 2, time: 3, length: 4, minutes: 5, days: 6, email: 7 }; body = rows; }
+  const cell = (r, k) => map[k] >= 0 ? (r[map[k]] || '').trim() : '';
+  const existing = new Set(active().map(s => s.name.trim().toLowerCase())), seen = new Set();
+  return body.map(r => {
+    const name = cell(r, 'name').replace(/\s+/g, ' ').slice(0, 40), notes = [];
+    const dayRaw = cell(r, 'day'), timeRaw = cell(r, 'time'), day = parseLessonDay(dayRaw), time = parseLessonTime(timeRaw);
+    if (dayRaw && day == null) notes.push(`“${dayRaw}” isn’t a day`);
+    if (timeRaw && !time) notes.push(`“${timeRaw}” isn’t a time`);
+    if ((day != null) !== !!time && (dayRaw || timeRaw)) notes.push('needs both a day and a time for lessons');
+    const length = Math.max(10, Math.min(180, parseInt(cell(r, 'length')) || 30));
+    const minutes = Math.max(5, Math.min(180, parseInt(cell(r, 'minutes')) || 20));
+    const days = Math.max(1, Math.min(7, parseInt(cell(r, 'days')) || 5));
+    const email = cell(r, 'email'), okEmail = !email || /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+    const key = name.toLowerCase(), duplicate = existing.has(key) ? 'Already in your studio' : seen.has(key) ? 'Listed twice' : ''; seen.add(key);
+    return { name, instrument: parseInstrument(cell(r, 'instrument')), day, time, length, minutes, days, email: okEmail ? email : '',
+             badEmail: !okEmail && email, notes, duplicate, include: !!name && !duplicate };
+  }).filter(x => x.name || x.notes.length);
+}
+
+function importModal() {
+  let rows = [], dates = (studio.terms || []).find(t => t.end >= dayKey())?.id || 'open';
+  const dateOptions = () => [...(studio.terms || []).filter(t => t.end >= dayKey()).map(t => [t.id, `${t.name} (${fmtDate(t.start, { day: 'numeric', month: 'short' })} – ${fmtDate(t.end, { day: 'numeric', month: 'short' })})`]),
+                             ['open', 'Starting today, no end date']];
+  const slotDates = () => { const t = (studio.terms || []).find(x => x.id === dates); return t ? { start: t.start > dayKey() ? t.start : dayKey(), end: t.end } : { start: dayKey(), end: '' }; };
+  const limit = () => isPartner() ? Infinity : Math.max(0, FREE_STUDENTS - active().length);
+
+  const step1 = (text = importDraft) => openModal(`${mhead('Import students')}
+    <p class="muted" style="margin-top:-6px">Copy the rows from your spreadsheet (Excel, Google Sheets, Numbers) and paste them below – or upload a CSV file. A heading row is fine.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="secondary" type="button" id="imUpload">${icon('report', 'sm')}Upload a CSV file</button>
+      <button class="ghost" type="button" id="imTemplate">${icon('copy', 'sm')}Download a template</button></div>
+    <textarea id="imText" class="pasteBox" data-keep="1" placeholder="Name, Instrument, Lesson day, Lesson time, Lesson length, Practice minutes, Practice days per week, Parent email
+Maya Chen, Violin, Tuesday, 4:00 PM, 30, 25, 5, parent@example.com
+Leo Park, Cello, Wednesday, 4:45 PM, 45, 30, 6">${esc(text)}</textarea>
+    <div class="colsHelp">Columns (only <b>Name</b> is required): ${IMPORT_COLUMNS.map(c => `<code>${c}</code>`).join(' ')}<br>
+      Days like “Mon” or “Monday”, times like “4:30 PM” or “16:30”. Practice days per week sets the plan (5 = weekdays). Parent emails are only used to email invite links – they aren’t saved.</div>
+    <label class="field">Lesson dates for everyone <select id="imDates">${dateOptions().map(([v, l]) => `<option value="${v}" ${v === dates ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>
+    <div class="gateErr" id="imErr"></div>
+    <footer><div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="imNext">Preview</button></div></footer>`, m => {
+    m.classList.add('wide');
+    m.querySelector('#imTemplate').onclick = () => {
+      const csv = IMPORT_COLUMNS.join(',') + '\r\nMaya Chen,Violin,Tuesday,4:00 PM,30,25,5,parent@example.com\r\nLeo Park,Cello,Wednesday,4:45 PM,45,30,6,\r\n';
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = 'allegrow-students.csv'; a.click();
+    };
+    m.querySelector('#imUpload').onclick = () => {
+      const input = document.createElement('input'); input.type = 'file'; input.accept = '.csv,.tsv,.txt,text/csv';
+      input.onchange = async () => { const f = input.files[0]; if (f) { m.querySelector('#imText').value = await f.text(); m.querySelector('#imNext').click(); } };
+      input.click();
+    };
+    m.querySelector('#imNext').onclick = () => {
+      dates = val('imDates'); importDraft = m.querySelector('#imText').value; rows = readImport(importDraft);
+      if (!rows.length) return (m.querySelector('#imErr').textContent = 'Paste at least one student (or upload a CSV file).');
+      step2(m.querySelector('#imText').value);
+    };
+  });
+
+  const step2 = text => {
+    const lim = limit();
+    let chosen = 0; rows.forEach(r => { if (r.include && chosen >= lim) r.include = false; if (r.include) chosen++; });
+    const draw = () => {
+      const count = rows.filter(r => r.include).length, over = count > lim;
+      openModal(`${mhead('Check your list')}
+        <p class="muted" style="margin-top:-6px">${rows.length} ${rows.length === 1 ? 'row' : 'rows'} found. Untick anyone you don’t want to add.</p>
+        <div class="tableWrap"><table class="impTable"><thead><tr><th></th><th>Name</th><th>Instrument</th><th>Lesson</th><th>Practice plan</th><th>Parent email</th></tr></thead><tbody>
+          ${rows.map((r, i) => `<tr class="${r.include ? '' : 'skip'}"><td><input type="checkbox" data-row="${i}" ${r.include ? 'checked' : ''} ${r.name ? '' : 'disabled'}></td>
+            <td><b>${esc(r.name) || '<span class="warn">No name</span>'}</b>${r.duplicate ? `<div class="warn">${r.duplicate}</div>` : ''}</td>
+            <td>${INSTRUMENTS[r.instrument]}</td>
+            <td>${r.day != null && r.time ? `${DAYS[r.day].slice(0, 3)} ${fmtTime(r.time)} · ${r.length} min` : '<span class="muted">No regular time</span>'}${r.notes.map(n => `<div class="warn">${esc(n)}</div>`).join('')}</td>
+            <td>${planText(planForImport(r))}</td><td>${r.badEmail ? `<span class="warn">“${esc(r.badEmail)}” doesn’t look like an email</span>` : esc(r.email) || '<span class="muted">–</span>'}</td></tr>`).join('')}
+        </tbody></table></div>
+        ${lim !== Infinity ? `<div class="banner" style="margin:0">${icon('alert')}<div class="grow">The free plan includes ${FREE_STUDENTS} students${lim === 0 ? ', and you’ve used them all' : lim < FREE_STUDENTS ? ` (you have room for ${lim} more)` : ''}. <b>Beta partners</b> can add everyone.</div><button class="secondary" type="button" id="imCode">Enter a beta code</button></div>` : ''}
+        <div class="gateErr" id="imErr">${over ? `You can add ${lim} more on the free plan – untick some, or enter a beta code.` : ''}</div>
+        <footer><button class="ghost" type="button" id="imBack">${icon('back', 'sm')}Back</button>
+          <div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="imGo" ${!count || over ? 'disabled' : ''}>Add ${count} ${count === 1 ? 'student' : 'students'}</button></div></footer>`, m => {
+        m.classList.add('wide');
+        m.querySelectorAll('[data-row]').forEach(c => c.onchange = () => { rows[+c.dataset.row].include = c.checked; draw(); });
+        m.querySelector('#imBack').onclick = () => step1(text);
+        m.querySelector('#imCode')?.addEventListener('click', () => betaCodeModal());
+        m.querySelector('#imGo').onclick = async () => {
+          m.querySelector('#imGo').disabled = true; m.querySelector('#imGo').textContent = 'Adding…';
+          const d = slotDates(), list = rows.filter(r => r.include).map((r, i) => {
+            const plan = planForImport(r), slots = r.day != null && r.time ? [{ day: r.day, time: r.time, length: r.length, start: d.start, end: d.end }] : [];
+            return [randomCode(), newStudentRecord({ name: r.name, instrument: r.instrument, color: COLORS[(active().length + i) % COLORS.length], plan,
+              target: Math.round(planTotal(plan) / planDayCount(plan)), teacherPhoto: null, slots, lesson: slots[0] || null }), r.email];
+          });
+          try {
+            await api.createStudents(list.map(([id, data]) => [id, data])); importDraft = '';
+            list.forEach(([id, , email]) => { if (email) importEmails[id] = email; });
+            invitesModal(list.map(([id]) => id), `${list.length} ${list.length === 1 ? 'student' : 'students'} added`);
+          } catch (e) { console.error(e); m.querySelector('#imErr').textContent = 'Couldn’t add the students. Please try again.'; m.querySelector('#imGo').disabled = false; }
+        };
+      });
+    };
+    draw();
+  };
+  step1();
+}
+function planForImport(r) { const p = Array(7).fill(0); (DAY_PATTERNS[r.days] || DAY_PATTERNS[5]).forEach(d => p[d] = r.minutes); return p; }
+
+// Every student's invite link in one place: copy them all, download a list for mail merge, or email each family
+function invitesModal(ids, title) {
+  const list = (ids ? ids.map(id => students[id]).filter(Boolean) : active().filter(s => !s.linkedAt)).sort((a, b) => a.name.localeCompare(b.name));
+  if (!list.length) return toast(ids ? 'Nothing to invite' : 'Every student is already connected');
+  const message = s => `Hi! ${studio.teacherName} here. Please open this link on the device ${firstName(s.name)} practices with, to connect the Allegrow app to my studio: ${inviteLink(s.id)}`;
+  const markSent = () => { if (!studio.invitesSent) { studio.invitesSent = true; api.updateStudio({ invitesSent: true }); render(); } };
+  openModal(`${mhead(title ? `${title} – now invite their families` : 'Invite families')}
+    <p class="muted" style="margin-top:-6px">Each family opens their link on the device their child practices with. ${ids ? '' : 'These students aren’t connected yet.'}</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="accent" type="button" id="ivCopy">${icon('copy', 'sm')}Copy all</button>
+      <button class="secondary" type="button" id="ivCsv">${icon('report', 'sm')}Download list (CSV)</button></div>
+    <div class="tableWrap"><table class="impTable"><thead><tr><th>Student</th><th>Invite</th><th></th></tr></thead><tbody>
+      ${list.map(s => `<tr><td><b>${esc(s.name)}</b>${importEmails[s.id] ? `<div class="muted small">${esc(importEmails[s.id])}</div>` : ''}</td>
+        <td><button class="ghost small" data-ivcopy="${s.id}">${icon('copy', 'sm')}Copy link</button></td>
+        <td><a class="ghost small" style="display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border-radius:10px;text-decoration:none;font-weight:600;color:var(--ink-2)"
+          data-ivmail="${s.id}" href="mailto:${encodeURIComponent(importEmails[s.id] || '')}?subject=${encodeURIComponent(`Connect ${firstName(s.name)} to ${studio.studioName} on Allegrow`)}&body=${encodeURIComponent(message(s))}">${icon('share', 'sm')}Email</a></td></tr>`).join('')}
+    </tbody></table></div>
+    <p class="small muted">Tip: you can also send links one at a time later from each student’s page (Invite link).</p>
+    <footer><div class="right"><button class="primary" data-close>Done</button></div></footer>`, m => {
+    m.classList.add('wide');
+    const copy = async (t, what) => { try { await navigator.clipboard.writeText(t); toast(what + ' copied'); } catch { prompt('Copy this:', t); } markSent(); };
+    m.querySelector('#ivCopy').onclick = () => copy(list.map(s => `${s.name}: ${inviteLink(s.id)}`).join('\n'), 'All links');
+    m.querySelectorAll('[data-ivcopy]').forEach(b => b.onclick = () => copy(inviteLink(b.dataset.ivcopy), 'Link'));
+    m.querySelectorAll('[data-ivmail]').forEach(a => a.addEventListener('click', markSent));
+    m.querySelector('#ivCsv').onclick = () => {
+      const q = v => `"${String(v).replace(/"/g, '""')}"`;
+      const csv = ['Student,Parent email,Invite link,Message', ...list.map(s => [s.name, importEmails[s.id] || '', inviteLink(s.id), message(s)].map(q).join(','))].join('\r\n');
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = 'allegrow-invites.csv'; a.click(); markSent();
+    };
+  });
 }
 
 // ============================================================================================
