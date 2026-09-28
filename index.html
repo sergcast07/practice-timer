@@ -169,6 +169,9 @@
   #beatDot.on { background: var(--kid); }
   .metroBody { display: grid; gap: 12px; margin-top: 16px; }
   .metroBody .stepper { justify-content: center; }
+  .volRow { display: flex; align-items: center; gap: 12px; }
+  .volRow input { flex: 1; accent-color: var(--kid); }
+  .volRow span { min-width: 64px; text-align: right; color: var(--ink-2); font-weight: 600; }
   .metroOpts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
   /* Summary */
@@ -232,6 +235,21 @@
   .pinBox { max-width: 300px; margin: 48px auto 0; text-align: center; display: flex; flex-direction: column; gap: 12px; align-items: stretch; }
   .pinBox .medal { --kid: var(--brand); }
   .pinBox input { text-align: center; font-size: 26px; letter-spacing: 10px; padding: 12px; }
+  /* Weekly recap */
+  .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  .recap { display: grid; gap: 12px; border: 1.5px solid color-mix(in srgb, var(--accent) 22%, transparent); }
+  .recapHead { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .recapHead h2 { margin: 0; }
+  .recapHead button { margin: -6px -8px 0 0; }
+  .recapRow { display: flex; gap: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .recapRow .avatar { width: 36px; height: 36px; font-size: 15px; }
+  .recapRow b { font-size: 16px; }
+  .recapRow p { margin-top: 3px; font-size: 14.5px; }
+  .tInfo .grow { flex: 1; }
+  .calOpts { display: grid; gap: 8px; margin-top: 14px; }
+  .calOpts button, .calOpts a { justify-content: flex-start; text-decoration: none; }
+  .calOpts small { display: block; font-weight: 500; color: var(--muted); font-size: 12.5px; }
+  .calOpts .txt { text-align: left; }
   /* Teacher connection */
   .teacherLink { text-align: center; font-size: 13px; color: var(--muted); }
   .teacherLink a { color: var(--muted); }
@@ -293,6 +311,9 @@
   <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
   <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4"/></symbol>
  <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21a2 2 0 0 1 2-2h13v2"/></symbol>
   <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"/></symbol>
   <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.2a6.5 6.5 0 0 1 3 5.8"/></symbol>
@@ -310,6 +331,7 @@
       <h1>Who’s practicing?</h1>
       <p>Tap your name to start.</p>
     </div>
+    <div class="card recap" id="recap" hidden></div>
     <div class="kids" id="kidList"></div>
     <div class="card empty" id="noKids" hidden>
       <svg class="ic lg muted"><use href="#i-users"/></svg>
@@ -362,12 +384,14 @@
           <span class="muted small">bpm</span>
           <button id="bpmUp" aria-label="Faster"><svg class="ic"><use href="#i-plus"/></svg></button>
         </div>
+        <label class="field">Tempo <select id="tempoMark" aria-label="Tempo marking"></select></label>
         <div class="metroOpts">
           <label class="field">Sound <select id="metroSound"></select></label>
           <label class="field">Accent <select id="metroAccent">
             <option value="0">None</option><option value="2">Every 2 beats</option><option value="3">Every 3 beats</option>
             <option value="4">Every 4 beats</option><option value="6">Every 6 beats</option></select></label>
         </div>
+        <label class="field">Volume <span class="volRow"><input type="range" id="metroVol" min="10" max="100" step="5" aria-label="Metronome volume"><span id="metroVolVal" class="num"></span></span></label>
       </div>
     </div>
     <div class="card rowBetween">
@@ -725,6 +749,7 @@ document.querySelectorAll('[data-home]').forEach(b => b.onclick = () => show('ho
 
 // ---------- Home ----------
 function renderHome() {
+  renderRecap();
   $('noKids').hidden = kids.length > 0;
   $('historyBtn').hidden = kids.length === 0;
   $('kidList').innerHTML = kids.map(k => {
@@ -781,6 +806,10 @@ function renderPractice(playing, talking) {
   if (!$('metroSound').options.length)
     $('metroSound').innerHTML = Object.entries(METRO_SOUNDS).map(([v, m]) => `<option value="${v}">${m.label}</option>`).join('');
   $('metroSound').value = kid.metroSound || 'click';
+  if (!$('tempoMark').options.length)
+    $('tempoMark').innerHTML = '<option value="">Choose a tempo…</option>' + TEMPOS.map(([n, lo, hi]) => `<option value="${n}">${n} (${lo}–${hi})</option>`).join('');
+  $('tempoMark').value = tempoFor(kid.bpm || 80);
+  $('metroVol').value = metroVol; $('metroVolVal').textContent = metroVol >= 90 ? 'Max' : metroVol + '%';
   $('metroAccent').value = kid.accent || 0;
 }
 $('startBtn').onclick = () => listening ? (stopAudio(), renderPractice()) : startAudio('practice');
@@ -802,6 +831,12 @@ function setBpm(v) {
 $('bpmVal').onchange = () => { setBpm(+$('bpmVal').value); $('bpmVal').blur(); };
 $('bpmVal').onkeydown = e => { if (e.key === 'Enter') $('bpmVal').onchange(); };
 $('metroSound').onchange = () => { kid.metroSound = $('metroSound').value; saveKids(); previewSound(); };
+$('tempoMark').onchange = () => { const t = TEMPOS.find(x => x[0] === $('tempoMark').value); if (t) setBpm(t[3]); };
+$('metroVol').oninput = () => {
+  metroVol = +$('metroVol').value; store.set('pt-metro-vol', metroVol);
+  $('metroVolVal').textContent = metroVol >= 90 ? 'Max' : metroVol + '%';
+};
+$('metroVol').onchange = () => previewSound();
 $('metroAccent').onchange = () => { kid.accent = +$('metroAccent').value; saveKids(); };
 function changeBpm(d) {
   kid.bpm = Math.max(30, Math.min(250, (kid.bpm || 80) + d)); saveKids();
@@ -1169,12 +1204,18 @@ function pitchStep(now) {
   }
 }
 
-// Note starts (onsets), for rhythm. Uses a low-pass copy of the sound so the metronome's
-// high-pitched click (6 kHz) is mostly filtered out and isn't mistaken for a note.
+// Note starts (onsets), for rhythm. Uses a low-pass copy of the sound: a steep (8th-order Butterworth)
+// filter at 1.4 kHz, so the metronome (3.5 kHz and up, even at full volume) isn't mistaken for a note.
 const HOP = 256, ONSET_DB = 9;
-let lp, lpA, hopE, hopN, hopDb, lpHist, lastOnset, sampleCount, t0, musicNowFlag = false;
+let lp, hopE, hopN, hopDb, lpHist, lastOnset, sampleCount, t0, musicNowFlag = false;
+function lowpassStages(sr, fc) {
+  return [0.5098, 0.6013, 0.9000, 2.5629].map(Q => {
+    const w = 2 * Math.PI * fc / sr, cs = Math.cos(w), al = Math.sin(w) / (2 * Q), a0 = 1 + al;
+    return { b0: (1 - cs) / 2 / a0, b1: (1 - cs) / a0, b2: (1 - cs) / 2 / a0, a1: -2 * cs / a0, a2: (1 - al) / a0, z1: 0, z2: 0 };
+  });
+}
 function resetAnalysis(sr) {
-  lp = [0, 0, 0, 0]; lpA = Math.exp(-2 * Math.PI * 1500 / sr);
+  lp = lowpassStages(sr, 1400);
   hopE = hopN = sampleCount = 0; hopDb = []; lpHist = []; lastOnset = -1e9; t0 = null;
   curNote = null; lastPitchAt = 0; nextPitchAt = 0;
 }
@@ -1182,7 +1223,7 @@ function analyseSamples(data) {
   if (t0 === null) t0 = audioCtx.currentTime - data.length / audioCtx.sampleRate;
   for (let i = 0; i < data.length; i++) {
     let y = data[i];
-    for (let k = 0; k < 4; k++) y = lp[k] = lp[k] + (1 - lpA) * (y - lp[k]);
+    for (const f of lp) { const x = y; y = f.b0 * x + f.z1; f.z1 = f.b1 * x - f.a1 * y + f.z2; f.z2 = f.b2 * x - f.a2 * y; }
     hopE += y * y;
     if (++hopN === HOP) { onHop(sampleCount + i, hopE / HOP); hopE = hopN = 0; }
   }
@@ -1218,30 +1259,51 @@ const lowLevel = () => {
 const metro = { timer: null, next: 0, anchor: 0, period: 0, onsets: [], count: 0 };
 // Metronome sounds. All are kept high-pitched (4 kHz and up) on purpose: the app filters out
 // sound above ~1.5 kHz when listening for notes, so the metronome never counts as practice.
+// 3.5–5 kHz is where phone speakers are loudest and ears most sensitive, while staying well above
+// the ~1.5 kHz cut-off the note detector listens below. Square waves sound fuller than pure tones.
 const METRO_SOUNDS = {
-  click: { label: 'Click', tones: [6000], accent: [7500], decay: 0.03 },
-  beep:  { label: 'Beep', tones: [4200], accent: [5200], decay: 0.09, hold: true },
-  tick:  { label: 'Tick', noise: true, decay: 0.025 },
-  bell:  { label: 'Bell', tones: [5000, 7300, 9100], accent: [6000, 8700, 11000], decay: 0.25 }
+  click: { label: 'Click', wave: 'square', tones: [3800], accent: [4800], decay: 0.05, hold: true },
+  beep:  { label: 'Beep', wave: 'square', tones: [3500], accent: [4400], decay: 0.09, hold: true },
+  tick:  { label: 'Tick', noise: true, cut: 3500, decay: 0.03 },
+  bell:  { label: 'Bell', tones: [3600, 5200, 7100], accent: [4300, 6200, 8400], decay: 0.25 }
 };
+// Italian tempo markings (common metronome ranges); choosing one sets a typical bpm for it
+const TEMPOS = [['Grave', 30, 44, 40], ['Largo', 45, 59, 50], ['Larghetto', 60, 65, 63], ['Adagio', 66, 75, 70], ['Andante', 76, 97, 88],
+                ['Moderato', 98, 111, 104], ['Allegretto', 112, 119, 116], ['Allegro', 120, 155, 132], ['Vivace', 156, 175, 164],
+                ['Presto', 176, 199, 184], ['Prestissimo', 200, 250, 208]];
+const tempoFor = bpm => TEMPOS.find(([, lo, hi]) => bpm >= lo && bpm <= hi)?.[0] || '';
+let metroVol = store.get('pt-metro-vol', 85);
+// Every click goes through a loudness stage: volume, then a fast limiter so the top of the slider
+// is loud without harsh clipping (phones turn down playback while the microphone is on).
+function metroOut(ctx) {
+  if (!ctx.__metroOut) {
+    const gain = ctx.createGain(), limiter = ctx.createDynamicsCompressor();
+    limiter.threshold.value = -4; limiter.knee.value = 0; limiter.ratio.value = 20; limiter.attack.value = 0.001; limiter.release.value = 0.05;
+    const trim = ctx.createGain(); trim.gain.value = 0.95;           // keeps limiter overshoot below clipping
+    gain.connect(limiter); limiter.connect(trim); trim.connect(ctx.destination);
+    ctx.__metroOut = gain;
+  }
+  ctx.__metroOut.gain.value = 4 * (metroVol / 100) ** 3;             // 50% ≈ quiet room, 100% ≈ as loud as the phone can go
+  return ctx.__metroOut;
+}
 function playMetroSound(ctx, t, name, accent) {
-  const m = METRO_SOUNDS[name] || METRO_SOUNDS.click, g = ctx.createGain(), peak = accent ? 0.9 : 0.5;
-  g.connect(ctx.destination);
+  const m = METRO_SOUNDS[name] || METRO_SOUNDS.click, g = ctx.createGain(), peak = accent ? 0.9 : 0.6;
+  g.connect(metroOut(ctx));
   g.gain.setValueAtTime(0.0001, t);
   g.gain.exponentialRampToValueAtTime(peak, t + 0.004);      // soft-ish attack: a sharper one leaks into low pitches
-  if (m.hold) g.gain.setValueAtTime(peak, t + m.decay * 0.6);
+  if (m.hold) g.gain.setValueAtTime(peak, t + m.decay * 0.5);
   g.gain.exponentialRampToValueAtTime(0.0001, t + m.decay);
   if (m.noise) {           // filtered noise burst, high-passed twice at 5 kHz
     const b = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * m.decay), ctx.sampleRate), d = b.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     const src = ctx.createBufferSource(); src.buffer = b;
     let node = src;
-    for (let k = 0; k < 2; k++) { const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = accent ? 7000 : 5000; node.connect(f); node = f; }
+    for (let k = 0; k < 2; k++) { const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = accent ? m.cut * 1.3 : m.cut; node.connect(f); node = f; }
     node.connect(g); src.start(t); src.stop(t + m.decay + 0.01);
   } else {
     const tones = accent ? m.accent : m.tones, norm = tones.reduce((a, _, i) => a + 1 / (i + 1), 0);
     tones.forEach((f, i) => {
-      const o = ctx.createOscillator(), og = ctx.createGain(); o.frequency.value = f; og.gain.value = 1 / (i + 1) / norm;
+      const o = ctx.createOscillator(), og = ctx.createGain(); o.type = m.wave || 'sine'; o.frequency.value = f; og.gain.value = 1 / (i + 1) / norm;
       o.connect(og); og.connect(g); o.start(t); o.stop(t + m.decay + 0.01);
     });
   }
@@ -1417,13 +1479,134 @@ function renderTeacherCard() {
           ${a.minutes ? `<span class="chipBtn">${icon('clock')}${a.minutes} min a day</span>` : ''}
           ${a.due ? `<span class="chipBtn">Due ${parseDay(a.due).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}</span>` : ''}</div></div></div>`; }).join('')
       : '<p class="muted small" style="padding:4px 0 2px">No assignments right now.</p>'}
-    ${nl ? `<div class="tInfo">${icon('calendar')}Next lesson ${lessonLabel(nl)}</div>` : ''}
+    ${nl ? `<div class="tInfo">${icon('calendar')}<span class="grow">Next lesson ${lessonLabel(nl)}</span><button class="ghost small" data-cal style="padding:4px 6px">Add to calendar</button></div>` : ''}
     ${evs.map(e => `<div class="tInfo">${icon('trophy')}<span>${esc(e.title)}${e.piece ? ' · ' + esc(e.piece) : ''} · <b>${countdown(e.date)}</b></span></div>`).join('')}`;
   card.querySelectorAll('[data-tick]').forEach(b => b.onclick = () => {
     const on = !b.classList.contains('on'); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on);
     F.updateDoc(F.doc(db, 'students', kid.link), { [`progress.${b.dataset.tick}.${today0}`]: on ? true : F.deleteField() }).catch(e => console.error(e));
   });
   card.querySelectorAll('[data-bpm]').forEach(b => b.onclick = () => { setBpm(+b.dataset.bpm); if (!metroOn) $('metroBtn').click(); });
+  card.querySelector('[data-cal]')?.addEventListener('click', () => calendarDialog(kid));
+}
+
+// ---------- Calendar ----------
+// Set once the calendar/email service (Cloudflare Worker) is deployed; enables live-updating calendar subscriptions.
+const WORKER_URL = '';
+const icsEsc = s => String(s ?? '').replace(/\\/g, '\\\\').replace(/\r?\n/g, '\\n').replace(/([,;])/g, '\\$1');
+const icsTime = d => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
+const icsFold = line => { const out = []; while (line.length > 74) { out.push(line.slice(0, 74)); line = ' ' + line.slice(74); } out.push(line); return out.join('\r\n'); };
+function buildIcs(calName, evs) {
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Practice Timer//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:' + icsEsc(calName)];
+  for (const e of evs) {
+    L.push('BEGIN:VEVENT', 'UID:' + e.uid, 'DTSTAMP:' + stamp, 'DTSTART:' + icsTime(e.start),
+           'DTEND:' + icsTime(new Date(e.start.getTime() + e.minutes * 60000)), 'SUMMARY:' + icsEsc(e.title));
+    if (e.rrule) L.push('RRULE:' + e.rrule);
+    for (const x of e.exdates || []) L.push('EXDATE:' + icsTime(x));
+    if (e.location) L.push('LOCATION:' + icsEsc(e.location));
+    if (e.desc) L.push('DESCRIPTION:' + icsEsc(e.desc));
+    L.push('END:VEVENT');
+  }
+  L.push('END:VCALENDAR');
+  return L.map(icsFold).join('\r\n') + '\r\n';
+}
+function downloadFile(name, text, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+const at = (key, time) => { const [h, m] = (time || '12:00').split(':').map(Number), d = parseDay(key); return new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m); };
+
+// This player's lessons and recitals, as calendar events (a weekly repeating lesson, minus cancelled/moved dates)
+function lessonCalendar(k, t) {
+  const evs = [], L = t.lesson || {}, ch = t.lessonChanges || {}, len = L.length || 30;
+  const title = `${(INSTRUMENTS[k.instrument] || 'Music').replace(/ \(.*/, '')} lesson – ${k.name}`, desc = `With ${t.teacherName}, ${t.studioName}`;
+  if (L.day !== '' && L.day != null && L.time) {
+    const from = L.start && L.start > dayKey() ? parseDay(L.start) : parseDay(dayKey());
+    while (from.getDay() !== +L.day) from.setDate(from.getDate() + 1);
+    const start = at(dayKey(from), L.time);
+    const exdates = Object.keys(ch).filter(key => parseDay(key).getDay() === +L.day && at(key, L.time) >= start).map(key => at(key, L.time));
+    evs.push({ uid: `lesson-${k.link}@practice-timer`, start, minutes: len, title, desc, rrule: 'FREQ=WEEKLY', exdates });
+  }
+  for (const [key, c] of Object.entries(ch)) if (c.status === 'extra' && key >= dayKey())
+    evs.push({ uid: `extra-${k.link}-${key}@practice-timer`, start: at(key, c.time), minutes: len, title, desc });
+  for (const [id, e] of Object.entries(t.upcoming || {})) if (e.date >= dayKey())
+    evs.push({ uid: `event-${id}-${k.link}@practice-timer`, start: at(e.date, e.time), minutes: 90, title: `${e.title} – ${k.name}`,
+               location: e.location, desc: [e.piece && 'Piece: ' + e.piece, desc].filter(Boolean).join('\n') });
+  return evs;
+}
+function googleCalUrl(ev) {
+  const p = new URLSearchParams({ action: 'TEMPLATE', text: ev.title, dates: `${icsTime(ev.start)}/${icsTime(new Date(ev.start.getTime() + ev.minutes * 60000))}`,
+                                  details: ev.desc || '', ctz: Intl.DateTimeFormat().resolvedOptions().timeZone });
+  if (ev.rrule) p.set('recur', 'RRULE:' + ev.rrule);
+  return 'https://calendar.google.com/calendar/render?' + p;
+}
+function calendarDialog(k) {
+  const t = teacherData[k.link]; if (!t || t.missing) return;
+  const evs = lessonCalendar(k, t), weekly = evs.find(e => e.rrule), live = WORKER_URL && `${WORKER_URL.replace(/^https?:/, 'webcal:')}/cal/s/${k.link}.ics`;
+  const card = $('linkCard');
+  card.innerHTML = `<div class="medal" style="--kid:${kidColor(k)}">${icon('calendar')}</div>
+    <h2 style="text-align:center">Add ${esc(k.name)}’s lessons to your calendar</h2>
+    <div class="calOpts">
+      ${live ? `<a class="primary" href="${live}" style="--kid:var(--brand);color:var(--bg);font-size:16px;padding:14px">${icon('refresh')}<span class="txt">Subscribe<small style="color:inherit;opacity:.8">Updates automatically when lessons move or are cancelled</small></span></a>
+        <button class="secondary block" data-copy>${icon('link', 'sm')}<span class="txt">Copy subscription link<small>For Google Calendar: Other calendars → From URL</small></span></button>` : ''}
+      <button class="secondary block" data-ics>${icon('download', 'sm')}<span class="txt">Apple or Outlook calendar<small>Lessons${Object.keys(t.upcoming || {}).length ? ' and recitals' : ''} as they stand today</small></span></button>
+      ${weekly ? `<a class="secondary block" style="display:inline-flex;gap:8px;align-items:center;padding:11px 16px;border-radius:14px;font-weight:600;color:var(--ink)" href="${googleCalUrl(weekly)}" target="_blank" rel="noopener">${icon('calendar', 'sm')}<span class="txt">Google Calendar<small>Adds the weekly lesson</small></span></a>` : ''}
+      <button class="ghost block" data-close>Close</button>
+    </div>
+    ${live ? '' : '<p class="muted small" style="margin-top:10px;text-align:center">These add a copy. If a lesson is moved or cancelled later, the app will have the latest time.</p>'}`;
+  $('linkDlg').hidden = false;
+  card.querySelector('[data-close]').onclick = () => { $('linkDlg').hidden = true; };
+  card.querySelector('[data-ics]').onclick = () => downloadFile(`${k.name} lessons.ics`, buildIcs(`${k.name} – music lessons`, evs), 'text/calendar');
+  card.querySelector('[data-copy]')?.addEventListener('click', async e => {
+    try { await navigator.clipboard.writeText(live.replace(/^webcal:/, 'https:')); e.currentTarget.querySelector('.txt').firstChild.textContent = 'Link copied'; } catch { prompt('Copy this link:', live.replace(/^webcal:/, 'https:')); }
+  });
+}
+
+// ---------- Weekly recap (shown once a week on the home screen) ----------
+// One specific win and one small next step per child. Never lists what was missed.
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+function recapWeek() {                               // the 7 days ending on the most recent Sunday (today, if it's Sunday)
+  const t = new Date(), end = new Date(t.getFullYear(), t.getMonth(), t.getDate() - t.getDay());
+  const days = n => Array.from({ length: 7 }, (_, i) => new Date(end.getFullYear(), end.getMonth(), end.getDate() - 7 * n - 6 + i));
+  return { key: dayKey(end), days: days(0), prev: days(1), before: [1, 2, 3, 4].flatMap(days) };
+}
+function kidRecap(k, w) {
+  const sum = ds => ds.reduce((a, d) => a + msOn(k, d), 0), cur = sum(w.days), prev = sum(w.prev);
+  const practiced = w.days.filter(d => msOn(k, d) >= 60000).length, goalDays = w.days.filter(d => msOn(k, d) >= k.goal * 60000).length;
+  const sc = statsOver(k, w.days), sp = statsOver(k, w.prev);
+  const longest = Math.max(0, ...w.days.map(d => statsOn(k, d).longest || 0)), best = Math.max(0, ...w.before.map(d => statsOn(k, d).longest || 0));
+  const wins = [];
+  if (practiced >= 5) wins.push([90, `Practised ${practiced} of 7 days – brilliant consistency.`]);
+  if (tracksPitch(k) && sc.tune != null && sp.tune != null && sc.tune - sp.tune >= 0.05) wins.push([80, `Tuning improved from ${pct(sp.tune)} to ${pct(sc.tune)}.`]);
+  if (sc.rhythm != null && sp.rhythm != null && sc.rhythm - sp.rhythm >= 0.05) wins.push([75, `Steadier rhythm: ${pct(sp.rhythm)} → ${pct(sc.rhythm)}.`]);
+  if (longest >= 5 * 60000 && longest > best) wins.push([70, `Longest focused stretch yet: ${mins(longest)}.`]);
+  if (goalDays >= 3) wins.push([60, `Reached the daily goal ${goalDays} times.`]);
+  if (prev > 0 && cur > prev + 10 * 60000) wins.push([55, `${mins(cur - prev)} more practice than the week before.`]);
+  if (cur > 0) wins.push([10, `${mins(cur)} of practice this week – every minute counts.`]);
+  else wins.push([0, 'A new week is a fresh start.']);
+  const t = k.link && teacherData[k.link] && !teacherData[k.link].missing ? teacherData[k.link] : null;
+  const asg = t && Object.values(t.assignments || {}).filter(a => a.status === 'active').sort((a, b) => (a.due || '9').localeCompare(b.due || '9'))[0];
+  const focus = asg ? `This week: ${asg.title}${asg.bpm ? ` at ${asg.bpm} bpm` : ''}.`
+    : practiced < 5 ? `This week: aim for ${plural(Math.min(7, practiced + 1), 'practice day')}${practiced ? '' : ' – even 10 minutes counts'}.`
+    : tracksPitch(k) && sc.tune != null && sc.tune < 0.8 ? 'This week: a few slow minutes with the tuner each day.'
+    : sc.rhythm == null ? 'This week: try one piece with the metronome.' : 'Keep the streak going!';
+  const nl = t && nextLesson(t);
+  return { win: wins.sort((a, b) => b[0] - a[0])[0][1], focus, next: nl ? `Next lesson ${lessonLabel(nl)}.` : '', minutes: cur };
+}
+function renderRecap() {
+  const el = $('recap'), w = recapWeek();
+  const anything = kids.some(k => [...w.days, ...w.prev].some(d => msOn(k, d) > 0));
+  if (!kids.length || !anything || store.get('pt-recap-seen') === w.key) { el.hidden = true; return; }
+  const range = `${w.days[0].toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} – ${w.days[6].toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`;
+  el.hidden = false;
+  el.innerHTML = `<div class="recapHead"><div><div class="eyebrow">Your week in music</div><h2>${range}</h2></div>
+      <button class="ghost icon" data-recap-close aria-label="Dismiss">${icon('x')}</button></div>
+    ${kids.map(k => { const r = kidRecap(k, w); return `<div class="recapRow" style="--kid:${kidColor(k)}"><div class="avatar">${initial(k)}</div>
+      <div><b>${esc(k.name)}</b> <span class="muted small">· ${mins(r.minutes)}</span><p>${esc(r.win)}</p><p class="muted">${esc(r.focus)} ${esc(r.next)}</p></div></div>`; }).join('')}
+    <button class="secondary block" data-recap-close>Got it</button>`;
+  el.querySelectorAll('[data-recap-close]').forEach(b => b.onclick = () => { store.set('pt-recap-seen', w.key); el.hidden = true; });
 }
 
 // ---------- Microphone ----------
