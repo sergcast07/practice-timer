@@ -1914,7 +1914,7 @@ function calendarDialog(k) {
     <div class="calOpts">
       ${live ? `<a class="primary" href="${live}" style="--kid:var(--brand);color:var(--bg);font-size:16px;padding:14px">${icon('refresh')}<span class="txt">Subscribe<small style="color:inherit;opacity:.8">Updates automatically when lessons move or are canceled</small></span></a>
         <button class="secondary block" data-copy>${icon('link', 'sm')}<span class="txt">Copy subscription link<small>For Google Calendar: Other calendars → From URL</small></span></button>` : ''}
-      <button class="secondary block" data-ics>${icon('download', 'sm')}<span class="txt">Apple or Outlook calendar<small>Lessons${Object.keys(t.upcoming || {}).length ? ' and recitals' : ''} as they stand today</small></span></button>
+      <button class="secondary block" data-ics>${icon('download', 'sm')}<span class="txt">Apple or Outlook calendar<small>Lessons${Object.keys(t.upcoming || {}).length ? ' and performances' : ''} as they stand today</small></span></button>
       ${weekly ? `<a class="secondary block" style="display:inline-flex;gap:8px;align-items:center;padding:11px 16px;border-radius:14px;font-weight:600;color:var(--ink)" href="${googleCalUrl(weekly)}" target="_blank" rel="noopener">${icon('calendar', 'sm')}<span class="txt">Google Calendar<small>Adds the weekly lesson</small></span></a>` : ''}
       <button class="ghost block" data-close>Close</button>
     </div>

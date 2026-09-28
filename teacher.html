@@ -36,6 +36,7 @@
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
+  html { overflow-x: clip; }                         /* phones: never let a wide moment during loading widen the whole page */
   body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 15.5px;
          line-height: 1.45; -webkit-font-smoothing: antialiased; }
   h1, h2, h3, .serif { font-family: var(--serif); font-weight: 600; letter-spacing: -0.01em; margin: 0; }
@@ -114,19 +115,19 @@
   #view { padding: 32px 36px 72px; max-width: 1120px; width: 100%; min-width: 0; }
   .demoBar { background: color-mix(in srgb, var(--gold) 16%, var(--card)); color: var(--ink); border-radius: 12px; padding: 10px 14px;
              font-size: 13.5px; display: flex; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 18px; flex-wrap: wrap; }
+  .mobileOnly { display: none !important; }       /* before the phone rules below, which turn these on */
   @media (max-width: 860px) {
     #shell { grid-template-columns: 1fr; }
     aside { position: fixed; top: auto; bottom: 0; left: 0; right: 0; height: auto; z-index: 5; flex-direction: row; padding: 6px 6px max(6px, env(safe-area-inset-bottom));
             border-right: 0; border-top: 1px solid var(--line); }
     .brand, .account { display: none; }
     nav { flex-direction: row; flex: 1; justify-content: space-around; }
-    nav button { flex-direction: column; gap: 3px; font-size: 11px; padding: 6px 4px; flex: 1; }
+    nav button { flex-direction: column; gap: 3px; font-size: 11px; padding: 6px 4px; flex: 1; min-width: 0; white-space: nowrap; }
     nav button .ic { width: 22px; height: 22px; }
     #view { padding: max(20px, env(safe-area-inset-top)) 16px 100px; }
     .mobileOnly { display: inline-flex !important; }
     .mobileHide { display: none; }
   }
-  .mobileOnly { display: none !important; }
 
   /* Page parts */
   .pageHead { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 22px; flex-wrap: wrap; }
@@ -158,6 +159,7 @@
              background: none; width: 100%; text-align: left; font-weight: 500; color: var(--ink); font-size: 15px; }
   .list > .rowLink:first-child { border-top: 0; }
   .rowLink:hover { background: var(--soft); }
+  .list > * { min-width: 0; }                       /* let rows shrink to the screen instead of widening the page */
   .rowLink .grow { flex: 1; min-width: 0; }
   .rowLink .t { font-weight: 700; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .rowLink .d { font-size: 13.5px; color: var(--muted); }
@@ -409,7 +411,7 @@
       <div><svg class="ic"><use href="#i-users"/></svg>See every student’s practice time, focus, tuning and rhythm</div>
       <div><svg class="ic"><use href="#i-calendar"/></svg>Plan your weekly lessons and keep lesson notes</div>
       <div><svg class="ic"><use href="#i-book"/></svg>Set practice assignments that appear in the student’s app</div>
-      <div><svg class="ic"><use href="#i-award"/></svg>Track recitals and exams, and print progress reports</div>
+      <div><svg class="ic"><use href="#i-award"/></svg>Track performances and exams, and print progress reports</div>
     </div>
     <button class="googleBtn" id="googleBtn">
       <svg viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.2-.1-2.4-.4-3.5z"/></svg>
@@ -441,7 +443,7 @@
       <button data-go="overview"><svg class="ic"><use href="#i-home"/></svg>Overview</button>
       <button data-go="students"><svg class="ic"><use href="#i-users"/></svg>Students</button>
       <button data-go="schedule"><svg class="ic"><use href="#i-calendar"/></svg>Schedule</button>
-      <button data-go="events"><svg class="ic"><use href="#i-award"/></svg><span>Recitals<span class="mobileHide"> &amp; exams</span></span></button>
+      <button data-go="events"><svg class="ic"><use href="#i-award"/></svg><span class="mobileHide">Performances &amp; exams</span><span class="mobileOnly">Events</span></button>
       <button data-go="reports"><svg class="ic"><use href="#i-report"/></svg>Reports</button>
       <button data-go="admin" id="adminNav" hidden><svg class="ic"><use href="#i-settings"/></svg>Beta admin</button>
     </nav>
@@ -516,7 +518,11 @@ const randomCode = () => {
 };
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const COLORS = ['#cf5c3c', '#1f8a7e', '#6a55c8', '#2f6bcc', '#b3821c', '#c2457a', '#4b7f3a', '#8a5a44'];
-const EVENT_TYPES = { recital: 'Recital', exam: 'Exam', competition: 'Competition', masterclass: 'Masterclass', other: 'Other' };
+// Performances first, then assessed events. "Other" lets the teacher type their own kind (saved as typeLabel).
+const EVENT_TYPES = { recital: 'Recital', concert: 'Concert', performance: 'Performance', festival: 'Festival', worship: 'Worship service',
+  community: 'Community event', competition: 'Competition', audition: 'Audition', exam: 'Exam', jury: 'Jury', masterclass: 'Masterclass', other: 'Other' };
+const ASSESSED = ['exam', 'audition', 'jury', 'competition'];      // shown with a blue chip, performances with gold
+const eventChip = e => `<span class="chip ${ASSESSED.includes(e.type) ? 'info' : 'gold'}">${esc(e.type === 'other' && e.typeLabel ? e.typeLabel : EVENT_TYPES[e.type] || 'Event')}</span>`;
 const STATUS = { scheduled: ['Scheduled', ''], done: ['Done', 'good'], cancelled: ['Canceled', 'bad'], noshow: ['No-show', 'warn'], moved: ['Moved', ''] };
 const RATINGS = [['preparation', 'Preparation'], ['technique', 'Technique'], ['musicality', 'Musicality']];
 function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2200); }
@@ -873,7 +879,7 @@ function vOverview() {
     </div>
     <section class="card"><h2>Practice, last 7 days</h2>${practiceTable(all)}</section>
     <section class="card"><h2>Coming up <button class="ghost small" data-go2="events">All events ${icon('chev', 'sm')}</button></h2>
-      <div class="list">${upcoming.length ? upcoming.slice(0, 6).map(eventRow).join('') : '<div class="empty">No recitals or exams in the next two months.</div>'}</div></section>
+      <div class="list">${upcoming.length ? upcoming.slice(0, 6).map(eventRow).join('') : '<div class="empty">No performances or exams in the next two months.</div>'}</div></section>
   </div>`;
 }
 
@@ -932,7 +938,7 @@ function eventRow(e) {
   const n = Object.keys(e.participants || {}).length, days = Math.round((parseDay(e.date) - today()) / 864e5);
   return `<button class="rowLink" data-event="${e.id}">
     <div class="time">${fmtDate(e.date, { day: 'numeric', month: 'short' })}</div>
-    <div class="grow"><div class="t">${esc(e.title)} <span class="chip ${e.type === 'exam' ? 'info' : 'gold'}">${EVENT_TYPES[e.type] || 'Event'}</span></div>
+    <div class="grow"><div class="t">${esc(e.title)} ${eventChip(e)}</div>
       <div class="d">${n} ${n === 1 ? 'student' : 'students'}${e.location ? ' · ' + esc(e.location) : ''}${days >= 0 ? ` · ${days === 0 ? 'today' : days === 1 ? 'tomorrow' : 'in ' + days + ' days'}` : ''}</div></div>
     ${icon('chev', 'muted')}</button>`;
 }
@@ -974,7 +980,7 @@ function vStudent() {
   const s = students[route.id];
   if (!s) return `<div class="emptyBig">${icon('users', 'lg')}<p>This student isn’t in your studio.</p><button class="secondary" data-go2="students">Back to students</button></div>`;
   const tab = sub.tab || 'progress';
-  const tabs = [['progress', 'Progress'], ['assignments', 'Assignments'], ['rewards', 'Badges & stars'], ['lessons', 'Lessons'], ['events', 'Recitals & exams'], ['notes', 'Notes']];
+  const tabs = [['progress', 'Progress'], ['assignments', 'Assignments'], ['rewards', 'Badges & stars'], ['lessons', 'Lessons'], ['events', 'Performances'], ['notes', 'Notes']];
   return `<div style="--kid:${s.color}">
     <button class="ghost" data-go2="students" style="margin-left:-10px;margin-bottom:10px">${icon('back', 'sm')}Students</button>
     <div class="studentHead">
@@ -1076,13 +1082,13 @@ function ratingSummary(rated) {
 
 function tEvents(s) {
   const list = Object.values(events).filter(e => e.participants?.[s.id]).sort((a, b) => b.date.localeCompare(a.date));
-  return `<div class="card"><h2>Recitals & exams <button class="accent" data-act="addEvent">${icon('plus', 'sm')}Add</button></h2>
+  return `<div class="card"><h2>Performances & exams <button class="accent" data-act="addEvent">${icon('plus', 'sm')}Add</button></h2>
     <div class="list">${list.length ? list.map(e => {
       const p = e.participants[s.id];
       return `<button class="rowLink" data-event="${e.id}"><div class="time" style="min-width:100px">${fmtDate(e.date)}</div>
-        <div class="grow"><div class="t">${esc(e.title)} <span class="chip ${e.type === 'exam' ? 'info' : 'gold'}">${EVENT_TYPES[e.type]}</span>${p.result ? `<span class="chip good">${esc(p.result)}</span>` : ''}</div>
+        <div class="grow"><div class="t">${esc(e.title)} ${eventChip(e)}${p.result ? `<span class="chip good">${esc(p.result)}</span>` : ''}</div>
         <div class="d">${p.piece ? esc(p.piece) : 'Piece not set'}</div></div>${icon('chev', 'muted')}</button>`;
-    }).join('') : '<div class="empty">No recitals or exams yet.</div>'}</div></div>`;
+    }).join('') : '<div class="empty">No performances or exams yet.</div>'}</div></div>`;
 }
 
 function tNotes(s) {
@@ -1120,10 +1126,10 @@ function vEvents() {
   const all = Object.values(events), t = dayKey();
   const up = all.filter(e => e.date >= t).sort((a, b) => a.date.localeCompare(b.date)), past = all.filter(e => e.date < t).sort((a, b) => b.date.localeCompare(a.date));
   return `
-  <div class="pageHead"><div><div class="eyebrow">${up.length} upcoming</div><h1>Recitals & exams</h1></div>
+  <div class="pageHead"><div><div class="eyebrow">${up.length} upcoming</div><h1>Performances & exams</h1></div>
     <div class="actions"><button class="accent" data-act="addEvent">${icon('plus', 'sm')}Add event</button></div></div>
   <div class="stack">
-    <div class="card"><h2>Upcoming</h2><div class="list">${up.length ? up.map(eventRow).join('') : '<div class="empty">Nothing planned. Add a recital, exam or competition – students see it in their app with a countdown.</div>'}</div></div>
+    <div class="card"><h2>Upcoming</h2><div class="list">${up.length ? up.map(eventRow).join('') : '<div class="empty">Nothing planned. Add a recital, concert, festival, exam or any other performance – students see it in their app with a countdown.</div>'}</div></div>
     ${past.length ? `<div class="card"><h2>Past</h2><div class="list">${past.map(eventRow).join('')}</div></div>` : ''}
   </div>`;
 }
@@ -1172,7 +1178,7 @@ function vReports() {
       ${asgDone.length || asg.some(a => a.status === 'active') ? `<div class="list">${[...asgDone, ...asg.filter(a => a.status === 'active')].map(a => `<div class="assign"><div class="grow"><div class="t">${esc(a.title)}</div>
         <div class="meta">${a.status === 'done' ? '<span class="chip good">Completed</span>' : '<span class="chip">In progress</span>'}<span class="chip">${Object.keys(s.progress?.[a.id] || {}).length} days practiced</span></div></div></div>`).join('')}</div>` : '<p class="muted">No assignments in this period.</p>'}
     </section>
-    ${ev.length ? `<section><h3>Recitals & exams</h3><div class="list">${ev.map(e => `<div class="assign"><div class="grow"><div class="t">${esc(e.title)} · ${fmtDate(e.date)}</div>
+    ${ev.length ? `<section><h3>Performances & exams</h3><div class="list">${ev.map(e => `<div class="assign"><div class="grow"><div class="t">${esc(e.title)} · ${fmtDate(e.date)}</div>
       <div class="det">${esc(e.participants[sid].piece || '')}${e.participants[sid].result ? ' — <b>' + esc(e.participants[sid].result) + '</b>' : ''}</div></div></div>`).join('')}</div></section>` : ''}
     <section><h3>Teacher’s comments</h3><div class="comment" contenteditable="true" data-placeholder="Type comments for the family here before printing (not saved)."></div></section>
   </div>`;
@@ -1465,12 +1471,13 @@ function extraLessonModal(sid) {
 function eventModal(eid, preselect) {
   const e = eid ? events[eid] : { type: 'recital', title: '', date: dayKey(addDays(today(), 30)), time: '', location: '', participants: preselect ? { [preselect]: { piece: '', result: '' } } : {} };
   const list = active().concat(Object.keys(e.participants).filter(id => students[id]?.archived).map(id => students[id]));
-  openModal(`${mhead(eid ? 'Edit event' : 'Add recital or exam')}
+  openModal(`${mhead(eid ? 'Edit event' : 'Add a performance or exam')}
     <div class="fields">
       <div class="fields two">
-        <label class="field">Type <select id="eType">${Object.entries(EVENT_TYPES).map(([k, v]) => `<option value="${k}" ${e.type === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+        <label class="field">Type <select id="eType">${Object.entries(EVENT_TYPES).map(([k, v]) => `<option value="${k}" ${e.type === k ? 'selected' : ''}>${k === 'other' ? 'Other – type it in…' : v}</option>`).join('')}</select></label>
         <label class="field">Title <input type="text" id="eTitle" value="${esc(e.title)}" maxlength="80" placeholder="e.g. Winter Recital"></label>
       </div>
+      <label class="field" id="eTypeOtherWrap" ${e.type === 'other' ? '' : 'hidden'}>What kind of event? <input type="text" id="eTypeOther" value="${esc(e.typeLabel || '')}" maxlength="30" placeholder="e.g. Wedding, Nursing home visit, Talent show"></label>
       <div class="fields three">
         <label class="field">Date <input type="date" id="eDate" value="${e.date}"></label>
         <label class="field">Time <input type="time" id="eTime" value="${e.time || ''}"></label>
@@ -1487,19 +1494,20 @@ function eventModal(eid, preselect) {
       c.onchange = () => { m.querySelector(`[data-more="${c.dataset.part}"]`).hidden = !c.checked; };
       c.nextElementSibling.onclick = () => { c.checked = !c.checked; c.onchange(); };
     });
+    m.querySelector('#eType').onchange = () => { const o = val('eType') === 'other'; m.querySelector('#eTypeOtherWrap').hidden = !o; if (o) m.querySelector('#eTypeOther').focus(); };
     m.querySelector('#eSave').onclick = async () => {
       const title = val('eTitle'), date = val('eDate');
       if (!title || !date) return (m.querySelector('#eErr').textContent = 'Please add a title and date.');
       const participants = {};
       m.querySelectorAll('[data-part]').forEach(c => { if (c.checked) participants[c.dataset.part] = { piece: m.querySelector(`[data-piece="${c.dataset.part}"]`).value.trim(), result: m.querySelector(`[data-result="${c.dataset.part}"]`).value.trim() }; });
-      const id = eid || newId(), data = { type: val('eType'), title, date, time: val('eTime'), location: val('eLoc'), participants };
+      const id = eid || newId(), data = { type: val('eType'), typeLabel: val('eType') === 'other' ? val('eTypeOther') : '', title, date, time: val('eTime'), location: val('eLoc'), participants };
       await api.saveEvent(id, data);
       // Families see upcoming events for their child (without other students' names)
       const before = Object.keys(e.participants || {});
       for (const sid of new Set([...before, ...Object.keys(participants)])) {
         if (!students[sid]) continue;
         const p = participants[sid];
-        await api.patchStudent(sid, { [`upcoming.${id}`]: p ? { type: data.type, title, date, time: data.time, location: data.location, piece: p.piece, result: p.result } : DEL });
+        await api.patchStudent(sid, { [`upcoming.${id}`]: p ? { type: data.type, typeLabel: data.typeLabel, title, date, time: data.time, location: data.location, piece: p.piece, result: p.result } : DEL });
       }
       closeModal(); toast('Saved');
     };
@@ -2028,7 +2036,7 @@ async function calendarEmailModal() {
   openModal(`${mhead('Calendar &amp; email')}
     <section class="fields">
       <h3>Calendar</h3>
-      ${!live ? `<p class="small muted">Download your lessons and recitals and import them into Google, Apple or Outlook Calendar. It’s a copy: changes you make here later won’t update it.</p>`
+      ${!live ? `<p class="small muted">Download your lessons and performances and import them into Google, Apple or Outlook Calendar. It’s a copy: changes you make here later won’t update it.</p>`
         : feed ? `<p class="small muted">Subscribe once and your calendar keeps itself up to date – including moved and canceled lessons.</p>
           <div class="codeBox" style="font-size:13px">${esc(url)}</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -2164,6 +2172,10 @@ function seedDemo() {
   A(ids[4], 'Clementi Sonatina Op. 36 No. 1', 'Learn the left hand of the first page.', null, 20, 10, 5);
   events.e1 = { id: 'e1', type: 'recital', title: 'Winter Recital', date: dayKey(addDays(t, 38)), time: '15:00', location: 'St. John’s Hall',
     participants: { [ids[0]]: { piece: 'Seitz Concerto No. 2, mvt 1', result: '' }, [ids[1]]: { piece: 'Bach Minuet No. 1', result: '' }, [ids[3]]: { piece: 'Twinkle Variations', result: '' }, [ids[2]]: { piece: 'Burgmüller: Arabesque', result: '' } } };
+  events.e5 = { id: 'e5', type: 'festival', title: 'Youth Strings Festival', date: dayKey(addDays(t, 24)), time: '13:00', location: 'City Park bandshell',
+    participants: { [ids[0]]: { piece: 'Hoedown (ensemble)', result: '' }, [ids[3]]: { piece: 'Hoedown (ensemble)', result: '' } } };
+  events.e6 = { id: 'e6', type: 'other', typeLabel: 'Nursing home visit', title: 'Holiday music at Maple Grove', date: dayKey(addDays(t, 52)), time: '11:00', location: 'Maple Grove Senior Living',
+    participants: { [ids[1]]: { piece: 'Jingle Bells', result: '' } } };
   events.e2 = { id: 'e2', type: 'exam', title: 'ABRSM Grade 3 Cello', date: dayKey(addDays(t, 17)), time: '10:20', location: 'Exam center', participants: { [ids[1]]: { piece: 'Grade 3 list A, B, C', result: '' } } };
   events.e3 = { id: 'e3', type: 'recital', title: 'Spring Recital', date: dayKey(addDays(t, -120)), time: '14:00', location: 'St. John’s Hall',
     participants: { [ids[0]]: { piece: 'Suzuki Book 2: Minuet', result: 'Performed' }, [ids[4]]: { piece: 'Für Elise (simplified)', result: 'Performed' } } };
