@@ -10,6 +10,7 @@ crons = ["0 * * * *"]
 PROJECT_ID = "music-practice-tracker-d77f7"
 API_KEY = "AIzaSyAUn6GqVxRR-m9i5kjTH9dY7-nGWCo1374"   # public web key (same as in the apps)
 APP_URL = "https://sergcast07.github.io/practice-timer/"
+WORKER_URL = "https://practice-timer.sergcast07.workers.dev"   # for unsubscribe links in emails
 # Resend's shared test sender can only email the address you signed up to Resend with.
 # Once you have your own domain, verify it in Resend and change this.
 FROM_EMAIL = "Allegrow <onboarding@resend.dev>"
@@ -19,4 +20,4 @@ FROM_EMAIL = "Allegrow <onboarding@resend.dev>"
 binding = "KV"
 id = "f7220465059b4eb49e5f909b540100f0"
 
-# The RESEND_API_KEY secret is set separately: npx wrangler secret put RESEND_API_KEY
+# Secrets are set separately: npx wrangler secret put RESEND_API_KEY  (and PARENT_SECRET, which signs unsubscribe links)

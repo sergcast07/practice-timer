@@ -861,12 +861,22 @@ async function googleSignIn() {
   const p = new A.GoogleAuthProvider(); p.setCustomParameters({ prompt: 'select_account' });
   return (await A.signInWithPopup(auth, p)).user;
 }
+// The email service (worker) – a signed-in parent proves who they are with their sign-in token
+async function parentApi(path, data = {}) {
+  const idToken = await auth.currentUser.getIdToken();
+  const r = await fetch(`${WORKER_URL}/parents/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idToken, tz: Intl.DateTimeFormat().resolvedOptions().timeZone, ...data }) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || 'Something went wrong. Please try again.');
+  return j;
+}
 const parentRecord = async uid => { const snap = await F.getDoc(F.doc(db, 'parents', uid)); return snap.exists() ? snap.data() : null; };
 async function linkParent(u) {
   const me = { email: u.email || '', name: u.displayName || '', at: new Date().toISOString() };
   await F.setDoc(F.doc(db, 'parents', u.uid), { family, ...me });
   await F.updateDoc(ref, { ['parents.' + u.uid]: me });
   familyParents[u.uid] = me;
+  parentApi('link').catch(console.error);        // lets the email service send this parent PIN codes and summaries
 }
 // From Settings: add a parent account to this family (turning on sync first if needed)
 async function addParentAccount() {
@@ -898,7 +908,7 @@ async function removeParentAccount(uid) {
   if (!confirm('Remove this parent account from the family? You can add it again any time.')) return;
   try {
     await F.updateDoc(ref, { ['parents.' + uid]: F.deleteField() });
-    if (auth?.currentUser?.uid === uid) { await F.deleteDoc(F.doc(db, 'parents', uid)).catch(() => {}); await A.signOut(auth); }
+    if (auth?.currentUser?.uid === uid) { await parentApi('unlink').catch(() => {}); await F.deleteDoc(F.doc(db, 'parents', uid)).catch(() => {}); await A.signOut(auth); }
   } catch (e) { console.error(e); }
   delete familyParents[uid]; renderParent();
 }
@@ -1452,8 +1462,29 @@ $('pinForgot').onclick = () => {
   const box = $('forgotBox'), parents = Object.values(familyParents);
   box.hidden = false;
   if (family && parents.length) {
-    box.innerHTML = `<p class="small">Sign in with the parent account linked to this family (${parents.map(x => esc(x.email)).join(', ')}) to choose a new PIN.</p>
-      <button class="secondary block" id="fgSignIn">${icon('user', 'sm')}Continue with Google</button><p class="small" id="fgErr" style="color:var(--danger)"></p>`;
+    box.innerHTML = `<p class="small">We’ll email a 6-digit code to this family’s parent ${parents.length === 1 ? 'account' : 'accounts'} (${parents.map(x => esc(x.email)).join(', ')}).</p>
+      <button class="secondary block" id="fgEmail">Email me a reset code</button>
+      <div class="addRow" id="fgCodeRow" hidden><input type="text" id="fgCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code" aria-label="Code from the email"><button class="secondary" id="fgVerify">Continue</button></div>
+      <p class="small" id="fgErr" style="color:var(--danger)"></p>
+      <button class="ghost small" id="fgSignIn">Or sign in with the parent account</button>`;
+    $('fgEmail').onclick = async () => {
+      $('fgEmail').disabled = true; $('fgErr').textContent = '';
+      try {
+        const r = await fetch(`${WORKER_URL}/parents/pin-code`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ family }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.error || 'Couldn’t send the code. Please try again.');
+        $('fgEmail').textContent = `Code sent to ${j.to.join(', ')}`; $('fgCodeRow').hidden = false; $('fgCode').focus();
+      } catch (e) { $('fgErr').textContent = e.message; $('fgEmail').disabled = false; }
+    };
+    $('fgVerify').onclick = async () => {
+      try {
+        const r = await fetch(`${WORKER_URL}/parents/pin-verify`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ family, code: $('fgCode').value.trim() }) });
+        const j = await r.json().catch(() => ({}));
+        if (!j.ok) return ($('fgErr').textContent = j.error || 'That code isn’t right.');
+        pinReset = 'an emailed code'; askPin(true);
+      } catch { $('fgErr').textContent = 'Couldn’t check the code. Check the internet connection.'; }
+    };
+    $('fgCode').onkeydown = e => { if (e.key === 'Enter') $('fgVerify').click(); };
     $('fgSignIn').onclick = async () => {
       try {
         const u = await googleSignIn();
@@ -1481,15 +1512,35 @@ $('changePinBtn').onclick = () => askPin(true);
 // Parent accounts on this family, in Devices & sync
 function renderAccount() {
   const list = Object.entries(familyParents), me = auth?.currentUser?.uid;
+  if (list.length && !A) loadAuth().then(renderAccount).catch(console.error);   // to know who's signed in here
+  const mine = me && familyParents[me];
+  // Once per visit, check the email service's copy (e.g. they unsubscribed from an email) and keep the switch honest
+  if (mine && !renderAccount.checked) {
+    renderAccount.checked = true;
+    parentApi('link').then(r => { if (!!r.weekly !== !!mine.weekly) { mine.weekly = r.weekly; F.updateDoc(ref, { [`parents.${me}.weekly`]: r.weekly }).catch(() => {}); renderAccount(); } }).catch(() => {});
+  }
   $('accountBlock').innerHTML = `<b>Parent account</b>
     ${list.length ? `<div class="parentList">${list.map(([uid, p]) => `<div class="opt"><span>${icon('user', 'sm')} ${esc(p.email || p.name)}${uid === me ? ' <span class="muted small">(signed in here)</span>' : ''}</span>
       <button class="ghost small" data-unparent="${uid}">Remove</button></div>`).join('')}</div>
-      <p class="muted small">Forgot the PIN? Sign in with ${list.length === 1 ? 'this account' : 'one of these accounts'} to choose a new one. On a new device, signing in brings your family back.</p>
+      ${mine ? `<label class="opt">Weekly summary email<br><small class="muted">Sunday evenings: each child’s practice time and what their teacher sent</small>
+          <input type="checkbox" class="toggle" id="weeklyToggle" ${mine.weekly ? 'checked' : ''}></label>
+        <div class="rowBetween"><button class="ghost small" id="testSummary" style="margin-left:-10px">Send me a test</button><span class="small muted" id="summaryMsg"></span></div>` : ''}
+      <p class="muted small">Forgot the PIN? We’ll email a reset code to ${list.length === 1 ? 'this address' : 'these addresses'}. On a new device, signing in brings your family back.</p>
       <button class="secondary" id="addParent" style="justify-self:start">${icon('plus', 'sm')}Add another parent</button>`
     : `<p class="muted small">Optional. Sign in with Google so you can reset the parent PIN if you forget it, and get your family back on a new device.${family ? '' : ' This also turns on sync.'}</p>
       <button class="secondary block" id="addParent">${icon('user', 'sm')}Continue with Google</button>`}
     ${settings.pinResetAt ? `<p class="muted small">The PIN was last reset ${new Date(settings.pinResetAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} by ${esc(settings.pinResetBy || 'a parent')}.</p>` : ''}`;
   $('addParent').onclick = addParentAccount;
+  const msg = t => { const el = $('summaryMsg'); if (el) el.textContent = t; };
+  $('weeklyToggle')?.addEventListener('change', async e => {
+    const on = e.target.checked;
+    try { await parentApi('prefs', { weekly: on }); await F.updateDoc(ref, { [`parents.${me}.weekly`]: on }); familyParents[me].weekly = on; msg(on ? 'On – first one this Sunday' : 'Off'); }
+    catch (err) { e.target.checked = !on; msg(err.message); }
+  });
+  $('testSummary')?.addEventListener('click', async () => {
+    msg('Sending…');
+    try { const r = await parentApi('test'); msg(`Sent to ${r.to}`); } catch (err) { msg(err.message); }
+  });
   $('accountBlock').querySelectorAll('[data-unparent]').forEach(b => b.onclick = () => removeParentAccount(b.dataset.unparent));
 }
 

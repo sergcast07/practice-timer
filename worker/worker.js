@@ -8,12 +8,21 @@
 //   GET  /cal/s/{code}.ics    live calendar of one student's lessons and recitals (for the family)
 //   POST /register            remember a teacher's feed so the scheduler emails them
 //   POST /test                send a test email now (rate limited)
-//   cron (hourly)             teaching-day brief ~1 hour before the first lesson; Sunday 6 pm studio digest
+//   POST /parents/link        a signed-in parent (family app) – remember their verified email for their family
+//   POST /parents/prefs       turn their weekly family summary on/off      POST /parents/test   send one now
+//   POST /parents/unlink      forget a parent                               GET /parents/unsubscribe  (link in emails)
+//   POST /parents/pin-code    email a PIN reset code to a family's parents  POST /parents/pin-verify  check it
+//   cron (hourly)             teaching-day brief ~1 hour before the first lesson; Sunday 6 pm studio digest;
+//                             Sunday 6 pm family summaries (parent's own time zone)
 //
-// Secret: RESEND_API_KEY. Vars (wrangler.toml): PROJECT_ID, API_KEY, FROM_EMAIL, APP_URL,
+// Parents prove who they are with their Firebase sign-in token: reading their own parents/{uid} record with it succeeds only
+// if the token is genuine and theirs (Firestore checks it). Their email comes from that token, so it's a verified address.
+//
+// Secrets: RESEND_API_KEY, PARENT_SECRET (signs unsubscribe links). Vars (wrangler.toml): PROJECT_ID, API_KEY, FROM_EMAIL, APP_URL,
 // FIRESTORE (only for the local emulator), DRY_RUN ("1" = don't send, and allow /preview for testing).
 
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' };
+const TEST_SENDER = /onboarding@resend\.dev/;
 const json = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json', ...CORS } });
 const validCode = c => /^[a-z0-9-]{20,40}$/.test(c || '');
 
@@ -51,6 +60,7 @@ export default {
         await sendEmail(env, feed.email, mail.subject, mail.html);
         return json({ ok: true, to: feed.email, subject: mail.subject });
       }
+      if (path.startsWith('/parents/')) return await parentsApi(req, env, url);
       if (env.DRY_RUN && (m = path.match(/^\/preview\/([a-z0-9-]+)\/(brief|digest)$/))) {
         const feed = await getDoc(env, `feeds/${m[1]}`);
         if (!feed) return new Response('Not found', { status: 404 });
@@ -67,6 +77,7 @@ export default {
 
   async scheduled(event, env, ctx) {
     ctx.waitUntil(runSchedule(env));
+    ctx.waitUntil(runParents(env));
   }
 };
 
@@ -399,4 +410,194 @@ async function processFeed(env, token) {
     }
   }
   return out;
+}
+
+
+// ============================================================================================
+// Parents (family app): weekly family summary and PIN reset codes
+// KV: parent:{uid} = { family, email, name, tz, weekly }   fam:{family}:{uid} = '1' (which parents a family has)
+// ============================================================================================
+const b64url = t => { t = t.replace(/-/g, '+').replace(/_/g, '/'); return atob(t + '='.repeat((4 - t.length % 4) % 4)); };
+async function verifyParent(env, idToken) {
+  if (typeof idToken !== 'string' || idToken.split('.').length !== 3) return null;
+  let claims; try { claims = JSON.parse(b64url(idToken.split('.')[1])); } catch { return null; }
+  const uid = claims.user_id || claims.sub;
+  if (!uid || !/^[A-Za-z0-9]{6,128}$/.test(uid)) return null;
+  const base = env.FIRESTORE || 'https://firestore.googleapis.com/v1';
+  const r = await fetch(`${base}/projects/${env.PROJECT_ID}/databases/(default)/documents/parents/${uid}?key=${env.API_KEY}`, { headers: { Authorization: `Bearer ${idToken}` } });
+  if (!r.ok) return null;                                    // not their record, expired or fake token
+  const rec = decode({ mapValue: { fields: (await r.json()).fields || {} } });
+  if (!claims.email || claims.email_verified === false || !validCode(rec.family)) return null;
+  return { uid, email: claims.email, name: claims.name || rec.name || '', family: rec.family };
+}
+async function hmac(env, text) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(env.PARENT_SECRET || 'dev-secret'), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return [...new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(text)))].slice(0, 16).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+const sha = async t => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)))].map(b => b.toString(16).padStart(2, '0')).join('');
+const getJSON = async (env, key) => JSON.parse(await env.KV.get(key) || 'null');
+const validTz = tz => { try { new Intl.DateTimeFormat('en-US', { timeZone: tz }); return true; } catch { return false; } };
+// Resend's shared test sender only delivers to the Resend account's own address
+const sendError = e => TEST_SENDER.test(String(e?.message)) || /only send testing emails/i.test(String(e?.message))
+  ? 'Allegrow can’t email this address yet (the email service is still in test mode). Please try again later.' : 'Couldn’t send the email. Please try again.';
+
+async function parentsApi(req, env, url) {
+  const path = url.pathname;
+  if (path === '/parents/unsubscribe' && req.method === 'GET') {
+    const uid = url.searchParams.get('u') || '', sig = url.searchParams.get('s') || '';
+    const rec = await getJSON(env, `parent:${uid}`);
+    if (rec && sig === await hmac(env, 'unsub:' + uid)) await env.KV.put(`parent:${uid}`, JSON.stringify({ ...rec, weekly: false }));
+    return new Response(`<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><body style="font-family:-apple-system,Segoe UI,sans-serif;background:#f6f3ee;color:#1e2a44;display:grid;place-items:center;min-height:90vh;margin:0">
+      <div style="background:#fff;border-radius:18px;padding:28px;max-width:420px;text-align:center"><h1 style="font-family:Georgia,serif;font-weight:600">You’re unsubscribed</h1>
+      <p>You won’t get the weekly Allegrow family summary any more. You can turn it back on in the app: Parents → Settings → Devices &amp; sync.</p></div></body>`,
+      { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+  }
+  // Local testing only (DRY_RUN): see a parent's weekly summary as HTML
+  if (env.DRY_RUN && path.startsWith('/parents/preview/')) {
+    const uid = path.split('/')[3], rec = await getJSON(env, `parent:${uid}`);
+    const mail = rec && await familyEmail(env, { ...rec, uid });
+    return mail ? new Response(`<!-- ${mail.subject} -->` + mail.html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } }) : new Response('Not found', { status: 404 });
+  }
+  if (req.method !== 'POST') return new Response('Not found', { status: 404 });
+  const body = await req.json().catch(() => ({}));
+
+  // PIN reset codes don't need a sign-in (that's the point): they go only to the family's verified parent emails
+  if (path === '/parents/pin-code') {
+    const family = body.family;
+    if (!validCode(family)) return json({ error: 'bad request' }, 400);
+    const emails = await familyParentEmails(env, family);
+    if (!emails.length) return json({ error: 'No parent email is set up for this family yet.' }, 404);
+    const sentKey = `pinrl:${family}`, count = +(await env.KV.get(sentKey) || 0);
+    if (count >= 3) return json({ error: 'Too many codes requested. Please wait an hour and try again.' }, 429);
+    const code = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, '0');
+    await env.KV.put(`pin:${family}`, JSON.stringify({ hash: await sha(family + ':' + code), tries: 0 }), { expirationTtl: 900 });
+    await env.KV.put(sentKey, String(count + 1), { expirationTtl: 3600 });
+    const mail = pinEmail(env, code);
+    const results = await Promise.allSettled(emails.map(e => sendEmail(env, e, mail.subject, mail.html)));
+    const ok = emails.filter((_, i) => results[i].status === 'fulfilled');
+    if (!ok.length) return json({ error: sendError(results[0].reason) }, 502);
+    return json({ ok: true, to: ok.map(maskEmail) });
+  }
+  if (path === '/parents/pin-verify') {
+    const { family, code } = body;
+    if (!validCode(family) || !/^\d{6}$/.test(code || '')) return json({ ok: false, error: 'Enter the 6-digit code from the email.' }, 400);
+    const rec = await getJSON(env, `pin:${family}`);
+    if (!rec) return json({ ok: false, error: 'That code has expired. Ask for a new one.' });
+    if (rec.tries >= 5) { await env.KV.delete(`pin:${family}`); return json({ ok: false, error: 'Too many tries. Ask for a new code.' }); }
+    if (rec.hash !== await sha(family + ':' + code)) { await env.KV.put(`pin:${family}`, JSON.stringify({ ...rec, tries: rec.tries + 1 }), { expirationTtl: 900 }); return json({ ok: false, error: 'That code isn’t right.' }); }
+    await env.KV.delete(`pin:${family}`);
+    return json({ ok: true });
+  }
+
+  // Everything else is a signed-in parent looking after their own settings
+  const me = await verifyParent(env, body.idToken);
+  if (!me) return json({ error: 'Please sign in again.' }, 401);
+  const old = await getJSON(env, `parent:${me.uid}`);
+  if (path === '/parents/link' || path === '/parents/prefs') {
+    const weekly = path === '/parents/prefs' ? !!body.weekly : !!old?.weekly;
+    const rec = { family: me.family, email: me.email, name: me.name, tz: validTz(body.tz) ? body.tz : old?.tz || 'UTC', weekly };
+    if (old?.family && old.family !== me.family) await env.KV.delete(`fam:${old.family}:${me.uid}`);
+    await env.KV.put(`parent:${me.uid}`, JSON.stringify(rec));
+    await env.KV.put(`fam:${me.family}:${me.uid}`, '1');
+    return json({ ok: true, weekly, email: me.email });
+  }
+  if (path === '/parents/unlink') {
+    if (old) await env.KV.delete(`fam:${old.family}:${me.uid}`);
+    await env.KV.delete(`parent:${me.uid}`);
+    return json({ ok: true });
+  }
+  if (path === '/parents/test') {
+    if (await env.KV.get(`rl:parent:${me.uid}`)) return json({ error: 'Please wait a minute before sending another test.' }, 429);
+    await env.KV.put(`rl:parent:${me.uid}`, '1', { expirationTtl: 60 });
+    const tz = validTz(body.tz) ? body.tz : old?.tz || 'UTC';
+    const mail = await familyEmail(env, { ...me, tz }, { test: true });
+    if (!mail) return json({ error: 'Couldn’t find your family.' }, 404);
+    try { await sendEmail(env, me.email, mail.subject, mail.html); } catch (e) { return json({ error: sendError(e) }, 502); }
+    return json({ ok: true, to: me.email, subject: mail.subject });
+  }
+  return new Response('Not found', { status: 404 });
+}
+const maskEmail = e => e.replace(/^(.).*?(.)?@/, (m, a, b) => `${a}•••${b || ''}@`);
+async function familyParentEmails(env, family) {
+  const page = await env.KV.list({ prefix: `fam:${family}:` }), out = [];
+  for (const k of page.keys) { const rec = await getJSON(env, `parent:${k.name.split(':')[2]}`); if (rec?.family === family && rec.email) out.push(rec.email); }
+  return [...new Set(out)];
+}
+
+function parentLayout(env, heading, intro, body, footer) {
+  const app = env.APP_URL || '';
+  return `<!doctype html><html><body style="margin:0;background:#f6f3ee;padding:24px 12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1e2a44">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center">
+  <table role="presentation" width="100%" style="max-width:560px;background:#ffffff;border-radius:18px;padding:28px 26px" cellspacing="0" cellpadding="0"><tr><td>
+    <div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#23865f">Allegrow</div>
+    <h1 style="font-family:Georgia,'Times New Roman',serif;font-size:26px;line-height:1.2;margin:6px 0 6px;font-weight:600">${heading}</h1>
+    <p style="margin:0 0 18px;color:#3d4760;font-size:15px;line-height:1.5">${intro}</p>
+    ${body}
+    <p style="margin:24px 0 0"><a href="${app}" style="display:inline-block;background:#1e2a44;color:#f6f3ee;text-decoration:none;font-weight:600;padding:11px 18px;border-radius:12px;font-size:15px">Open Allegrow</a></p>
+  </td></tr></table>
+  <p style="max-width:560px;font-size:12px;color:#8a8f9e;line-height:1.5;margin:14px auto 0">${footer}</p>
+  </td></tr></table></body></html>`;
+}
+function pinEmail(env, code) {
+  return { subject: `Your Allegrow PIN reset code: ${code}`,
+    html: parentLayout(env, 'Reset your parent PIN', 'Someone asked to reset the parent PIN in Allegrow. Enter this code in the app to choose a new PIN:',
+      `<div style="font-size:34px;font-weight:700;letter-spacing:.3em;background:#f6f3ee;border-radius:14px;padding:16px;text-align:center;font-variant-numeric:tabular-nums">${code}</div>
+       <p style="font-size:14px;color:#3d4760;margin:14px 0 0">It works for 15 minutes. If this wasn’t you, you can ignore this email – the PIN stays the same.</p>`,
+      'You got this because your Google account is a parent account on an Allegrow family.') };
+}
+
+// The family's week: time and days for each child, plus what their teacher sent (numbers only; no scores)
+async function familyEmail(env, parent, { test } = {}) {
+  const fam = await getDoc(env, `families/${parent.family}`);
+  if (!fam) return null;
+  const now = localNow(parent.tz || 'UTC'), rows = [];
+  let total = 0, prevTotal = 0;
+  for (const k of fam.kids || []) {
+    const man = {}; for (const e of Object.values(fam.manual?.[k.id] || {})) if (e?.day) man[e.day] = (man[e.day] || 0) + (e.ms || 0);
+    const t = k.link && validCode(k.link) ? await getDoc(env, `students/${k.link}`) : null;
+    const linked = t && t.linkedAt;
+    const plan = Array.isArray(k.parentPlan) ? k.parentPlan : linked && Array.isArray(t.plan) ? t.plan : Array.isArray(k.plan) ? k.plan : Array(7).fill(k.goal || 20);
+    const s = { name: k.name, practice: { log: fam.log?.[k.id] || {}, manual: man, stats: fam.stats?.[k.id] || {}, plan } };
+    const c = week(s, now.key), p = week(s, now.key, 1), planned = plan.filter(n => n > 0).length;
+    total += c.total; prevTotal += p.total;
+    const lines = [`${c.days} of ${planned} planned ${planned === 1 ? 'day' : 'days'}${c.manual ? ` · ${minsText(c.manual)} logged by hand` : ''}`];
+    if (c.longest >= 5 * 60000 && (!linked || insMode(t, 'focus') !== 'off')) lines.push(`Longest stretch without stopping: ${minsText(c.longest)}`);
+    if (linked) {
+      const since = addKey(now.key, -6);
+      const stars = Object.values(t.cheers || {}).filter(x => x.date >= since);
+      const badges = Object.values(t.badges || {}).filter(b => b.date >= since);
+      if (stars.length) lines.push(good(`${stars.length === 1 ? 'A star' : stars.length + ' stars'} from ${esc(t.teacherName)}`) + (stars[0].note ? ` – “${esc(stars[0].note)}”` : ''));
+      if (badges.length) lines.push(good(`Earned ${badges.map(b => esc(b.label)).join(', ')}`));
+      const a = currentAssignment(t); if (a) lines.push(`Working on: ${esc(a.title)}${a.due ? ` (due ${fmtDay(a.due)})` : ''}`);
+      const nl = nextLessonAfter(t, now.key, 10); if (nl) { const l = lessonsOn(t, nl)[0]; lines.push(`Next lesson: ${fmtDay(nl)}${l?.time ? ' at ' + fmtTime(l.time) : ''}`); }
+    }
+    rows.push(row('', `${esc(k.name)} · ${minsText(c.total)}${p.total ? ` <span style="font-weight:500;color:#6e7385">(${minsText(p.total)} the week before)</span>` : ''}`, lines));
+  }
+  if (!rows.length) rows.push('<p style="font-size:15px;color:#3d4760">No players yet – add them in the app under Parents → Settings.</p>');
+  const unsub = `${env.WORKER_URL || ''}/parents/unsubscribe?u=${encodeURIComponent(parent.uid)}&s=${await hmac(env, 'unsub:' + parent.uid)}`;
+  return {
+    subject: `${test ? '[Test] ' : ''}Your family’s week in music: ${minsText(total)} of practice`,
+    html: parentLayout(env, 'Your week in music', total ? `Together your family practiced <b>${minsText(total)}</b> this week${prevTotal && total > prevTotal ? ` – up from ${minsText(prevTotal)}` : ''}.` : 'A quiet week – a fresh one starts tomorrow. Even 10 minutes a day adds up.',
+      rows.join(''), `You get this on Sunday evenings because you turned on the weekly summary in Allegrow. <a href="${unsub}" style="color:#8a8f9e">Unsubscribe</a>`)
+  };
+}
+async function runParents(env) {
+  let cursor; const sent = [];
+  do {
+    const page = await env.KV.list({ prefix: 'parent:', cursor });
+    for (const k of page.keys) {
+      try {
+        const rec = await getJSON(env, k.name); if (!rec?.weekly || !rec.email) continue;
+        const now = localNow(rec.tz || 'UTC');
+        if (dow(now.key) !== 0 || now.minutes < 18 * 60 || now.minutes >= 19 * 60) continue;
+        const key = `sent:family:${k.name.slice(7)}:${now.key}`;
+        if (await env.KV.get(key)) continue;
+        const mail = await familyEmail(env, { ...rec, uid: k.name.slice(7) });
+        if (mail) { await sendEmail(env, rec.email, mail.subject, mail.html); sent.push(rec.email); }
+        await env.KV.put(key, '1', { expirationTtl: 172800 });
+      } catch (e) { console.error('parent', e.message); }
+    }
+    cursor = page.list_complete ? null : page.cursor;
+  } while (cursor);
+  return sent;
 }
