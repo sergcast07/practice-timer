@@ -361,7 +361,7 @@ async function sendEmail(env, to, subject, html) {
   if (env.DRY_RUN) { console.log(`[dry run] email to ${to}: ${subject}`); return { dryRun: true }; }
   const r = await fetch('https://api.resend.com/emails', {
     method: 'POST', headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: env.FROM_EMAIL, to: [to], subject, html })
+    body: JSON.stringify({ from: env.FROM_EMAIL, to: [to], subject, html, ...(env.REPLY_TO ? { reply_to: env.REPLY_TO } : {}) })
   });
   if (!r.ok) throw new Error(`Resend ${r.status}: ${await r.text()}`);
   return r.json();
