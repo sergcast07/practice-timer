@@ -107,7 +107,44 @@
   .bar { height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; margin-top: 10px; }
   .bar > div { height: 100%; background: var(--kid); border-radius: 3px; }
   .empty { text-align: center; padding: 32px 20px; display: flex; flex-direction: column; gap: 14px; align-items: center; }
-  #syncStatus { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; color: var(--muted); min-height: 20px; }
+  #syncStatus { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--muted); min-height: 20px; margin: 0 auto; padding: 6px 12px; }
+  #syncStatus .ic { width: 16px; height: 16px; }
+
+  /* Settings: jump links, devices & sync */
+  .jump { display: flex; gap: 8px; flex-wrap: wrap; }
+  .jump a { font-size: 13.5px; font-weight: 600; color: var(--ink-2); text-decoration: none; background: var(--card); border: 1.5px solid var(--line); border-radius: 999px; padding: 6px 12px; }
+  .sectionLabel[id] { scroll-margin-top: 16px; }
+  .syncBlock { display: grid; gap: 6px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+  .btnRow { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+  .btnRow button { flex: 1 1 auto; padding: 10px 12px; font-size: 14.5px; }
+  .qrBox { display: grid; justify-items: center; gap: 6px; margin: 8px 0 4px; }
+  .qrBox #qr { width: 200px; background: #fff; border-radius: 12px; padding: 6px; }
+  .qrBox svg { display: block; width: 100%; height: auto; }
+
+  /* Tablets: more room – two columns while practicing, wider lists */
+  @media (min-width: 720px) {
+    body { padding-left: 28px; padding-right: 28px; }
+    main { max-width: 980px; }
+    #pin, #parent { width: 100%; max-width: 600px; margin: 0 auto; }
+    h1 { font-size: 34px; }
+    .kids { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .tile { padding: 20px; }
+    .tile .avatar { width: 64px; height: 64px; font-size: 26px; }
+    .tile .name { font-size: 21px; }
+    #home > .intro, #home > .recap, #home > .installCard, #home > #historyBtn, #home > #noKids { width: 100%; }
+    #home > #historyBtn { max-width: 420px; margin: 0 auto; }
+    #histList { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+    #practice:not([hidden]) { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 16px 22px; align-items: start; }
+    #practice > header { grid-column: 1 / -1; }
+    .pMain { position: sticky; top: 16px; }
+    .ring { width: min(340px, 100%); }
+    #time { font-size: 64px; }
+    .overlay .card { max-width: 460px; }
+  }
+  @media (min-width: 1100px) {
+    .kids { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+  .pMain, .pSide { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 
   /* Practice */
   .who { display: flex; align-items: center; gap: 12px; font-size: 21px; font-weight: 700; }
@@ -384,6 +421,8 @@
   <symbol id="i-cloudoff" viewBox="0 0 24 24"><path d="M7 18.5h10.5a4 4 0 0 0 .6-7.96A6 6 0 0 0 6.6 9.5 4.5 4.5 0 0 0 7 18.5z"/><path d="M4 4l16 16"/></symbol>
   <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/></symbol>
   <symbol id="i-share" viewBox="0 0 24 24"><path d="M4.5 12.5V19a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-6.5"/><path d="m16 6.5-4-4-4 4M12 2.5V15"/></symbol>
+  <symbol id="i-qr" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="6" height="6" rx="1"/><rect x="14.5" y="3.5" width="6" height="6" rx="1"/><rect x="3.5" y="14.5" width="6" height="6" rx="1"/><path d="M14.5 14.5h2.5v2.5h-2.5zM18.5 18.5h2v2h-2zM14.5 19.5h1M20.5 14.5v1.5"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="12" height="12" rx="2"/><path d="M15.5 8.5V5.5a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3"/></symbol>
   <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M18.5 11a6.5 6.5 0 0 1-13 0M12 17.5V21"/></symbol>
   <symbol id="i-metronome" viewBox="0 0 24 24"><path d="M9.2 3h5.6l4 17.5H5.2z"/><path d="M5.8 17.5h12.4M12 15 16.5 6.5"/></symbol>
   <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 9a6 6 0 0 1 12 0c0 6.5 2.5 8 2.5 8h-17S6 15.5 6 9z"/><path d="M10.3 20.5a2 2 0 0 0 3.4 0"/></symbol>
@@ -432,7 +471,7 @@
       <button class="secondary" id="setupBtn">Add players</button>
     </div>
     <button class="secondary block" id="historyBtn"><svg class="ic"><use href="#i-chart"/></svg>Practice history</button>
-    <div id="syncStatus"></div>
+    <button class="ghost" id="syncStatus" type="button"></button>
     <p class="teacherLink">Are you a teacher? <a href="teacher.html">Sign in to your studio</a></p>
   </section>
 
@@ -442,6 +481,7 @@
       <div class="who"><div class="avatar" id="pAvatar"></div><span id="pName"></span></div>
       <button class="secondary" id="doneBtn"><svg class="ic sm"><use href="#i-check"/></svg>Done</button>
     </header>
+    <div class="pMain">
     <div class="card">
       <div class="ring" id="ring">
         <svg viewBox="0 0 120 120">
@@ -466,6 +506,8 @@
       <div class="meter"><div class="level"></div><div class="mark"></div></div>
     </div>
     <button class="primary" id="startBtn"></button>
+    </div>
+    <div class="pSide">
     <div class="card" id="teacherCard" hidden></div>
     <button class="card badgeEntry" id="badgeEntry"></button>
     <div class="card">
@@ -511,6 +553,7 @@
       </div>
       <div id="manualList"></div>
     </div>
+    </div>
   </section>
 
   <!-- HISTORY -->
@@ -550,8 +593,42 @@
       <button class="ghost back" data-home><svg class="ic"><use href="#i-back"/></svg>Done</button>
     </header>
     <div class="intro"><h1>Settings</h1><p>For parents and teachers.</p></div>
+    <div class="jump"><a href="#syncCard">Devices &amp; sync</a><a href="#playersCard">Players</a><a href="#micCard">Microphone</a></div>
 
-    <div class="sectionLabel">Players</div>
+    <div class="sectionLabel" id="syncCard">Devices &amp; sync</div>
+    <div class="card">
+      <div id="syncOff">
+        <p class="muted small">Everything is saved on this device only. Turn on sync to share players and practice history across all your phones and tablets.</p>
+        <button class="secondary block" id="createFamilyBtn" style="margin-top:14px"><svg class="ic"><use href="#i-cloud"/></svg>Turn on sync</button>
+      </div>
+      <div id="syncOn">
+        <div id="syncState"></div>
+        <div class="syncBlock">
+          <b>Add another device</b>
+          <p class="muted small">On the other phone or tablet, scan this code with the camera, or open the link you send it.</p>
+          <div class="qrBox" id="qrBox" hidden><div id="qr"></div><div class="small muted">Scan with the other device’s camera</div></div>
+          <div class="btnRow">
+            <button class="secondary" id="qrBtn"><svg class="ic sm"><use href="#i-qr"/></svg>Show QR code</button>
+            <button class="secondary" id="shareBtn"><svg class="ic sm"><use href="#i-share"/></svg>Send link</button>
+            <button class="secondary" id="copyCodeBtn"><svg class="ic sm"><use href="#i-copy"/></svg>Copy code</button>
+          </div>
+          <div class="help" style="margin-top:8px">Family code</div><div id="familyCode" class="code"></div>
+          <div class="help">Anyone with this code can see and change your practice data, so share it only with family.</div>
+        </div>
+      </div>
+      <div class="syncBlock" id="joinBlock">
+        <b id="joinTitle">Already using Allegrow on another device?</b>
+        <p class="muted small" id="joinHelp">Scan its QR code with this device’s camera, or enter its family code here.</p>
+        <div class="addRow" style="margin-top:8px">
+          <input type="text" id="joinCode" placeholder="Family code, e.g. abcde-fghjk-…" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Family code">
+          <button class="secondary" id="joinBtn">Connect</button>
+        </div>
+        <div id="joinError" class="small" style="color:var(--danger);margin-top:6px"></div>
+      </div>
+      <button class="danger" id="leaveBtn" style="margin-top:10px;margin-left:-10px">Stop syncing on this device</button>
+    </div>
+
+    <div class="sectionLabel" id="playersCard">Players</div>
     <div class="card">
       <div id="players"></div>
       <div class="addRow">
@@ -561,29 +638,7 @@
       <p class="muted small" style="margin-top:10px">Use a first name or nickname. Practice stays on this device unless you turn on sync or connect a teacher – see the <a href="privacy.html">privacy policy</a>.</p>
     </div>
 
-    <div class="sectionLabel">Sync across devices</div>
-    <div class="card">
-      <div id="syncOff">
-        <p class="muted small">Everything is saved on this device only. Turn on sync to share players and practice history across all your phones and tablets.</p>
-        <button class="secondary block" id="createFamilyBtn" style="margin-top:14px"><svg class="ic"><use href="#i-cloud"/></svg>Turn on sync</button>
-        <div class="help" style="margin:18px 0 8px">Already set up on another device? Enter its family code:</div>
-        <div class="addRow" style="margin-top:0">
-          <input type="text" id="joinCode" placeholder="Family code" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Family code">
-          <button class="secondary" id="joinBtn">Join</button>
-        </div>
-        <div id="joinError" class="small" style="color:var(--danger);margin-top:6px"></div>
-      </div>
-      <div id="syncOn">
-        <div id="syncState"></div>
-        <div class="help" style="margin-top:14px">Family code</div>
-        <div id="familyCode" class="code"></div>
-        <button class="secondary block" id="shareBtn"><svg class="ic"><use href="#i-share"/></svg>Send link to another device</button>
-        <div class="help">Open the link on another phone or tablet to connect it. Anyone with this code can see and change your practice data, so share it only with family.</div>
-        <button class="danger" id="leaveBtn" style="margin-top:10px;margin-left:-10px">Stop syncing on this device</button>
-      </div>
-    </div>
-
-    <div class="sectionLabel">Microphone</div>
+    <div class="sectionLabel" id="micCard">Microphone</div>
     <div class="card">
       <div class="row">
         <label class="opt">Only count music, not talking <input type="checkbox" class="toggle" id="musicOnly"></label>
@@ -795,7 +850,10 @@ async function joinFamily(code) {
     const snap = await F.getDoc(F.doc(db, 'families', code));
     if (!snap.exists()) return fail('No family found with that code.');
   } catch (e) { console.error(e); return fail('Couldn’t reach the server. Check the internet connection.'); }
-  if (kids.length && !confirm('Replace the players and history on this device with your family’s shared ones?')) return;
+  if (code === family) return fail('This device is already using that family code.');
+  if (family ? !confirm('Switch this device to the other family account? It will show that account’s players and history instead. Your current account stays safe on your other devices, and you can switch back with its code.')
+      : kids.length && !confirm('Replace the players and history on this device with your family’s shared ones?')) return;
+  if (family) { flushPractice(); flushFields(); }
   family = code; store.set('pt-family', family);
   pend = {}; store.set('pt-pend', pend);
   pendStats = {}; store.set('pt-pendstats', pendStats);
@@ -818,7 +876,9 @@ function setSync(state) {
     missing: ['alert', 'Family not found – check the family code in Settings']
   }[state];
   const html = text ? `${icon(ic, 'sm')}<span>${text}</span>` : '';
-  $('syncStatus').innerHTML = html;
+  // On the home screen this line doubles as the way into Devices & sync
+  $('syncStatus').innerHTML = state === 'local' ? `${icon('cloud', 'sm')}<span>Use Allegrow on more than one device?</span>`
+    : state === 'synced' ? `${html}<span class="muted">·</span><span style="text-decoration:underline">Add a device</span>` : html;
   $('syncState').innerHTML = html;
 }
 
@@ -893,6 +953,8 @@ function show(name) {
   for (const s of document.querySelectorAll('.screen')) s.hidden = s.id !== name;
   ({ home: renderHome, history: renderHistory, parent: renderParent, practice: () => { renderPractice(); renderTeacherCard(); renderManualList(); renderBadgeEntry(); setTimeout(showNextCheer, 400); }, badges: renderBadges }[name] || (() => {}))();
   window.scrollTo(0, 0);
+  if (name === 'parent' && afterPin) { $(afterPin).scrollIntoView({ block: 'start' }); afterPin = null; }
+  if (name === 'home') afterPin = null;
 }
 document.querySelectorAll('[data-home]').forEach(b => b.onclick = () => show('home'));
 
@@ -1354,6 +1416,10 @@ function renderParent() {
   });
   $('syncOff').hidden = !!family;
   $('syncOn').hidden = !family;
+  $('leaveBtn').hidden = !family;
+  $('joinTitle').textContent = family ? 'Bring in a different family account' : 'Already using Allegrow on another device?';
+  $('joinHelp').textContent = family ? 'Has your family already set up Allegrow somewhere else? Enter that family code to switch this device over to it.'
+    : 'Scan its QR code with this device’s camera, or enter its family code here.';
   $('familyCode').textContent = family || '';
   $('musicOnly').checked = settings.musicOnly;
   $('sens').value = settings.sens;
@@ -1380,14 +1446,31 @@ $('createFamilyBtn').onclick = createFamily;
 $('joinBtn').onclick = () => joinFamily($('joinCode').value);
 $('joinCode').onkeydown = e => { if (e.key === 'Enter') $('joinBtn').click(); };
 $('leaveBtn').onclick = leaveFamily;
+const joinUrl = () => location.origin + location.pathname + '#join=' + family;
 $('shareBtn').onclick = async () => {
-  const url = location.origin + location.pathname + '#join=' + family;
+  const url = joinUrl();
   try {
     if (navigator.share) return await navigator.share({ title: 'Allegrow', text: 'Open this to connect this device to our family’s Allegrow:', url });
     await navigator.clipboard.writeText(url);
-    $('shareBtn').innerHTML = `${icon('check')}Link copied – paste it on the other device`;
+    $('shareBtn').innerHTML = `${icon('check', 'sm')}Link copied`;
   } catch {}
 };
+$('copyCodeBtn').onclick = async () => {
+  try { await navigator.clipboard.writeText(family); $('copyCodeBtn').innerHTML = `${icon('check', 'sm')}Code copied`; } catch { prompt('Family code:', family); }
+};
+// QR code of the join link (a small free library, loaded only when asked for)
+$('qrBtn').onclick = async () => {
+  if (!$('qrBox').hidden) { $('qrBox').hidden = true; $('qrBtn').innerHTML = `${icon('qr', 'sm')}Show QR code`; return; }
+  try {
+    if (!window.qrcode) await new Promise((ok, bad) => { const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js'; sc.onload = ok; sc.onerror = bad; document.head.append(sc); });
+    const qr = qrcode(0, 'M'); qr.addData(joinUrl()); qr.make();
+    $('qr').innerHTML = qr.createSvgTag({ cellSize: 6, margin: 3, scalable: true });
+    $('qrBox').hidden = false; $('qrBtn').innerHTML = `${icon('qr', 'sm')}Hide QR code`;
+  } catch (e) { console.error(e); alert('Couldn’t make the QR code – check the internet connection, or use Send link instead.'); }
+};
+// Home screen sync line → straight to Devices & sync (after the parent PIN)
+let afterPin = null;
+$('syncStatus').onclick = () => { afterPin = 'syncCard'; askPin(); };
 $('newName').onkeydown = e => { if (e.key === 'Enter') $('addBtn').click(); };
 $('sens').oninput = () => { settings.sens = +$('sens').value; saveSettings(); $('sensVal').textContent = settings.sens; updateMarks(); };
 $('grace').oninput = () => { settings.grace = +$('grace').value; saveSettings(); $('graceVal').textContent = settings.grace + ' s'; };
@@ -2277,6 +2360,7 @@ watchTeachers().then(() => kids.forEach(pushTeacher));
 // A teacher's invite link: #link=<student code>
 const teacherInvite = location.hash.match(/link=([a-z0-9-]{20,})/);
 if (teacherInvite) { history.replaceState(null, '', location.pathname + location.search); startLink(teacherInvite[1]); }
+if (!family) setSync('local');
 // A "Send link to another device" link: #join=<family code>
 const joinLink = location.hash.match(/join=([a-z0-9-]{20,})/);
 if (joinLink) {
