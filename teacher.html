@@ -169,7 +169,12 @@
   .num { font-variant-numeric: tabular-nums; }
   .mbar { height: 6px; background: var(--track); border-radius: 3px; overflow: hidden; margin-top: 5px; }
   .mbar > div { height: 100%; background: var(--kid); border-radius: 3px; }
-  .mbar.full > div { background: var(--good); }
+  .mbar { display: flex; }
+  .mbar.full > div:first-child { background: var(--good); }
+  .hatch { background: repeating-linear-gradient(135deg, var(--kid) 0 2.5px, transparent 2.5px 5.5px) !important; opacity: .8; }
+  .mbar.full > .hatch { --kid: var(--good); }
+  .byHand { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; color: var(--muted); margin-left: 6px; }
+  .byHand .ic { width: 12px; height: 12px; }
   .lbl-m { display: none; font-size: 11.5px; color: var(--muted); font-weight: 600; }
   @media (max-width: 760px) {
     .ptr.head { display: none; }
@@ -426,17 +431,20 @@ const RATINGS = [['preparation', 'Preparation'], ['technique', 'Technique'], ['m
 function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2200); }
 
 // ---------- Practice data (mirrored from the family app) ----------
-const pDay = (s, d) => s.practice?.log?.[dayKey(d)] || 0;
+// Recorded by the app (log) and logged by hand (manual); totals include both, quality scores only the recorded time
+const recDay = (s, d) => s.practice?.log?.[dayKey(d)] || 0;
+const manDay = (s, d) => s.practice?.manual?.[dayKey(d)] || 0;
+const pDay = (s, d) => recDay(s, d) + manDay(s, d);
 const sDay = (s, d) => s.practice?.stats?.[dayKey(d)] || {};
 function practiceSummary(s, days) {
-  const t = { total: 0, days: 0, active: 0, played: 0, notes: 0, inTune: 0, beats: 0, steady: 0 };
+  const t = { total: 0, manual: 0, days: 0, active: 0, played: 0, notes: 0, inTune: 0, beats: 0, steady: 0 };
   for (const d of days) {
     const ms = pDay(s, d), st = sDay(s, d);
-    t.total += ms; if (ms >= 60000) t.days++;
-    if (st.active) { t.active += st.active; t.played += Math.min(ms, st.active); }
+    t.total += ms; t.manual += manDay(s, d); if (ms >= 60000) t.days++;
+    if (st.active) { t.active += st.active; t.played += Math.min(recDay(s, d), st.active); }
     t.notes += st.notes || 0; t.inTune += st.inTune || 0; t.beats += st.beats || 0; t.steady += st.steady || 0;
   }
-  return { total: t.total, days: t.days,
+  return { total: t.total, manual: t.manual, days: t.days,
     focus: t.active >= 60000 ? t.played / t.active : null,
     tune: t.notes >= 10 ? t.inTune / t.notes : null,
     rhythm: t.beats >= 8 ? t.steady / t.beats : null };
@@ -645,7 +653,8 @@ function practiceTable(list) {
       const c = practiceSummary(s, wk), p = practiceSummary(s, prev), target = (s.target || 20) * 7 * 60000, f = Math.min(c.total / target, 1);
       return `<div class="ptr" data-student="${s.id}" style="--kid:${s.color}">
         <div class="name"><div class="avatar sm">${initial(s.name)}</div><span>${esc(s.name)}</span></div>
-        <div class="mins"><span class="num">${mins(c.total)}</span> <span class="muted small">/ ${mins(target)}</span><div class="mbar ${f >= 1 ? 'full' : ''}"><div style="width:${f * 100}%"></div></div></div>
+        <div class="mins"><span class="num">${mins(c.total)}</span> <span class="muted small">/ ${mins(target)}</span>${c.manual ? `<span class="byHand" title="Logged by hand">${icon('edit')}${mins(c.manual)}</span>` : ''}
+          <div class="mbar ${f >= 1 ? 'full' : ''}"><div style="width:${Math.min((c.total - c.manual) / target, 1) * 100}%"></div><div class="hatch" style="width:${(f - Math.min((c.total - c.manual) / target, 1)) * 100}%"></div></div></div>
         <div><span class="lbl-m">Days</span><span class="num">${c.days}</span></div>
         <div><span class="lbl-m">Focus</span><span class="num">${pct(c.focus)}</span>${trend(c.focus, p.focus)}</div>
         <div><span class="lbl-m">In tune</span><span class="num">${s.instrument === 'piano' ? '<span class="muted">n/a</span>' : pct(c.tune)}</span>${trend(c.tune, p.tune)}</div>
@@ -729,7 +738,7 @@ function tProgress(s) {
   return `<div class="stack">
     <div class="card">
       <div class="stats">
-        <div class="stat"><b>${mins(c.total)}</b><span>last 7 days</span></div>
+        <div class="stat"><b>${mins(c.total)}</b><span>last 7 days${c.manual ? ` · ${mins(c.manual)} by hand` : ''}</span></div>
         <div class="stat"><b>${c.days}/7</b><span>days practiced</span></div>
         <div class="stat"><b>${pct(c.focus)}${trend(c.focus, p.focus)}</b><span>focus</span></div>
         ${s.instrument !== 'piano' ? `<div class="stat"><b>${pct(c.tune)}${trend(c.tune, p.tune)}</b><span>in tune</span></div>` : ''}
@@ -738,9 +747,10 @@ function tProgress(s) {
       </div>
       <div class="chart">
         <div class="goal" style="bottom:${target / top * 100}%" title="Target ${s.target || 20} min"></div>
-        ${vals.map((v, i) => `<div class="col" title="${fmtDate(days[i])}: ${mins(v)}"><div class="b ${v >= target ? 'met' : ''}" style="height:${v / top * 100}%"></div></div>`).join('')}
+        ${vals.map((v, i) => { const m = manDay(s, days[i]); return `<div class="col" style="flex-direction:column;justify-content:flex-end" title="${fmtDate(days[i])}: ${mins(v)}${m ? ` (${mins(m)} by hand)` : ''}">
+          ${m ? `<div class="b hatch" style="height:${m / top * 100}%;min-height:0"></div>` : ''}<div class="b ${v >= target ? 'met' : ''}" style="height:${(v - m) / top * 100}%;${m ? 'border-radius:0' : ''}"></div></div>`; }).join('')}
       </div>
-      <div class="axis"><span>${fmtDate(days[0], { day: 'numeric', month: 'short' })}</span><span>Last 4 weeks · dashed line = ${s.target || 20} min/day target</span><span>Today</span></div>
+      <div class="axis"><span>${fmtDate(days[0], { day: 'numeric', month: 'short' })}</span><span>Last 4 weeks · dashed line = ${s.target || 20} min/day minimum · striped = logged by hand</span><span>Today</span></div>
     </div>
     <p class="small muted">Last practiced: ${lastPracticedText(lastPracticed(s))}. Practice data comes from ${esc(s.kidName || firstName(s.name))}’s Practice Timer app.</p>
   </div>`;
@@ -880,7 +890,7 @@ function vReports() {
       <div style="text-align:right"><b>Progress report</b><div class="muted small">${fmtDate(start, { day: 'numeric', month: 'long' })} – ${fmtDate(end, { day: 'numeric', month: 'long', year: 'numeric' })}</div></div></div>
     <section><h3>Practice</h3>
       ${s.linkedAt ? `<div class="stats">
-        <div class="stat"><b>${mins(P.total)}</b><span>total</span></div>
+        <div class="stat"><b>${mins(P.total)}</b><span>total${P.manual ? ` (${mins(P.manual)} logged by hand)` : ''}</span></div>
         <div class="stat"><b>${mins(P.total / (range / 7))}</b><span>per week</span></div>
         <div class="stat"><b>${P.days} of ${range}</b><span>days practiced</span></div>
         <div class="stat"><b>${pct(P.focus)}</b><span>focus</span></div>
@@ -1361,8 +1371,10 @@ function seedDemo() {
         st[k].steady = Math.round(st[k].beats * rnd(.5, .9));
       }
     }
+    const man = {};                                   // some practice logged by hand on days the app wasn't used
+    if (keen > 0) for (let d = 1; d < 60; d++) { const k = dayKey(addDays(t, -d)); if (!log[k] && Math.random() < .18) man[k] = Math.round(rnd(10, 25)) * 60000; }
     students[id] = { id, name, instrument, color: COLORS[ci], target, studioId: 'demo', lesson: { day, time, length, start: '2025-01-01' },
-      practice: keen > 0 ? { log, stats: st } : null, linkedAt: keen > 0 ? '2026-01-10' : null, kidName: firstName(name),
+      practice: keen > 0 ? { log, stats: st, manual: man } : null, linkedAt: keen > 0 ? '2026-01-10' : null, kidName: firstName(name),
       assignments: {}, progress: {}, upcoming: {}, lessonChanges: {}, archived: false };
     const L = students[id].lesson;
     for (let w = 1; w <= 16; w++) {             // past lessons with notes and ratings

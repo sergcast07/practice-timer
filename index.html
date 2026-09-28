@@ -237,6 +237,20 @@
   .pinBox { max-width: 300px; margin: 48px auto 0; text-align: center; display: flex; flex-direction: column; gap: 12px; align-items: stretch; }
   .pinBox .medal { --kid: var(--brand); }
   .pinBox input { text-align: center; font-size: 26px; letter-spacing: 10px; padding: 12px; }
+  /* Practice logged by hand: drawn as "sketched" hatching instead of solid colour */
+  .hatch { background: repeating-linear-gradient(135deg, var(--kid) 0 2.5px, transparent 2.5px 5.5px) !important; opacity: .8; }
+  .bar { display: flex; }
+  #manualNote { font-size: 12.5px; color: var(--muted); margin-top: 6px; display: flex; align-items: center; gap: 4px; }
+  #manualNote .ic { width: 13px; height: 13px; }
+  #manualNote:empty { display: none; }
+  .card.sketch { background: transparent; box-shadow: none; border: 1.5px dashed var(--line); }
+  .sketch .label { font-weight: 600; color: var(--ink-2); }
+  .mEntry { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--ink-2); padding: 8px 0 0; }
+  .mEntry .sw { width: 18px; height: 12px; border-radius: 3px; flex: none; }
+  .mEntry .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mEntry button { padding: 4px; }
+  .medal.hatched { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--kid) 22%, var(--card)) 0 4px, var(--card) 4px 8px); }
+  .fieldRow { display: grid; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted); text-align: left; margin-top: 12px; }
   /* Weekly recap */
   .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
   .recap { display: grid; gap: 12px; border: 1.5px solid color-mix(in srgb, var(--accent) 22%, transparent); }
@@ -313,6 +327,7 @@
   <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
   <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
   <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></symbol>
   <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4"/></symbol>
@@ -354,12 +369,15 @@
     <div class="card">
       <div class="ring" id="ring">
         <svg viewBox="0 0 120 120">
+          <defs><pattern id="hatchRing" patternUnits="userSpaceOnUse" width="4" height="4" patternTransform="rotate(45)"><rect width="2" height="4" style="fill:var(--kid)"/></pattern></defs>
           <circle class="track" cx="60" cy="60" r="52"/>
+          <circle id="progManual" cx="60" cy="60" r="52" style="stroke:url(#hatchRing);opacity:.85"/>
           <circle class="prog" id="prog" cx="60" cy="60" r="52"/>
         </svg>
         <div class="center">
           <div id="time">0:00</div>
           <div id="ofGoal"></div>
+          <div id="manualNote"></div>
         </div>
       </div>
       <div class="statusRow"><div class="status" id="status"><span class="dot"></span><span id="statusText"></span></div></div>
@@ -406,6 +424,13 @@
         </div>
       </div>
       <p class="muted small" id="goalNote" style="margin-top:8px;text-align:right"></p>
+    </div>
+    <div class="card sketch">
+      <div class="rowBetween">
+        <div class="label"><svg class="ic"><use href="#i-pencil"/></svg>Practised without the app?</div>
+        <button class="secondary" id="manualBtn">Log it</button>
+      </div>
+      <div id="manualList"></div>
     </div>
   </section>
 
@@ -546,6 +571,7 @@ const store = {
 };
 let kids = store.get('pt-kids', []);            // [{id, name, color, goal (minutes)}]
 let log = store.get('pt-log', {});              // {kidId: {'YYYY-MM-DD': ms}}
+let manual = store.get('pt-manual', {});        // practice logged by hand: {kidId: {entryId: {day, ms, note, at}}}
 let stats = store.get('pt-stats', {});          // {kidId: {'YYYY-MM-DD': {active, breaks, longest, notes, inTune, beats, steady}}}
 let settings = Object.assign(
   { sens: +store.get('sens', 60), grace: +store.get('grace', 3), musicOnly: store.get('musicOnly', true), pin: null },
@@ -602,6 +628,7 @@ function onRemote(snap) {
   if (!pendingFields.settings) settings = Object.assign(settings, d.settings || {});
   log = d.log || {};
   stats = d.stats || {};
+  manual = d.manual || {}; store.set('pt-manual', manual);
   store.set('pt-kids', kids); store.set('pt-log', log); store.set('pt-settings', settings); store.set('pt-stats', stats);
   if (kid) {
     kid = kids.find(k => k.id === kid.id) || null;
@@ -649,7 +676,7 @@ async function createFamily() {
   setSync('connecting');
   try { await loadFirebase(); } catch (e) { console.error(e); return setSync('error'); }
   family = familyCode();
-  F.setDoc(F.doc(db, 'families', family), { kids, log, stats, settings, created: F.serverTimestamp() })
+  F.setDoc(F.doc(db, 'families', family), { kids, log, stats, manual, settings, created: F.serverTimestamp() })
     .catch(e => { console.error(e); setSync('error'); });
   store.set('pt-family', family);
   connect(); renderParent();
@@ -699,7 +726,10 @@ function lastDays(n) {            // oldest → today
   for (let i = n - 1; i >= 0; i--) out.push(new Date(t.getFullYear(), t.getMonth(), t.getDate() - i));
   return out;
 }
-const msOn = (kid, d = new Date()) => ((log[kid.id] || {})[dayKey(d)] || 0) + ((pend[kid.id] || {})[dayKey(d)] || 0);
+// Recorded = heard by the app; manual = logged by hand. Totals, goals and streaks count both.
+const recordedOn = (kid, d = new Date()) => ((log[kid.id] || {})[dayKey(d)] || 0) + ((pend[kid.id] || {})[dayKey(d)] || 0);
+const manualOn = (kid, d = new Date()) => { const k = dayKey(d); return Object.values(manual[kid.id] || {}).reduce((a, e) => a + (e.day === k ? e.ms : 0), 0); };
+const msOn = (kid, d = new Date()) => recordedOn(kid, d) + manualOn(kid, d);
 // Quality stats for one day, including anything not yet synced
 function statsOn(kid, d = new Date()) {
   const k = dayKey(d), r = stats[kid.id]?.[k] || {}, p = pendStats[kid.id]?.[k] || {}, out = { ...r };
@@ -711,7 +741,7 @@ function statsOver(kid, days) {
   const t = { active: 0, played: 0, notes: 0, inTune: 0, beats: 0, steady: 0 };
   for (const d of days) {
     const s = statsOn(kid, d);
-    if (s.active) { t.active += s.active; t.played += Math.min(msOn(kid, d), s.active); }
+    if (s.active) { t.active += s.active; t.played += Math.min(recordedOn(kid, d), s.active); }
     t.notes += s.notes || 0; t.inTune += s.inTune || 0; t.beats += s.beats || 0; t.steady += s.steady || 0;
   }
   return {
@@ -756,7 +786,7 @@ function show(name) {
   if (listening) stopAudio();
   screen = name;
   for (const s of document.querySelectorAll('.screen')) s.hidden = s.id !== name;
-  ({ home: renderHome, history: renderHistory, parent: renderParent, practice: () => { renderPractice(); renderTeacherCard(); } }[name] || (() => {}))();
+  ({ home: renderHome, history: renderHistory, parent: renderParent, practice: () => { renderPractice(); renderTeacherCard(); renderManualList(); } }[name] || (() => {}))();
   window.scrollTo(0, 0);
 }
 document.querySelectorAll('[data-home]').forEach(b => b.onclick = () => show('home'));
@@ -780,7 +810,8 @@ function renderHome() {
           const nl = nextLesson(t), ev = upcomingEvents(t).find(e => daysUntil(e.date) <= 30);
           return nl || ev ? `<div class="lessonLine">${nl ? `${icon('calendar')}Lesson ${lessonLabel(nl)}` : ''}${ev ? `<span class="badge">${icon('trophy')}${esc(ev.title)} ${countdown(ev.date)}</span>` : ''}</div>` : '';
         })(k.link && teacherData[k.link])}
-        <div class="bar"><div style="width:${frac * 100}%"></div></div>
+        ${(() => { const g = goalOf(k) * 60000, r = Math.min(recordedOn(k) / g, 1);
+          return `<div class="bar"><div style="width:${r * 100}%"></div><div class="hatch" style="width:${(frac - r) * 100}%"></div></div>`; })()}
       </div>${icon('chev', 'go')}</button>`;
   }).join('');
   document.querySelectorAll('[data-kid]').forEach(b => b.onclick = () => { kid = kids.find(k => k.id === b.dataset.kid); sessionMs = 0; session = newSession(); show('practice'); });
@@ -801,7 +832,11 @@ function renderPractice(playing, talking) {
   const today = msOn(kid), goal = goalOf(kid) * 60000, frac = Math.min(today / goal, 1);
   $('time').textContent = clock(today);
   $('ofGoal').textContent = `of ${goalOf(kid)} min today`;
-  $('prog').style.strokeDashoffset = CIRC * (1 - frac);
+  const recFrac = Math.min(recordedOn(kid) / goal, 1), manLen = CIRC * (frac - recFrac), man = manualOn(kid);
+  $('prog').style.strokeDashoffset = CIRC * (1 - recFrac);
+  $('progManual').style.strokeDasharray = `${manLen} ${CIRC}`;
+  $('progManual').style.strokeDashoffset = -CIRC * recFrac;
+  $('manualNote').innerHTML = man ? `${icon('pencil')}${mins(man)} logged by hand` : '';
   $('ring').classList.toggle('done', frac >= 1);
   const floor = goalFloor(kid);
   $('goalVal').textContent = goalOf(kid) + ' min';
@@ -864,6 +899,70 @@ $('bpmUp').onclick = () => changeBpm(5);
 $('bpmDown').onclick = () => changeBpm(-5);
 function changeGoal(d) { kid.goal = Math.max(goalFloor(kid)?.min || 5, Math.min(180, goalOf(kid) + d)); saveKids(); renderPractice(); }
 $('goalUp').onclick = () => changeGoal(5);
+
+// ---------- Practice logged by hand ----------
+// For practice the app didn't hear. It counts toward goals and streaks, but is always drawn "sketched"
+// (hatched) rather than solid, never gets focus/tuning/rhythm scores, and never sets off the celebration.
+const MANUAL_DAY_MAX = 180;
+function addManual(k, day, ms, note) {
+  const id = Date.now().toString(36), e = { day, ms, note, at: new Date().toISOString() };
+  (manual[k.id] ??= {})[id] = e; store.set('pt-manual', manual);
+  if (family && ref) F.updateDoc(ref, { [`manual.${k.id}.${id}`]: e }).catch(e => console.error(e));
+  pushTeacher(k);
+}
+function removeManual(k, id) {
+  delete manual[k.id]?.[id]; store.set('pt-manual', manual);
+  if (family && ref) F.updateDoc(ref, { [`manual.${k.id}.${id}`]: F.deleteField() }).catch(e => console.error(e));
+  pushTeacher(k);
+}
+function renderManualList() {
+  if (!kid) return;
+  const since = dayKey(lastDays(7)[0]);
+  const list = Object.entries(manual[kid.id] || {}).filter(([, e]) => e.day >= since).sort((a, b) => b[1].day.localeCompare(a[1].day) || b[1].at.localeCompare(a[1].at));
+  $('manualList').innerHTML = list.map(([id, e]) => {
+    const d = parseDay(e.day), when = e.day === dayKey() ? 'Today' : daysUntil(e.day) === -1 ? 'Yesterday' : d.toLocaleDateString(undefined, { weekday: 'short' });
+    return `<div class="mEntry"><span class="sw hatch"></span><span class="grow">${when} · ${mins(e.ms)}${e.note ? ' · ' + esc(e.note) : ''}</span>
+      <button class="ghost icon" data-unlog="${id}" aria-label="Remove this entry">${icon('x', 'sm')}</button></div>`;
+  }).join('');
+  $('manualList').querySelectorAll('[data-unlog]').forEach(b => b.onclick = () => {
+    if (!confirm('Remove this entry?')) return;
+    removeManual(kid, b.dataset.unlog); renderPractice(); renderManualList();
+  });
+}
+function manualDialog() {
+  const k = kid, days = lastDays(7).reverse();
+  let minsVal = 15;
+  const card = $('linkCard');
+  card.style.setProperty('--kid', kidColor(k));
+  card.innerHTML = `<div class="medal hatched">${icon('pencil')}</div>
+    <h2 style="text-align:center">Log practice by hand</h2>
+    <p class="muted" style="text-align:center">For practice the app didn’t hear. It counts toward ${esc(k.name)}’s goal, and shows as sketched lines instead of solid colour.</p>
+    <label class="fieldRow">When
+      <select id="mDay">${days.map((d, i) => `<option value="${dayKey(d)}">${i === 0 ? 'Today' : i === 1 ? 'Yesterday' : d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short' })}</option>`).join('')}</select></label>
+    <div class="fieldRow">How long
+      <div class="stepper" style="justify-content:center"><button id="mLess" aria-label="Less">${icon('minus')}</button><span class="val" id="mMins"></span><button id="mMore" aria-label="More">${icon('plus')}</button></div></div>
+    <label class="fieldRow">What did you practise? <span style="font-weight:500">(optional)</span>
+      <input type="text" id="mNote" maxlength="60" placeholder="e.g. Scales at school"></label>
+    <p class="small" id="mErr" style="color:var(--danger);min-height:1.2em;margin-top:8px;text-align:center"></p>
+    <div class="pickList" style="margin-top:4px">
+      <button class="primary" id="mAdd" style="--kid:var(--brand);color:var(--bg);justify-content:center">Add to ${esc(k.name)}’s practice</button>
+      <button class="ghost block" id="mCancel" style="justify-content:center">Cancel</button></div>`;
+  const show = () => { card.querySelector('#mMins').textContent = mins(minsVal * 60000); card.querySelector('#mLess').disabled = minsVal <= 5; };
+  show();
+  card.querySelector('#mLess').onclick = () => { minsVal = Math.max(5, minsVal - 5); show(); };
+  card.querySelector('#mMore').onclick = () => { minsVal = Math.min(MANUAL_DAY_MAX, minsVal + 5); show(); };
+  card.querySelector('#mCancel').onclick = () => { $('linkDlg').hidden = true; };
+  card.querySelector('#mAdd').onclick = () => {
+    const day = card.querySelector('#mDay').value, already = manualOn(k, parseDay(day));
+    if (already + minsVal * 60000 > MANUAL_DAY_MAX * 60000)
+      return (card.querySelector('#mErr').textContent = `That’s more than ${MANUAL_DAY_MAX / 60} hours by hand for one day.`);
+    addManual(k, day, minsVal * 60000, card.querySelector('#mNote').value.trim());
+    $('linkDlg').hidden = true;
+    renderPractice(); renderManualList();
+  };
+  $('linkDlg').hidden = false;
+}
+$('manualBtn').onclick = manualDialog;
 $('goalDown').onclick = () => changeGoal(-5);
 
 function addPractice(ms) {
@@ -943,10 +1042,11 @@ function renderHistory() {
       })()}
       <div class="chart">
         <div class="goalLine" style="bottom:${goal / top * 100}%"></div>
-        ${vals.map((v, i) => `<div class="col" title="${days[i].toDateString()}: ${mins(v)}"><div class="b ${v >= goal ? 'met' : ''}" style="height:${v / top * 100}%"></div></div>`).join('')}
+        ${vals.map((v, i) => { const m = manualOn(k, days[i]); return `<div class="col" title="${days[i].toDateString()}: ${mins(v)}${m ? ` (${mins(m)} by hand)` : ''}">
+          ${m ? `<div class="b hatch" style="height:${m / top * 100}%;border-radius:4px 4px 0 0;min-height:0"></div>` : ''}<div class="b ${v >= goal ? 'met' : ''}" style="height:${(v - m) / top * 100}%;${m ? 'border-radius:0' : ''}"></div></div>`; }).join('')}
       </div>
       <div class="days">${days.map((d, i) => `<span>${i === days.length - 1 ? 'Today' : DOW[d.getDay()]}</span>`).join('')}</div>
-      <div class="footnote">Last two weeks. Solid bars met the ${goalOf(k)}-minute goal (dashed line).
+      <div class="footnote">Last two weeks. Solid bars met the ${goalOf(k)}-minute goal (dashed line); striped parts were logged by hand.
         Focus, tuning and rhythm cover the last 7 days, with the change from the week before.
         ${tracksPitch(k) ? `A note is in tune within ${IN_TUNE_CENTS} cents of the instrument’s own tuning.` : ''}</div>
     </div>`;
@@ -1024,9 +1124,9 @@ function renderParent() {
   document.querySelectorAll('[data-remove]').forEach(b => b.onclick = () => {
     const k = kids.find(k => k.id === b.dataset.remove);
     if (!confirm(`Remove ${k.name} and all of their practice history?`)) return;
-    kids = kids.filter(x => x !== k); delete log[k.id]; delete pend[k.id]; delete stats[k.id]; delete pendStats[k.id];
-    saveKids(); saveLog(); store.set('pt-stats', stats);
-    if (ref) F.updateDoc(ref, { ['log.' + k.id]: F.deleteField(), ['stats.' + k.id]: F.deleteField() }).catch(console.error);
+    kids = kids.filter(x => x !== k); delete log[k.id]; delete pend[k.id]; delete stats[k.id]; delete pendStats[k.id]; delete manual[k.id];
+    saveKids(); saveLog(); store.set('pt-stats', stats); store.set('pt-manual', manual);
+    if (ref) F.updateDoc(ref, { ['log.' + k.id]: F.deleteField(), ['stats.' + k.id]: F.deleteField(), ['manual.' + k.id]: F.deleteField() }).catch(console.error);
     renderParent();
   });
   $('syncOff').hidden = !!family;
@@ -1410,13 +1510,14 @@ async function watchTeachers() {
 // Share the last 60 days of this player's practice with their teacher
 function pushTeacher(k) {
   if (!k?.link || !db || teacherData[k.link]?.missing) return;
-  const log60 = {}, stats60 = {};
+  const log60 = {}, stats60 = {}, manual60 = {};
   for (const d of lastDays(60)) {
-    const key = dayKey(d), ms = msOn(k, d), st = statsOn(k, d);
+    const key = dayKey(d), ms = recordedOn(k, d), man = manualOn(k, d), st = statsOn(k, d);
     if (ms) log60[key] = Math.round(ms);
+    if (man) manual60[key] = Math.round(man);
     if (Object.keys(st).length) stats60[key] = Object.fromEntries(Object.entries(st).map(([f, v]) => [f, Math.round(v)]));
   }
-  F.updateDoc(F.doc(db, 'students', k.link), { practice: { log: log60, stats: stats60, goal: goalOf(k), updated: Date.now() }, kidName: k.name })
+  F.updateDoc(F.doc(db, 'students', k.link), { practice: { log: log60, manual: manual60, stats: stats60, goal: goalOf(k), updated: Date.now() }, kidName: k.name })
     .catch(e => console.error(e));
 }
 

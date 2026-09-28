@@ -190,17 +190,17 @@ const minsText = ms => { const m = Math.round(ms / 60000); return m >= 60 ? `${M
 const pct = x => x == null ? '–' : Math.round(x * 100) + '%';
 function week(s, endKey, offset = 0) {
   const keys = Array.from({ length: 7 }, (_, i) => addKey(endKey, -6 + i - 7 * offset));
-  const t = { total: 0, days: 0, active: 0, played: 0, notes: 0, inTune: 0, beats: 0, steady: 0, longest: 0 };
+  const t = { total: 0, manual: 0, days: 0, active: 0, played: 0, notes: 0, inTune: 0, beats: 0, steady: 0, longest: 0 };
   for (const k of keys) {
-    const ms = s.practice?.log?.[k] || 0, st = s.practice?.stats?.[k] || {};
-    t.total += ms; if (ms >= 60000) t.days++;
-    if (st.active) { t.active += st.active; t.played += Math.min(ms, st.active); }
+    const rec = s.practice?.log?.[k] || 0, man = s.practice?.manual?.[k] || 0, ms = rec + man, st = s.practice?.stats?.[k] || {};
+    t.total += ms; t.manual += man; if (ms >= 60000) t.days++;
+    if (st.active) { t.active += st.active; t.played += Math.min(rec, st.active); }
     t.notes += st.notes || 0; t.inTune += st.inTune || 0; t.beats += st.beats || 0; t.steady += st.steady || 0; t.longest = Math.max(t.longest, st.longest || 0);
   }
   return { ...t, focus: t.active >= 60000 ? t.played / t.active : null, tune: t.notes >= 10 ? t.inTune / t.notes : null, rhythm: t.beats >= 8 ? t.steady / t.beats : null };
 }
 function lastPracticed(s, todayKey) {
-  for (let i = 0; i < 60; i++) if ((s.practice?.log?.[addKey(todayKey, -i)] || 0) >= 60000) return i;
+  for (let i = 0; i < 60; i++) { const k = addKey(todayKey, -i); if ((s.practice?.log?.[k] || 0) + (s.practice?.manual?.[k] || 0) >= 60000) return i; }
   return null;
 }
 const currentAssignment = s => Object.values(s.assignments || {}).filter(a => a.status === 'active').sort((a, b) => (a.due || '9').localeCompare(b.due || '9'))[0];
@@ -238,7 +238,7 @@ const trendTxt = (a, b) => { if (a == null || b == null) return ''; const d = Ma
 // One line that tells the teacher how the week went, in the order a teacher cares about (numbers only – safe as HTML)
 function weekLine(s, todayKey) {
   if (!s.linkedAt) return 'Not connected to the app yet';
-  const c = week(s, todayKey), p = week(s, todayKey, 1), parts = [`${c.days} of 7 days · ${minsText(c.total)}`];
+  const c = week(s, todayKey), p = week(s, todayKey, 1), parts = [`${c.days} of 7 days · ${minsText(c.total)}${c.manual ? ` <span style="color:#6e7385">(${minsText(c.manual)} by hand)</span>` : ''}`];
   if (c.focus != null) parts.push(`focus ${pct(c.focus)}${trendTxt(c.focus, p.focus)}`);
   if (s.instrument !== 'piano' && c.tune != null) parts.push(`in tune ${pct(c.tune)}${trendTxt(c.tune, p.tune)}`);
   if (c.rhythm != null) parts.push(`rhythm ${pct(c.rhythm)}${trendTxt(c.rhythm, p.rhythm)}`);
