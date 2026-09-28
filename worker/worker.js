@@ -300,7 +300,7 @@ function digestEmail(env, feed, students, now, test) {
       wins.push([88, `${esc(first(s.name))} completed your challenge “${esc(s.challenges[id].title || CHALLENGE_LABELS[s.challenges[id].kind]?.replace('{n}', s.challenges[id].target) || 'Challenge')}”.`]);
     const done = Object.values(s.assignments || {}).filter(a => a.status === 'done' && a.completed && a.completed > addKey(now.key, -7));
     for (const a of done) wins.push([60, `${esc(first(s.name))} finished “${esc(a.title)}”.`]);
-    else if (planned && c.days === planned - 1 && c.days >= 3) wins.push([50, `${esc(first(s.name))} practiced ${c.days} of ${planned} planned days.`]);
+    if (planned && c.days === planned - 1 && c.days >= 3) wins.push([50, `${esc(first(s.name))} practiced ${c.days} of ${planned} planned days.`]);
   }
   const topWins = wins.sort((a, b) => b[0] - a[0]).slice(0, 3).map(w => w[1]);
   const nudges = weeks.filter(({ s, c }) => c.days <= Math.min(1, plannedDays(s) - 2)).sort((a, b) => a.c.total - b.c.total).slice(0, 3);
