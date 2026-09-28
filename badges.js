@@ -178,3 +178,21 @@ function medalSvg(iconId, color, { locked = false, size = 64 } = {}) {
     <svg x="18" y="18" width="28" height="28" viewBox="0 0 24 24" style="color:${ink}"><use href="#i-${iconId}" style="stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round"/></svg>
   </svg>`;
 }
+
+// ---------- Photos ----------
+// A small square picture (128 × 128 JPEG, about 5–10 KB) kept right on the player/student record, so no file
+// storage is needed. Just enough for a teacher with many students to see who's who.
+async function makePhoto(file, size = 128) {
+  let src;
+  try { src = await createImageBitmap(file); }
+  catch { src = new Image(); src.src = URL.createObjectURL(file); await src.decode(); }
+  const w = src.width, h = src.height, s = Math.min(w, h), c = document.createElement('canvas');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d'); ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(src, (w - s) / 2, (h - s) / 2, s, s, 0, 0, size, size);          // center crop to a square
+  let q = 0.8, url = c.toDataURL('image/jpeg', q);
+  while (url.length > 16000 && q > 0.4) { q -= 0.1; url = c.toDataURL('image/jpeg', q); }
+  return url;
+}
+// Only ever display a small JPEG data URL – anything else stored in a photo field is ignored
+const safePhoto = p => typeof p === 'string' && p.length < 40000 && /^data:image\/jpeg;base64,[A-Za-z0-9+/]+=*$/.test(p) ? p : null;

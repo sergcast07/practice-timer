@@ -147,6 +147,10 @@
 
   .avatar { flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--kid); color: #fff; display: grid; place-items: center;
             font-family: var(--serif); font-weight: 600; font-size: 17px; }
+  .avatar { overflow: hidden; }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .photoField { display: flex; align-items: center; gap: 12px; }
+  .photoField .avatar { width: 56px; height: 56px; font-size: 22px; }
   .avatar.sm { width: 30px; height: 30px; font-size: 13px; }
   .avatar.lg { width: 60px; height: 60px; font-size: 25px; }
   .list { display: grid; }
@@ -435,7 +439,7 @@
 <div class="overlay" id="modal" hidden><div class="card modal" id="modalCard" role="dialog" aria-modal="true"></div></div>
 <div id="toast"></div>
 
-<script src="badges.js?v=4"></script>
+<script src="badges.js?v=5"></script>
 <script>
 // ============================================================================================
 // Allegrow Studio (teacher side of Allegrow)
@@ -482,6 +486,8 @@ const fmtTime = t => { if (!t) return ''; const [h, m] = t.split(':').map(Number
 const mins = ms => { const m = Math.round(ms / 60000); return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m} min`; };
 const pct = x => x == null ? '–' : Math.round(x * 100) + '%';
 const initial = s => esc([...(s || '?').trim()][0]?.toUpperCase() || '?');
+// A student's avatar: the family's photo, else one the teacher added, else the first letter of their name
+const face = s => { const p = safePhoto(s?.photo) || safePhoto(s?.teacherPhoto); return p ? `<img src="${p}" alt="">` : initial(s?.name); };
 const firstName = s => (s || '').trim().split(/\s+/).filter(w => !/^(mr|mrs|ms|miss|dr|mx)\.?$/i.test(w))[0] || s;
 const randomCode = () => {
   const abc = 'abcdefghjkmnpqrstuvwxyz23456789', r = crypto.getRandomValues(new Uint8Array(25));
@@ -832,7 +838,7 @@ function vOverview() {
       <section class="card"><h2>Needs attention</h2>
         <div class="list">${attention.length ? attention.slice(0, 7).map(([s, kind, ic, t1, t2]) => `
           <button class="rowLink" data-student="${s.id}" style="--kid:${s.color}">
-            <div class="avatar sm">${initial(s.name)}</div>
+            <div class="avatar sm">${face(s)}</div>
             <div class="grow"><div class="t">${esc(s.name)} <span class="chip ${kind}">${icon(ic)}${t1}</span></div><div class="d">${esc(t2)}</div></div>
           </button>`).join('') : '<div class="empty">Everyone is on track. Nice.</div>'}</div></section>
     </div>
@@ -848,11 +854,11 @@ function practiceTable(list) {
   return `<div class="ptable">
     <div class="ptr head"><div>Student</div><div>Minutes vs target</div><div>Days</div><div>Focus</div><div>In tune</div><div>Rhythm</div><div>Last practiced</div></div>
     ${list.map(s => {
-      if (!s.linkedAt) return `<div class="ptr" data-student="${s.id}" style="--kid:${s.color}"><div class="name"><div class="avatar sm">${initial(s.name)}</div><span>${esc(s.name)}</span></div>
+      if (!s.linkedAt) return `<div class="ptr" data-student="${s.id}" style="--kid:${s.color}"><div class="name"><div class="avatar sm">${face(s)}</div><span>${esc(s.name)}</span></div>
         <div class="mins"><span class="chip info">${icon('link')}Not connected</span></div><div></div><div></div><div></div><div></div><div></div></div>`;
       const c = practiceSummary(s, wk), p = practiceSummary(s, prev), plan = planOfStudent(s), target = Math.max(1, planTotal(plan)) * 60000, f = Math.min(c.total / target, 1);
       return `<div class="ptr" data-student="${s.id}" style="--kid:${s.color}">
-        <div class="name"><div class="avatar sm">${initial(s.name)}</div><span>${esc(s.name)}</span></div>
+        <div class="name"><div class="avatar sm">${face(s)}</div><span>${esc(s.name)}</span></div>
         <div class="mins"><span class="num">${mins(c.total)}</span> <span class="muted small">/ ${mins(target)}</span>${c.manual ? `<span class="byHand" title="Logged by hand">${icon('edit')}${mins(c.manual)}</span>` : ''}
           <div class="mbar ${f >= 1 ? 'full' : ''}"><div style="width:${Math.min((c.total - c.manual) / target, 1) * 100}%"></div><div class="hatch" style="width:${(f - Math.min((c.total - c.manual) / target, 1)) * 100}%"></div></div></div>
         <div><span class="lbl-m">Days</span><span class="num">${c.days}<span class="muted small"> / ${planDayCount(plan)}</span></span></div>
@@ -868,7 +874,7 @@ function lessonRow(l) {
   const [label, kind] = STATUS[l.status] || STATUS.scheduled;
   return `<button class="rowLink" data-lesson="${l.id}" style="--kid:${s.color}">
     <div class="time ${l.status === 'moved' || l.status === 'cancelled' ? 'strike' : ''}">${fmtTime(l.time)}</div>
-    <div class="avatar sm">${initial(s.name)}</div>
+    <div class="avatar sm">${face(s)}</div>
     <div class="grow"><div class="t">${esc(s.name)} ${l.status !== 'scheduled' ? `<span class="chip ${kind}">${label}</span>` : ''}${l.extra ? '<span class="chip">Extra</span>' : ''}</div>
       <div class="d">${l.length} min · ${esc(INSTRUMENTS[s.instrument] || '')}${l.notes ? ' · ' + esc(l.notes.slice(0, 60)) + (l.notes.length > 60 ? '…' : '') : ''}</div></div>
     ${icon('chev', 'muted')}</button>`;
@@ -895,7 +901,7 @@ function vStudents() {
     <div class="list">${list.map(s => {
       const c = practiceSummary(s, lastDays(7));
       return `<button class="rowLink" data-student="${s.id}" style="--kid:${s.color}">
-        <div class="avatar">${initial(s.name)}</div>
+        <div class="avatar">${face(s)}</div>
         <div class="grow"><div class="t">${esc(s.name)} ${s.linkedAt ? '' : `<span class="chip info">${icon('link')}Invite pending</span>`}</div>
           <div class="d">${esc(INSTRUMENTS[s.instrument] || 'Instrument not set')} · ${lessonText(s)}</div></div>
         <div class="small muted num" style="text-align:right">${s.linkedAt ? mins(c.total) + '<br>this week' : ''}</div>
@@ -903,7 +909,7 @@ function vStudents() {
     }).join('') || (active().length ? '<div class="empty">No matches.</div>' : practiceTable([]))}</div>
   </div>
   ${archived.length ? `<details class="card" style="margin-top:16px"><summary style="cursor:pointer;font-weight:700">Archived (${archived.length})</summary>
-    <div class="list" style="margin-top:10px">${archived.map(s => `<button class="rowLink" data-student="${s.id}" style="--kid:${s.color}"><div class="avatar sm">${initial(s.name)}</div><div class="grow">${esc(s.name)}</div></button>`).join('')}</div></details>` : ''}`;
+    <div class="list" style="margin-top:10px">${archived.map(s => `<button class="rowLink" data-student="${s.id}" style="--kid:${s.color}"><div class="avatar sm">${face(s)}</div><div class="grow">${esc(s.name)}</div></button>`).join('')}</div></details>` : ''}`;
 }
 const planLine = s => `Plan: ${planText(planOfStudent(s))}`;
 // The lesson time that's running now (or the next one to start)
@@ -924,7 +930,7 @@ function vStudent() {
   return `<div style="--kid:${s.color}">
     <button class="ghost" data-go2="students" style="margin-left:-10px;margin-bottom:10px">${icon('back', 'sm')}Students</button>
     <div class="studentHead">
-      <div class="avatar lg">${initial(s.name)}</div>
+      <div class="avatar lg">${face(s)}</div>
       <div class="grow"><h1>${esc(s.name)}</h1><div class="muted">${esc(INSTRUMENTS[s.instrument] || 'Instrument not set')} · ${lessonText(s)}</div><div class="muted small">${planLine(s)}</div></div>
       <div class="actions" style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="secondary" data-act="invite">${icon('link', 'sm')}${s.linkedAt ? 'Invite link' : 'Invite family'}</button>
@@ -1178,7 +1184,12 @@ function studentModal(sid) {
   let color = s.color;
   openModal(`${mhead(sid ? 'Edit student' : 'Add student')}
     <div class="fields">
-      <label class="field">Name <input type="text" id="fName" value="${esc(s.name)}" maxlength="40" placeholder="Student’s name"></label>
+      <div class="photoField"><div class="avatar" id="fPhotoPrev" style="--kid:${s.color}">${face(s)}</div>
+        <label class="field" style="flex:1">Name <input type="text" id="fName" value="${esc(s.name)}" maxlength="40" placeholder="Student’s name"></label></div>
+      <div class="field" style="margin-top:-4px">${safePhoto(s.photo) ? '<span class="small muted" style="font-weight:500">Photo added by the family.</span>'
+        : `<span style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button type="button" class="secondary small" id="fPhoto">${icon('plus', 'sm')}${s.teacherPhoto ? 'Change photo' : 'Add a photo'}</button>
+          <button type="button" class="ghost small" id="fPhotoDel" ${s.teacherPhoto ? '' : 'hidden'}>Remove</button>
+          <span class="small muted" style="font-weight:500">Optional – a small picture to help you recognize them. A photo the family adds in their app replaces it.</span></span>`}</div>
       <div class="fields two">
         <label class="field">Instrument <select id="fInstr"><option value="">Choose…</option>${Object.entries(INSTRUMENTS).map(([k, v]) => `<option value="${k}" ${s.instrument === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
         <div></div>
@@ -1195,6 +1206,18 @@ function studentModal(sid) {
     </div>
     <footer>${sid ? `<button class="danger" id="fArchive">${s.archived ? 'Delete permanently' : 'Archive student'}</button>` : ''}
       <div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="fSave">${sid ? 'Save' : 'Add student'}</button></div></footer>`, m => {
+    // photo (teacher's own; the family's photo, if any, always wins)
+    let tPhoto = s.teacherPhoto || null;
+    m.querySelector('#fPhoto')?.addEventListener('click', () => {
+      const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*';
+      input.onchange = async () => {
+        if (!input.files[0]) return;
+        try { tPhoto = await makePhoto(input.files[0]); m.querySelector('#fPhotoPrev').innerHTML = `<img src="${tPhoto}" alt="">`; m.querySelector('#fPhotoDel').hidden = false; }
+        catch (e) { console.error(e); toast('Couldn’t use that picture'); }
+      };
+      input.click();
+    });
+    m.querySelector('#fPhotoDel')?.addEventListener('click', () => { tPhoto = null; m.querySelector('#fPhotoPrev').innerHTML = initial(val('fName') || s.name); m.querySelector('#fPhotoDel').hidden = true; });
     // lesson times editor
     const orig = lessonSlots(s).map(l => ({ ...l }));
     let slots = sid ? orig.map((l, i) => ({ ...l, _o: i })) : [];      // _o: which original lesson time this row started as
@@ -1244,7 +1267,7 @@ function studentModal(sid) {
         } else final.push({ ...L, end: L.end || '' });
       }
       final.sort((a, b) => a.start.localeCompare(b.start));
-      const data = { name, instrument: val('fInstr'), color, plan, target: Math.round(planTotal(plan) / planDayCount(plan)),
+      const data = { name, instrument: val('fInstr'), color, plan, target: Math.round(planTotal(plan) / planDayCount(plan)), teacherPhoto: tPhoto,
                      slots: final, lesson: currentSlot({ slots: final }) || final[final.length - 1] || null };
       if (sid) {
         await api.patchStudent(sid, data); closeModal(); toast('Saved');

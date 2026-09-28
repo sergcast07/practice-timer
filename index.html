@@ -311,6 +311,10 @@
   .cheerNote .from { display: block; font-size: 13px; color: var(--muted); margin-top: 6px; }
   .teacherAwards { display: flex; gap: 10px; flex-wrap: wrap; }
   .teacherAwards > div { display: grid; justify-items: center; gap: 2px; width: 88px; text-align: center; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+  .avatar { overflow: hidden; }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .photoRow { display: flex; align-items: center; gap: 10px; }
+  .photoRow .avatar { width: 44px; height: 44px; font-size: 18px; }
   .consent { display: flex; gap: 10px; align-items: flex-start; text-align: left; font-size: 13.5px; line-height: 1.45; color: var(--ink-2);
              background: var(--soft); border-radius: 12px; padding: 12px; margin-top: 12px; cursor: pointer; }
   .consent input { width: 20px; height: 20px; flex: none; margin-top: 1px; accent-color: var(--accent); }
@@ -629,7 +633,7 @@
   </div>
 </div>
 
-<script src="badges.js?v=4"></script>
+<script src="badges.js?v=5"></script>
 <script>
 const $ = id => document.getElementById(id);
 const CIRC = 2 * Math.PI * 52;
@@ -875,6 +879,7 @@ function streak(kid) {            // practice days in a row (today may still be 
   return n;
 }
 const esc = s => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const face = k => safePhoto(k.photo) ? `<img src="${k.photo}" alt="">` : initial(k);
 const initial = k => esc([...k.name.trim()][0]?.toUpperCase() || '?');
 
 // ---------- Navigation ----------
@@ -897,7 +902,7 @@ function renderHome() {
   $('kidList').innerHTML = kids.map(k => {
     const today = msOn(k), g = goalOf(k) * 60000, frac = g ? Math.min(today / g, 1) : (today ? 1 : 0), st = streak(k);
     return `<button class="tile" data-kid="${k.id}" style="--kid:${kidColor(k)}">
-      <div class="avatar">${initial(k)}</div>
+      <div class="avatar">${face(k)}</div>
       <div class="info">
         <div class="name">${esc(k.name)}
           ${g && frac >= 1 ? `<span class="badge good">${icon('check')}Done</span>` : ''}
@@ -925,7 +930,7 @@ const newSession = () => ({ active: 0, breaks: 0, longest: 0, stretch: 0, wasPla
 function renderPractice(playing, talking) {
   if (!kid) return;
   document.body.style.setProperty('--kid', kidColor(kid));
-  $('pAvatar').innerHTML = initial(kid);
+  $('pAvatar').innerHTML = face(kid);
   $('pName').textContent = kid.name;
   const today = msOn(kid), goal = goalOf(kid) * 60000, frac = goal ? Math.min(today / goal, 1) : (today ? 1 : 0);
   $('time').textContent = clock(today);
@@ -1113,6 +1118,18 @@ function manualDialog() {
 }
 $('manualBtn').onclick = manualDialog;
 
+// Player photos: shrunk to a 128 px square in the browser before saving (see makePhoto in badges.js)
+function pickPhoto(k) {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*';
+  input.onchange = async () => {
+    const file = input.files[0]; if (!file) return;
+    try { k.photo = await makePhoto(file); saveKids(); pushTeacher(k); renderParent(); }
+    catch (e) { console.error(e); alert('Couldn’t use that picture. Try a different photo.'); }
+  };
+  input.click();
+}
+
 // Feedback from parents goes to the Allegrow team (read only by admins – see firestore.rules)
 $('feedbackBtn').onclick = () => {
   const card = $('linkCard');
@@ -1216,7 +1233,7 @@ function renderHistory() {
     const month = lastDays(30).reduce((a, d) => a + msOn(k, d), 0);
     const daysPracticed = lastDays(30).filter(d => msOn(k, d) >= 60000).length;
     return `<div class="card" style="--kid:${kidColor(k)}">
-      <div class="histHead"><div class="avatar">${initial(k)}</div><b>${esc(k.name)}</b></div>
+      <div class="histHead"><div class="avatar">${face(k)}</div><b>${esc(k.name)}</b></div>
       <div class="stats">
         <div><b>${mins(week)}</b><span>last 7 days</span></div>
         <div><b>${mins(month)}</b><span>last 30 days</span></div>
@@ -1272,7 +1289,7 @@ function renderParent() {
   document.body.style.setProperty('--kid', 'var(--accent)');
   $('players').innerHTML = kids.map(k => `
     <div class="player" style="--kid:${kidColor(k)}">
-      <div class="avatar">${initial(k)}</div>
+      <div class="avatar">${face(k)}</div>
       <input type="text" value="${esc(k.name)}" data-rename="${k.id}" maxlength="20" aria-label="Name">
       <button class="danger" data-remove="${k.id}">Remove</button>
       <div class="more">
@@ -1281,6 +1298,8 @@ function renderParent() {
         ${hasPitch(k) ? `<label class="opt">Tuner and in-tune score <input type="checkbox" class="toggle" data-tuning="${k.id}" ${k.tuning !== false ? 'checked' : ''}></label>` : ''}
         <div class="opt"><span>Practice plan<br><small class="muted">${esc(planText(planFor(k)))}${(f => f ? ` · ${f.by === 'a parent' ? 'set by you' : 'set by ' + esc(f.by)}` : ' · child chooses')(planFloor(k))}</small></span>
           <button class="secondary" data-plan="${k.id}">Edit</button></div>
+        <div class="opt"><span>Photo<br><small class="muted">A small picture so ${k.link ? 'the teacher' : 'a teacher'} can tell who’s who</small></span>
+          <span style="display:flex;gap:6px"><button class="secondary" data-photo="${k.id}">${k.photo ? 'Change' : 'Add'}</button>${k.photo ? `<button class="ghost" data-unphoto="${k.id}">Remove</button>` : ''}</span></div>
         <label class="opt">Chime at goal <input type="checkbox" class="toggle" data-chime="${k.id}" ${k.chime !== false ? 'checked' : ''}></label>
         ${k.link ? `<div class="opt"><span class="small">${icon('link', 'sm')} ${(t => t?.missing ? 'Teacher removed this connection' : t ? 'Teacher: ' + esc(t.teacherName) : 'Connected to a teacher')(teacherData[k.link])}</span>
           <button class="ghost small" data-unlink="${k.id}">Disconnect</button></div>`
@@ -1300,6 +1319,12 @@ function renderParent() {
     if (code) startLink(code, kids.find(k => k.id === b.dataset.link));
   });
   document.querySelectorAll('[data-unlink]').forEach(b => b.onclick = () => unlink(kids.find(k => k.id === b.dataset.unlink)));
+  document.querySelectorAll('[data-photo]').forEach(b => b.onclick = () => pickPhoto(kids.find(k => k.id === b.dataset.photo)));
+  document.querySelectorAll('[data-unphoto]').forEach(b => b.onclick = () => {
+    const k = kids.find(k => k.id === b.dataset.unphoto);
+    if (!confirm(`Remove ${k.name}’s photo?`)) return;
+    k.photo = null; saveKids(); pushTeacher(k); renderParent();
+  });
   document.querySelectorAll('[data-plan]').forEach(b => b.onclick = () => planDialog(kids.find(k => k.id === b.dataset.plan), 'parent'));
   document.querySelectorAll('[data-chime]').forEach(c => c.onchange = () => {
     kids.find(k => k.id === c.dataset.chime).chime = c.checked; saveKids();
@@ -1712,6 +1737,7 @@ function pushTeacher(k) {
     if (Object.keys(st).length) stats60[key] = Object.fromEntries(Object.entries(st).map(([f, v]) => [f, Math.round(v)]));
   }
   F.updateDoc(F.doc(db, 'students', k.link), { practice: { log: log60, manual: manual60, stats: stats60, goal: goalOf(k), plan: planFor(k), updated: Date.now() }, kidName: k.name,
+      ...((safePhoto(k.photo) || null) !== (teacherData[k.link]?.photo || null) ? { photo: safePhoto(k.photo) || null } : {}),
       badges: Object.fromEntries(kidBadges(k).filter(b => b.tier >= 0).map(b => [b.id, { tier: b.tier, label: `${b.name} – ${BADGE_TIERS[b.tier].name} (${b.unit(b.tiers[b.tier])})`, date: badgeSeen[k.id]?.[b.id]?.date || dayKey() }])) })
     .catch(e => console.error(e));
 }
@@ -1728,12 +1754,12 @@ async function startLink(code, forKid) {
   card.innerHTML = `<div class="medal" style="--kid:var(--accent)">${icon('users')}</div>
     <h2 style="text-align:center">Connect to ${esc(t.teacherName)}</h2>
     <p class="muted" style="text-align:center">${esc(t.studioName)} invited <b>${esc(t.name)}</b>.${forKid ? '' : ' Which player is this?'}</p>
-    <label class="consent"><input type="checkbox" id="lkConsent"><span>I’m this child’s parent or guardian. I agree to share their practice time, practice scores and badges with
+    <label class="consent"><input type="checkbox" id="lkConsent"><span>I’m this child’s parent or guardian. I agree to share their practice time, practice scores, badges and photo (if I add one) with
       ${esc(t.teacherName)}, and to receive their assignments and lesson times, as described in the <a href="privacy.html" target="_blank" rel="noopener">privacy policy</a>.
       Sound is never recorded or sent anywhere.</span></label>
     <p class="small" id="lkErr" style="color:var(--danger);min-height:1.2em;text-align:center"></p>
     <div class="pickList">
-      ${choices.map(k => `<button class="secondary block" data-pick="${k.id}"><div class="avatar" style="--kid:${kidColor(k)}">${initial(k)}</div>${forKid ? `Connect ${esc(k.name)}` : esc(k.name)}${k.link === code ? '<span class="muted small">(already connected)</span>' : ''}</button>`).join('')}
+      ${choices.map(k => `<button class="secondary block" data-pick="${k.id}"><div class="avatar" style="--kid:${kidColor(k)}">${face(k)}</div>${forKid ? `Connect ${esc(k.name)}` : esc(k.name)}${k.link === code ? '<span class="muted small">(already connected)</span>' : ''}</button>`).join('')}
       ${forKid ? '' : `<button class="secondary block" data-pick="new">${icon('plus', 'sm')}Add ${esc(firstWord(t.name))} as a new player</button>`}
       <button class="ghost block" data-pick="cancel">Not now</button>
     </div>
@@ -1936,7 +1962,7 @@ function renderRecap() {
   el.hidden = false;
   el.innerHTML = `<div class="recapHead"><div><div class="eyebrow">Your week in music</div><h2>${range}</h2></div>
       <button class="ghost icon" data-recap-close aria-label="Dismiss">${icon('x')}</button></div>
-    ${kids.map(k => { const r = kidRecap(k, w); return `<div class="recapRow" style="--kid:${kidColor(k)}"><div class="avatar">${initial(k)}</div>
+    ${kids.map(k => { const r = kidRecap(k, w); return `<div class="recapRow" style="--kid:${kidColor(k)}"><div class="avatar">${face(k)}</div>
       <div><b>${esc(k.name)}</b> <span class="muted small">· ${mins(r.minutes)}</span><p>${esc(r.win)}</p><p class="muted">${esc(r.focus)} ${esc(r.next)}</p></div></div>`; }).join('')}
     <button class="secondary block" data-recap-close>Got it</button>`;
   el.querySelectorAll('[data-recap-close]').forEach(b => b.onclick = () => { store.set('pt-recap-seen', w.key); el.hidden = true; });
