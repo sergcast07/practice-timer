@@ -196,3 +196,42 @@ async function makePhoto(file, size = 128) {
 }
 // Only ever display a small JPEG data URL – anything else stored in a photo field is ignored
 const safePhoto = p => typeof p === 'string' && p.length < 40000 && /^data:image\/jpeg;base64,[A-Za-z0-9+/]+=*$/.test(p) ? p : null;
+
+// ---------- Instruments ----------
+// The 12 most common lesson instruments. `low` = the lowest note (Hz) we listen for on instruments whose
+// tuning the player controls note by note; no `low` = fixed pitch or chords (piano, guitar, drums): no tuning score.
+// A student's `instrument` is one of these keys, or – for anything else – the name the teacher or parent typed.
+const INSTRUMENTS = {
+  piano:     { label: 'Piano' },
+  guitar:    { label: 'Guitar' },
+  violin:    { label: 'Violin', low: 180 },
+  voice:     { label: 'Voice', low: 75 },
+  drums:     { label: 'Drums' },
+  cello:     { label: 'Cello', low: 60 },
+  flute:     { label: 'Flute', low: 240 },
+  clarinet:  { label: 'Clarinet', low: 140 },
+  saxophone: { label: 'Saxophone', low: 65 },
+  trumpet:   { label: 'Trumpet', low: 155 },
+  viola:     { label: 'Viola', low: 120 },
+  ukulele:   { label: 'Ukulele' }
+};
+const OLD_INSTRUMENTS = { other: { label: 'Other', low: 60 } };   // earlier "Other (flute, voice, …)" choice
+const instrumentInfo = v => INSTRUMENTS[v] || OLD_INSTRUMENTS[v] || null;
+const instrumentLabel = (v, fallback = '') => instrumentInfo(v)?.label || (v ? String(v) : fallback);
+const instrumentLow = v => instrumentInfo(v)?.low || 0;           // 0 = no tuning score
+// Turn typed text ("Keyboard", "alto sax", "Bb clarinet", "Harp") into a catalog key, or keep the name as typed
+const INSTRUMENT_WORDS = [[/pian|keyboard|keys/, 'piano'], [/ukul|uke\b/, 'ukulele'], [/guitar/, 'guitar'], [/viola|vla/, 'viola'],
+  [/violin|fiddle|vln/, 'violin'], [/cello|\bvc\b/, 'cello'], [/voice|vocal|sing|choir/, 'voice'], [/drum|percussion/, 'drums'],
+  [/flute|piccolo/, 'flute'], [/clarinet/, 'clarinet'], [/sax/, 'saxophone'], [/trumpet|cornet/, 'trumpet']];
+function instrumentFrom(text) {
+  const t = String(text || '').trim().replace(/\s+/g, ' ').slice(0, 30);
+  if (!t) return '';
+  const low = t.toLowerCase();
+  if (INSTRUMENTS[low]) return low;
+  const hit = INSTRUMENT_WORDS.find(([re]) => re.test(low));
+  return hit ? hit[1] : t.charAt(0).toUpperCase() + t.slice(1);
+}
+// <option>s for an instrument <select>, with "Other – type it in" last (value "__other")
+const instrumentOptions = (v, placeholder = 'Choose…') => `<option value="" ${v ? '' : 'selected'} disabled>${placeholder}</option>` +
+  Object.entries(INSTRUMENTS).sort((a, b) => a[1].label.localeCompare(b[1].label)).map(([k, i]) => `<option value="${k}" ${v === k ? 'selected' : ''}>${i.label}</option>`).join('') +
+  `<option value="__other" ${v && !INSTRUMENTS[v] ? 'selected' : ''}>Other – type it in…</option>`;

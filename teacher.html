@@ -460,7 +460,7 @@
 <div class="overlay" id="modal" hidden><div class="card modal" id="modalCard" role="dialog" aria-modal="true"></div></div>
 <div id="toast"></div>
 
-<script src="badges.js?v=5"></script>
+<script src="badges.js?v=6"></script>
 <script>
 // ============================================================================================
 // Allegrow Studio (teacher side of Allegrow)
@@ -515,7 +515,6 @@ const randomCode = () => {
   return [...r].map(x => abc[x % abc.length]).join('').match(/.{5}/g).join('-');
 };
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-const INSTRUMENTS = { piano: 'Piano', violin: 'Violin', viola: 'Viola', cello: 'Cello', other: 'Other' };
 const COLORS = ['#cf5c3c', '#1f8a7e', '#6a55c8', '#2f6bcc', '#b3821c', '#c2457a', '#4b7f3a', '#8a5a44'];
 const EVENT_TYPES = { recital: 'Recital', exam: 'Exam', competition: 'Competition', masterclass: 'Masterclass', other: 'Other' };
 const STATUS = { scheduled: ['Scheduled', ''], done: ['Done', 'good'], cancelled: ['Canceled', 'bad'], noshow: ['No-show', 'warn'], moved: ['Moved', ''] };
@@ -912,7 +911,7 @@ function practiceTable(list) {
           <div class="mbar ${f >= 1 ? 'full' : ''}"><div style="width:${Math.min((c.total - c.manual) / target, 1) * 100}%"></div><div class="hatch" style="width:${(f - Math.min((c.total - c.manual) / target, 1)) * 100}%"></div></div></div>
         <div><span class="lbl-m">Days</span><span class="num">${c.days}<span class="muted small"> / ${planDayCount(plan)}</span></span></div>
         <div><span class="lbl-m">Focus</span><span class="num">${pct(c.focus)}</span>${trend(c.focus, p.focus)}</div>
-        <div><span class="lbl-m">In tune</span><span class="num">${s.instrument === 'piano' ? '<span class="muted">n/a</span>' : pct(c.tune)}</span>${trend(c.tune, p.tune)}</div>
+        <div><span class="lbl-m">In tune</span><span class="num">${!instrumentLow(s.instrument) ? '<span class="muted">n/a</span>' : pct(c.tune)}</span>${trend(c.tune, p.tune)}</div>
         <div><span class="lbl-m">Rhythm</span><span class="num">${pct(c.rhythm)}</span>${trend(c.rhythm, p.rhythm)}</div>
         <div class="small muted">${lastPracticedText(lastPracticed(s))}</div></div>`;
     }).join('')}</div>`;
@@ -925,7 +924,7 @@ function lessonRow(l) {
     <div class="time ${l.status === 'moved' || l.status === 'cancelled' ? 'strike' : ''}">${fmtTime(l.time)}</div>
     <div class="avatar sm">${face(s)}</div>
     <div class="grow"><div class="t">${esc(s.name)} ${l.status !== 'scheduled' ? `<span class="chip ${kind}">${label}</span>` : ''}${l.extra ? '<span class="chip">Extra</span>' : ''}</div>
-      <div class="d">${l.length} min · ${esc(INSTRUMENTS[s.instrument] || '')}${l.notes ? ' · ' + esc(l.notes.slice(0, 60)) + (l.notes.length > 60 ? '…' : '') : ''}</div></div>
+      <div class="d">${l.length} min · ${esc(instrumentLabel(s.instrument, ''))}${l.notes ? ' · ' + esc(l.notes.slice(0, 60)) + (l.notes.length > 60 ? '…' : '') : ''}</div></div>
     ${icon('chev', 'muted')}</button>`;
 }
 
@@ -952,7 +951,7 @@ function vStudents() {
       return `<button class="rowLink" data-student="${s.id}" style="--kid:${s.color}">
         <div class="avatar">${face(s)}</div>
         <div class="grow"><div class="t">${esc(s.name)} ${s.linkedAt ? '' : `<span class="chip info">${icon('link')}Invite pending</span>`}</div>
-          <div class="d">${esc(INSTRUMENTS[s.instrument] || 'Instrument not set')} · ${lessonText(s)}</div></div>
+          <div class="d">${esc(instrumentLabel(s.instrument, 'Instrument not set'))} · ${lessonText(s)}</div></div>
         <div class="small muted num" style="text-align:right">${s.linkedAt ? mins(c.total) + '<br>this week' : ''}</div>
         ${icon('chev', 'muted')}</button>`;
     }).join('') || (active().length ? '<div class="empty">No matches.</div>' : practiceTable([]))}</div>
@@ -980,7 +979,7 @@ function vStudent() {
     <button class="ghost" data-go2="students" style="margin-left:-10px;margin-bottom:10px">${icon('back', 'sm')}Students</button>
     <div class="studentHead">
       <div class="avatar lg">${face(s)}</div>
-      <div class="grow"><h1>${esc(s.name)}</h1><div class="muted">${esc(INSTRUMENTS[s.instrument] || 'Instrument not set')} · ${lessonText(s)}</div><div class="muted small">${planLine(s)}</div></div>
+      <div class="grow"><h1>${esc(s.name)}</h1><div class="muted">${esc(instrumentLabel(s.instrument, 'Instrument not set'))} · ${lessonText(s)}</div><div class="muted small">${planLine(s)}</div></div>
       <div class="actions" style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="secondary" data-act="invite">${icon('link', 'sm')}${s.linkedAt ? 'Invite link' : 'Invite family'}</button>
         <button class="secondary" data-act="editStudent">${icon('edit', 'sm')}Edit</button>
@@ -1005,7 +1004,7 @@ function tProgress(s) {
         <div class="stat"><b>${mins(c.total)}</b><span>last 7 days${c.manual ? ` · ${mins(c.manual)} by hand` : ''}</span></div>
         <div class="stat"><b>${c.days} ${c.days === 1 ? 'day' : 'days'}</b><span>practiced · ${planDayCount(planOfStudent(s))} planned</span></div>
         <div class="stat"><b>${pct(c.focus)}${trend(c.focus, p.focus)}</b><span>focus</span></div>
-        ${s.instrument !== 'piano' ? `<div class="stat"><b>${pct(c.tune)}${trend(c.tune, p.tune)}</b><span>in tune</span></div>` : ''}
+        ${instrumentLow(s.instrument) ? `<div class="stat"><b>${pct(c.tune)}${trend(c.tune, p.tune)}</b><span>in tune</span></div>` : ''}
         <div class="stat"><b>${pct(c.rhythm)}${trend(c.rhythm, p.rhythm)}</b><span>steady rhythm</span></div>
         <div class="stat"><b>${mins(m.total)}</b><span>last 30 days</span></div>
       </div>
@@ -1150,7 +1149,7 @@ function vReports() {
       <button class="primary" onclick="print()">${icon('print', 'sm')}Print / PDF</button></div></div>
   <div class="card report" style="--kid:${s.color}">
     <div class="rhead"><div><div class="eyebrow">${esc(studio.studioName)}</div><h1>${esc(s.name)}</h1>
-      <div class="muted">${esc(INSTRUMENTS[s.instrument] || '')} · Teacher: ${esc(studio.teacherName)}</div></div>
+      <div class="muted">${esc(instrumentLabel(s.instrument, ''))} · Teacher: ${esc(studio.teacherName)}</div></div>
       <div style="text-align:right"><b>Progress report</b><div class="muted small">${fmtDate(start, { day: 'numeric', month: 'long' })} – ${fmtDate(end, { day: 'numeric', month: 'long', year: 'numeric' })}</div></div></div>
     <section><h3>Practice</h3>
       ${s.linkedAt ? `<div class="stats">
@@ -1158,7 +1157,7 @@ function vReports() {
         <div class="stat"><b>${mins(P.total / (range / 7))}</b><span>per week</span></div>
         <div class="stat"><b>${P.days} of ${range}</b><span>days practiced</span></div>
         <div class="stat"><b>${pct(P.focus)}</b><span>focus</span></div>
-        ${s.instrument !== 'piano' ? `<div class="stat"><b>${pct(P.tune)}</b><span>in tune</span></div>` : ''}
+        ${instrumentLow(s.instrument) ? `<div class="stat"><b>${pct(P.tune)}</b><span>in tune</span></div>` : ''}
         <div class="stat"><b>${pct(P.rhythm)}</b><span>steady rhythm</span></div></div>
       <div class="chart" style="height:110px">${wVals.map((v, i) => `<div class="col" title="Week of ${fmtDate(weeks[i][0])}: ${mins(v)}"><div class="b met" style="height:${v / wTop * 100}%"></div></div>`).join('')}
         <div class="goal" style="bottom:${weekTarget / wTop * 100}%"></div></div>
@@ -1242,8 +1241,9 @@ function studentModal(sid) {
           <button type="button" class="ghost small" id="fPhotoDel" ${s.teacherPhoto ? '' : 'hidden'}>Remove</button>
           <span class="small muted" style="font-weight:500">Optional – a small picture to help you recognize them. A photo the family adds in their app replaces it.</span></span>`}</div>
       <div class="fields two">
-        <label class="field">Instrument <select id="fInstr"><option value="">Choose…</option>${Object.entries(INSTRUMENTS).map(([k, v]) => `<option value="${k}" ${s.instrument === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
-        <div></div>
+        <label class="field">Instrument <select id="fInstr">${instrumentOptions(s.instrument || '')}</select></label>
+        <label class="field" id="fInstrOtherWrap" ${s.instrument && !INSTRUMENTS[s.instrument] ? '' : 'hidden'}>Which instrument?
+          <input id="fInstrOther" maxlength="30" placeholder="e.g. Harp, Oboe, Bass" value="${s.instrument && !INSTRUMENTS[s.instrument] && s.instrument !== 'other' ? esc(s.instrument) : ''}"></label>
       </div>
       <div class="field">Practice plan – minutes each day (leave 0 for a rest day). The family’s app uses this as the minimum.
         <div class="presetRow">${PLAN_PRESETS.map(([n], i) => `<button type="button" class="secondary" data-preset="${i}">${n}</button>`).join('')}</div>
@@ -1302,6 +1302,9 @@ function studentModal(sid) {
     m.querySelectorAll('[data-day]').forEach(i => i.oninput = showPlan);
     m.querySelectorAll('[data-preset]').forEach(b => b.onclick = () => { const p = PLAN_PRESETS[+b.dataset.preset][1]; m.querySelectorAll('[data-day]').forEach(i => i.value = p[+i.dataset.day]); showPlan(); });
     showPlan();
+    m.querySelector('#fInstr').onchange = () => { const other = val('fInstr') === '__other'; m.querySelector('#fInstrOtherWrap').hidden = !other; if (other) m.querySelector('#fInstrOther').focus(); };
+    // A typed name that matches a known instrument ("keyboard", "alto sax") is stored as that instrument
+    const readInstr = () => val('fInstr') !== '__other' ? val('fInstr') : instrumentFrom(val('fInstrOther')) || (s.instrument === 'other' ? 'other' : '');
     m.querySelectorAll('[data-color]').forEach(b => b.onclick = () => { color = b.dataset.color; m.querySelectorAll('[data-color]').forEach(x => x.classList.toggle('on', x === b)); });
     m.querySelector('#fSave').onclick = async () => {
       const name = val('fName'); if (!name) return (m.querySelector('#fErr').textContent = 'Please enter a name.');
@@ -1318,7 +1321,7 @@ function studentModal(sid) {
         } else final.push({ ...L, end: L.end || '' });
       }
       final.sort((a, b) => a.start.localeCompare(b.start));
-      const data = { name, instrument: val('fInstr'), color, plan, target: Math.round(planTotal(plan) / planDayCount(plan)), teacherPhoto: tPhoto,
+      const data = { name, instrument: readInstr(), color, plan, target: Math.round(planTotal(plan) / planDayCount(plan)), teacherPhoto: tPhoto,
                      slots: final, lesson: currentSlot({ slots: final }) || final[final.length - 1] || null };
       if (sid) {
         await api.patchStudent(sid, data); closeModal(); toast('Saved');
@@ -1799,15 +1802,7 @@ function parseLessonTime(v) {
   if (!ap && h >= 1 && h <= 7) h += 12;                  // "4:30" with no am/pm: lessons are usually in the afternoon
   return `${pad(h)}:${pad(min)}`;
 }
-function parseInstrument(v) {
-  const x = (v || '').toLowerCase().trim();
-  if (!x) return 'other';
-  if (/pian|keyboard|keys/.test(x)) return 'piano';
-  if (/viola|vla/.test(x)) return 'viola';
-  if (/violin|fiddle|vln/.test(x)) return 'violin';
-  if (/cello|vc/.test(x)) return 'cello';
-  return 'other';
-}
+const parseInstrument = v => instrumentFrom(v);
 const DAY_PATTERNS = { 7: [0, 1, 2, 3, 4, 5, 6], 6: [1, 2, 3, 4, 5, 6], 5: [1, 2, 3, 4, 5], 4: [1, 2, 4, 5], 3: [1, 3, 5], 2: [2, 4], 1: [3] };
 // Work out which column is which from the headings (or assume the template's order if there are none)
 function columnMap(header) {
@@ -1893,7 +1888,7 @@ Leo Park, Cello, Wednesday, 4:45 PM, 45, 30, 6">${esc(text)}</textarea>
         <div class="tableWrap"><table class="impTable"><thead><tr><th></th><th>Name</th><th>Instrument</th><th>Lesson</th><th>Practice plan</th><th>Parent email</th></tr></thead><tbody>
           ${rows.map((r, i) => `<tr class="${r.include ? '' : 'skip'}"><td><input type="checkbox" data-row="${i}" ${r.include ? 'checked' : ''} ${r.name ? '' : 'disabled'}></td>
             <td><b>${esc(r.name) || '<span class="warn">No name</span>'}</b>${r.duplicate ? `<div class="warn">${r.duplicate}</div>` : ''}</td>
-            <td>${INSTRUMENTS[r.instrument]}</td>
+            <td>${esc(instrumentLabel(r.instrument)) || '<span class="muted">–</span>'}</td>
             <td>${r.day != null && r.time ? `${DAYS[r.day].slice(0, 3)} ${fmtTime(r.time)} · ${r.length} min` : '<span class="muted">No regular time</span>'}${r.notes.map(n => `<div class="warn">${esc(n)}</div>`).join('')}</td>
             <td>${planText(planForImport(r))}</td><td>${r.badEmail ? `<span class="warn">“${esc(r.badEmail)}” doesn’t look like an email</span>` : esc(r.email) || '<span class="muted">–</span>'}</td></tr>`).join('')}
         </tbody></table></div>
@@ -1970,7 +1965,7 @@ const plusMin = (key, time, m) => { const [h, mm] = (time || '12:00').split(':')
 function studioIcs() {
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, ''), from = dayKey(addDays(today(), -28)), ev = [];
   for (const s of active()) {
-    const ch = s.lessonChanges || {}, len = lessonSlots(s)[0]?.length || 30, title = `${s.name} – ${INSTRUMENTS[s.instrument] || 'Music'} lesson`;
+    const ch = s.lessonChanges || {}, len = lessonSlots(s)[0]?.length || 30, title = `${s.name} – ${instrumentLabel(s.instrument, 'Music')} lesson`;
     for (const L of lessonSlots(s)) {
       if (L.end && L.end < from) continue;
       let d = parseDay(L.start && L.start > from ? L.start : from);
@@ -2125,7 +2120,7 @@ function seedDemo() {
   const t = today(), rnd = (a, b) => a + Math.random() * (b - a);
   const kids = [
     ['Maya Chen', 'violin', 0, 2, '16:00', 30, 25, .9], ['Leo Park', 'cello', 1, 2, '16:45', 45, 30, .7], ['Sam Rivera', 'piano', 3, 3, '15:30', 30, 20, .5],
-    ['Ava Johnson', 'violin', 5, 4, '17:00', 30, 20, .85], ['Noah Williams', 'piano', 2, 1, '16:00', 45, 30, .3], ['Zoe Martin', 'viola', 7, 4, '16:00', 30, 20, 0]
+    ['Ava Johnson', 'violin', 5, 4, '17:00', 30, 20, .85], ['Noah Williams', 'voice', 2, 1, '16:00', 45, 30, .3], ['Zoe Martin', 'viola', 7, 4, '16:00', 30, 20, 0]
   ];
   kids.forEach(([name, instrument, ci, day, time, length, target, keen], i) => {
     const id = 'demo-student-' + i + '-xxxxxxxxxxxx', log = {}, st = {};
@@ -2134,7 +2129,7 @@ function seedDemo() {
       if (Math.random() < keen - (d < 5 && keen < .4 ? .3 : 0)) {
         const ms = Math.round(rnd(.5, 1.4) * target * 60000), active = ms * rnd(1.05, 1.5);
         log[k] = ms;
-        st[k] = { active, longest: ms * rnd(.3, .7), notes: instrument === 'piano' ? 0 : Math.round(ms / 2500),
+        st[k] = { active, longest: ms * rnd(.3, .7), notes: instrumentLow(instrument) ? Math.round(ms / 2500) : 0,
                   inTune: 0, beats: Math.random() < .5 ? Math.round(ms / 4000) : 0, steady: 0 };
         st[k].inTune = Math.round(st[k].notes * Math.min(.97, rnd(.55, .8) + keen * .15 + (120 - d) / 1200));
         st[k].steady = Math.round(st[k].beats * rnd(.5, .9));
@@ -2177,7 +2172,7 @@ function seedDemo() {
   // rewards: badges the family app would have reported, a challenge, and some stars
   for (const id of ids) {
     const s = students[id]; if (!s.practice) continue;
-    const lv = badgeLevels(badgeMetrics({ days: studentDays(s), goalFor: key => goalMsOn(s, key), tickDays: studentTicks(s) }), {}, { strings: s.instrument !== 'piano' });
+    const lv = badgeLevels(badgeMetrics({ days: studentDays(s), goalFor: key => goalMsOn(s, key), tickDays: studentTicks(s) }), {}, { strings: !!instrumentLow(s.instrument) });
     s.badges = Object.fromEntries(lv.filter(b => b.tier >= 0).map((b, i) => [b.id, { tier: b.tier, date: dayKey(addDays(t, -i * 3)), label: b.name }]));
   }
   const sun = dayKey(addDays(t, (7 - t.getDay()) % 7)), mon = dayKey(addDays(t, -((t.getDay() + 6) % 7)));

@@ -633,15 +633,13 @@
   </div>
 </div>
 
-<script src="badges.js?v=5"></script>
+<script src="badges.js?v=6"></script>
 <script>
 const $ = id => document.getElementById(id);
 const CIRC = 2 * Math.PI * 52;
 $('prog').style.strokeDasharray = CIRC;
-const INSTRUMENTS = { '': 'Choose instrument…', piano: 'Piano', violin: 'Violin', viola: 'Viola', cello: 'Cello', other: 'Other (flute, voice, …)' };
-// Lowest note we listen for, per instrument (Hz). Piano isn't checked for tuning – its notes are fixed.
-const LOWEST = { violin: 180, viola: 120, cello: 60, other: 60 };
-const hasPitch = k => !!LOWEST[k?.instrument];                  // instrument we can hear pitch on
+// Instruments (badges.js): the lowest note we listen for, per instrument. Piano, guitar and drums aren't checked for tuning.
+const hasPitch = k => !!instrumentLow(k?.instrument);          // instrument we can hear pitch on
 const tracksPitch = k => hasPitch(k) && k.tuning !== false;      // …and the parent wants tuning shown for this kid
 const COLORS = ['#cf5c3c', '#1f8a7e', '#6a55c8', '#2f6bcc', '#b3821c', '#c2457a'];
 const OLD_COLORS = ['#e0653a', '#2a9d8f', '#7b5cd6', '#2f7ed8', '#d4a017', '#d6457a'];   // earlier palette → map to the refined one
@@ -1293,8 +1291,9 @@ function renderParent() {
       <input type="text" value="${esc(k.name)}" data-rename="${k.id}" maxlength="20" aria-label="Name">
       <button class="danger" data-remove="${k.id}">Remove</button>
       <div class="more">
-        <select data-instr="${k.id}" aria-label="Instrument">${Object.entries(INSTRUMENTS).map(([v, l]) =>
-          `<option value="${v}" ${(k.instrument || '') === v ? 'selected' : ''} ${v === '' ? 'disabled' : ''}>${l}</option>`).join('')}</select>
+        <select data-instr="${k.id}" aria-label="Instrument">${instrumentOptions(k.instrument || '', 'Choose instrument…')}</select>
+        <input type="text" data-instr-other="${k.id}" maxlength="30" placeholder="Type the instrument, e.g. Harp" aria-label="Instrument name"
+          value="${k.instrument && !INSTRUMENTS[k.instrument] && k.instrument !== 'other' ? esc(k.instrument) : ''}" ${k.instrument && !INSTRUMENTS[k.instrument] ? '' : 'hidden'}>
         ${hasPitch(k) ? `<label class="opt">Tuner and in-tune score <input type="checkbox" class="toggle" data-tuning="${k.id}" ${k.tuning !== false ? 'checked' : ''}></label>` : ''}
         <div class="opt"><span>Practice plan<br><small class="muted">${esc(planText(planFor(k)))}${(f => f ? ` · ${f.by === 'a parent' ? 'set by you' : 'set by ' + esc(f.by)}` : ' · child chooses')(planFloor(k))}</small></span>
           <button class="secondary" data-plan="${k.id}">Edit</button></div>
@@ -1330,7 +1329,12 @@ function renderParent() {
     kids.find(k => k.id === c.dataset.chime).chime = c.checked; saveKids();
   });
   document.querySelectorAll('[data-instr]').forEach(sel => sel.onchange = () => {
+    if (sel.value === '__other') { const t = document.querySelector(`[data-instr-other="${sel.dataset.instr}"]`); t.hidden = false; t.focus(); return; }
     kids.find(k => k.id === sel.dataset.instr).instrument = sel.value; saveKids(); renderParent();
+  });
+  document.querySelectorAll('[data-instr-other]').forEach(t => t.onchange = () => {
+    const v = instrumentFrom(t.value); if (!v) return;
+    kids.find(k => k.id === t.dataset.instrOther).instrument = v; saveKids(); renderParent();
   });
   document.querySelectorAll('[data-remove]').forEach(b => b.onclick = () => {
     const k = kids.find(k => k.id === b.dataset.remove);
@@ -1395,6 +1399,7 @@ const MODEL = 'https://storage.googleapis.com/mediapipe-models/audio_classifier/
 // 132–276 are music (Music, Musical instrument, Piano, Violin, Cello, … and music genres).
 const isSpeech = i => i <= 4;
 const isMusic = i => i >= 132 && i <= 276;
+const isSinging = name => /sing|choir|humming|yodel|chant/i.test(name || '');   // counts as music for Voice students
 const MUSIC_MIN = 0.15;        // music score needed to count
 const SPEECH_RATIO = 2;        // …unless speech is this many times stronger than music
 
@@ -1421,7 +1426,7 @@ async function loadClassifier() {
 function renderDetector() {
   $('detectorNote').textContent = !musicOnly() ? 'Any sound louder than the orange line counts.'
     : { loading: 'Loading music detector… (first time only, about 10 MB)',
-        ready: 'Talking, singing and other noises won’t count.',
+        ready: 'Talking and other noises won’t count. Singing counts only for players whose instrument is Voice.',
         failed: 'Couldn’t load the music detector, so any loud sound counts for now. Check your internet connection and reload.',
         idle: '' }[classifierState];
   if (!musicOnly() || classifierState !== 'ready') $('hears').textContent = '';
@@ -1440,8 +1445,9 @@ function classify(now) {
   // Model reads 0.975 s windows; the first one covers our clip (any later one is mostly padding)
   const cats = result[0]?.classifications[0]?.categories || [];
   let music = 0, speech = 0, top = null;
+  const singer = kid?.instrument === 'voice';
   for (const c of cats) {
-    if (isMusic(c.index)) music = Math.max(music, c.score);
+    if (isMusic(c.index) || (singer && isSinging(c.categoryName))) music = Math.max(music, c.score);
     if (isSpeech(c.index)) speech = Math.max(speech, c.score);
     if (!top || c.score > top.score) top = c;
   }
@@ -1529,7 +1535,7 @@ function endNote(final) {
 // sharper note-start timing), covering all audio received since the last call exactly once.
 let nextPitchAt = 0;
 function pitchStep(now) {
-  const sr = audioCtx.sampleRate, minF = LOWEST[kid.instrument], n = Math.round(sr * 0.025) + Math.floor(sr / minF) + 2;
+  const sr = audioCtx.sampleRate, minF = instrumentLow(kid.instrument), n = Math.round(sr * 0.025) + Math.floor(sr / minF) + 2;
   const hop = metro.timer ? 0.025 : 0.05, step = Math.round(sr * hop);
   const oldest = Math.max(n, sampleCount - Math.floor(sr / 2));
   if (nextPitchAt < oldest) nextPitchAt = oldest;          // fell behind (e.g. tab was hidden): skip ahead
@@ -1875,7 +1881,7 @@ const at = (key, time) => { const [h, m] = (time || '12:00').split(':').map(Numb
 // This player's lessons and recitals, as calendar events (a weekly repeating lesson, minus canceled/moved dates)
 function lessonCalendar(k, t) {
   const evs = [], ch = t.lessonChanges || {}, len = lessonSlots(t)[0]?.length || 30;
-  const title = `${(INSTRUMENTS[k.instrument] || 'Music').replace(/ \(.*/, '')} lesson – ${k.name}`, desc = `With ${t.teacherName}, ${t.studioName}`;
+  const title = `${instrumentLabel(k.instrument, 'Music')} lesson – ${k.name}`, desc = `With ${t.teacherName}, ${t.studioName}`;
   lessonSlots(t).forEach((L, n) => {                   // one repeating event per lesson time, ending on its end date
     if (L.end && L.end < dayKey()) return;
     const from = L.start && L.start > dayKey() ? parseDay(L.start) : parseDay(dayKey());

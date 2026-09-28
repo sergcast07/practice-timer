@@ -112,7 +112,10 @@ const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 
 const toMin = t => { const [h, m] = (t || '0:0').split(':').map(Number); return h * 60 + m; };
 const fmtTime = t => { const [h, m] = t.split(':').map(Number); return `${(h + 11) % 12 + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`; };
 const fmtDay = k => keyDate(k).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
-const INSTRUMENTS = { piano: 'Piano', violin: 'Violin', viola: 'Viola', cello: 'Cello', other: 'Music' };
+// Same keys as the app's list (badges.js); anything else is an instrument name the teacher or parent typed
+const INSTRUMENTS = { piano: 'Piano', guitar: 'Guitar', violin: 'Violin', voice: 'Voice', drums: 'Drums', cello: 'Cello', flute: 'Flute',
+  clarinet: 'Clarinet', saxophone: 'Saxophone', trumpet: 'Trumpet', viola: 'Viola', ukulele: 'Ukulele', other: 'Music' };
+const instLabel = (v, fallback = '') => INSTRUMENTS[v] || (v ? String(v).slice(0, 30) : fallback);
 
 // A student's weekly lesson times, each between a start and (optional) end date – e.g. one per semester
 const lessonSlots = s => (Array.isArray(s.slots) && s.slots.length ? s.slots : s.lesson ? [s.lesson] : []).filter(l => l && l.day !== '' && l.day != null && l.time);
@@ -171,7 +174,7 @@ function studentLessonEvents(s, title, desc, fromKey) {
 function teacherCalendar(feed, students) {
   const from = addKey(localNow(feed.tz || 'UTC').key, -56), events = [], recitals = {};
   for (const s of students) {
-    events.push(...studentLessonEvents(s, `${s.name} – ${INSTRUMENTS[s.instrument] || 'Music'} lesson`, `${s.name}'s lesson`, from));
+    events.push(...studentLessonEvents(s, `${s.name} – ${instLabel(s.instrument, 'Music')} lesson`, `${s.name}'s lesson`, from));
     for (const [id, e] of Object.entries(s.upcoming || {})) {
       (recitals[id] ??= { ...e, names: [] }).names.push(`${s.name}${e.piece ? ': ' + e.piece : ''}`);
     }
@@ -182,7 +185,7 @@ function teacherCalendar(feed, students) {
 }
 function studentCalendar(s) {
   const name = s.kidName || s.name.split(' ')[0], tz = s.tz || null, from = addKey(localNow(tz || 'UTC').key, -56);
-  const events = studentLessonEvents(s, `${INSTRUMENTS[s.instrument] || 'Music'} lesson – ${name}`, `With ${s.teacherName}, ${s.studioName}`, from);
+  const events = studentLessonEvents(s, `${instLabel(s.instrument, 'Music')} lesson – ${name}`, `With ${s.teacherName}, ${s.studioName}`, from);
   for (const [id, e] of Object.entries(s.upcoming || {})) if (e.date >= from)
     events.push({ uid: `event-${id}-${s.id}@practice-timer`, date: e.date, time: e.time || '12:00', minutes: 90, title: `${e.title} – ${name}`,
                   location: e.location, desc: [e.piece && 'Piece: ' + e.piece, `${s.teacherName}, ${s.studioName}`].filter(Boolean).join('\n') });
@@ -273,7 +276,7 @@ function briefEmail(env, feed, students, now, test) {
   const when = day === now.key ? 'Today' : DAYS[dow(day)];
   const body = lessons.length ? lessons.map(({ s, time, length }) => {
     const lp = s.linkedAt ? lastPracticed(s, now.key) : null;
-    return row(fmtTime(time), `${esc(s.name)} <span style="font-weight:500;color:#6e7385">· ${esc(INSTRUMENTS[s.instrument] || '')} · ${length} min</span>`, [
+    return row(fmtTime(time), `${esc(s.name)} <span style="font-weight:500;color:#6e7385">· ${esc(instLabel(s.instrument, ''))} · ${length} min</span>`, [
       weekLine(s, now.key), assignmentLine(s, now.key),
       s.linkedAt && (lp == null || lp >= 4) ? `<span style="color:#c0612b">Hasn’t practiced for ${lp == null ? 'a while' : lp + ' days'} – worth a gentle check-in.</span>` : ''
     ]);
