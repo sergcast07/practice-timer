@@ -599,6 +599,9 @@ function lastPracticed(s) {
   for (let i = 0; i < 120; i++) if (pDay(s, addDays(today(), -i)) >= 60000) return i;
   return null;
 }
+// A family that disconnected from their own app: when, and whether they removed what they'd shared
+const leftAt = s => !s.linkedAt && s.consent?.withdrawnAt ? s.consent.withdrawnAt.slice(0, 10) : null;
+const leftText = s => `Family disconnected ${fmtDate(leftAt(s), { day: 'numeric', month: 'short' })}`;
 const lastPracticedText = n => n == null ? 'No practice yet' : n === 0 ? 'Today' : n === 1 ? 'Yesterday' : `${n} days ago`;
 function trend(a, b) {
   if (a == null || b == null) return '';
@@ -889,6 +892,7 @@ function vOverview() {
   const todays = lessonsBetween(t, t);
   const attention = [];
   for (const s of all) {
+    if (leftAt(s)) { attention.push([s, 'bad', 'link', leftText(s), s.consent.removedData ? 'They also removed the practice they’d shared. Archive the student, or send a new invite.' : 'Archive the student if they’ve moved on, or send a new invite.']); continue; }
     if (!s.linkedAt) { attention.push([s, 'info', 'link', 'Not connected yet', 'Send the family their invite link']); continue; }
     const lp = lastPracticed(s);
     if (lp == null || lp >= 4) attention.push([s, 'warn', 'alert', lp == null ? 'No practice recorded' : `No practice for ${lp} days`, 'Last practiced ' + lastPracticedText(lp).toLowerCase()]);
@@ -957,7 +961,7 @@ function practiceTable(list) {
     <div class="ptr head"><div>Student</div><div>Minutes vs target</div><div>Days</div>${cols.map(m => `<div>${head[m]} ${infoBtn(m)}</div>`).join('')}<div>Last practiced</div></div>
     ${list.map(s => {
       if (!s.linkedAt) return `<div class="ptr" data-student="${s.id}" style="--kid:${s.color}"><div class="name"><div class="avatar sm">${face(s)}</div><span>${esc(s.name)}</span></div>
-        <div class="mins"><span class="chip info">${icon('link')}Not connected</span></div><div></div>${cols.map(() => '<div></div>').join('')}<div></div></div>`;
+        <div class="mins">${leftAt(s) ? `<span class="chip bad">${icon('link')}${leftText(s)}</span>` : `<span class="chip info">${icon('link')}Not connected</span>`}</div><div></div>${cols.map(() => '<div></div>').join('')}<div></div></div>`;
       const c = practiceSummary(s, wk), p = practiceSummary(s, prev), plan = planOfStudent(s), target = Math.max(1, planTotal(plan)) * 60000, f = Math.min(c.total / target, 1);
       return `<div class="ptr" data-student="${s.id}" style="--kid:${s.color}">
         <div class="name"><div class="avatar sm">${face(s)}</div><span>${esc(s.name)}</span></div>
@@ -1002,7 +1006,7 @@ function vStudents() {
       const c = practiceSummary(s, lastDays(7));
       return `<button class="rowLink" data-student="${s.id}" style="--kid:${s.color}">
         <div class="avatar">${face(s)}</div>
-        <div class="grow"><div class="t">${esc(s.name)} ${s.linkedAt ? '' : `<span class="chip info">${icon('link')}Invite pending</span>`}</div>
+        <div class="grow"><div class="t">${esc(s.name)} ${s.linkedAt ? '' : leftAt(s) ? `<span class="chip bad">${icon('link')}${leftText(s)}</span>` : `<span class="chip info">${icon('link')}Invite pending</span>`}</div>
           <div class="d">${esc(instrumentLabel(s.instrument, 'Instrument not set'))} · ${lessonText(s)}</div></div>
         <div class="small muted num" style="text-align:right">${s.linkedAt ? mins(c.total) + '<br>this week' : ''}</div>
         ${icon('chev', 'muted')}</button>`;
@@ -1040,14 +1044,16 @@ function vStudent() {
       </div>
     </div>
     ${s.archived ? `<div class="banner">${icon('alert')}<div class="grow">This student is archived.</div><button class="secondary" data-act="unarchive">Restore</button></div>` : ''}
-    ${!s.linkedAt && !s.archived ? `<div class="banner">${icon('link')}<div class="grow"><b>Not connected yet.</b> Send the family the invite link so ${esc(firstName(s.name))}’s practice shows up here and your assignments appear in their app.</div><button class="accent" data-act="invite">Send invite</button></div>` : ''}
+    ${leftAt(s) && !s.archived ? `<div class="banner">${icon('link')}<div class="grow"><b>${leftText(s)}.</b> ${esc(firstName(s.name))}’s family disconnected Allegrow from your studio${s.consent.removedData ? ' and removed the practice history they’d shared' : ' – practice they shared before stays here'}. They no longer see your assignments or lesson times.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="secondary" data-act="archiveLeft">Archive student</button><button class="secondary" data-act="invite">New invite</button></div></div>` : ''}
+    ${!s.linkedAt && !leftAt(s) && !s.archived ? `<div class="banner">${icon('link')}<div class="grow"><b>Not connected yet.</b> Send the family the invite link so ${esc(firstName(s.name))}’s practice shows up here and your assignments appear in their app.</div><button class="accent" data-act="invite">Send invite</button></div>` : ''}
     <div class="tabs noprint">${tabs.map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
     ${{ progress: tProgress, assignments: tAssignments, rewards: tRewards, lessons: tLessons, events: tEvents, notes: tNotes }[tab](s)}
   </div>`;
 }
 
 function tProgress(s) {
-  if (!s.linkedAt) return `<div class="card emptyBig">${icon('clock', 'lg')}<p>Practice data appears here once the family connects the app.</p></div>`;
+  if (!s.linkedAt && !(leftAt(s) && s.practice)) return `<div class="card emptyBig">${icon('clock', 'lg')}<p>${leftAt(s) ? 'The family removed the practice history they’d shared.' : 'Practice data appears here once the family connects the app.'}</p></div>`;
   const wk = lastDays(7), prev = lastDays(7, addDays(today(), -7)), c = practiceSummary(s, wk), p = practiceSummary(s, prev), m = practiceSummary(s, lastDays(30));
   const days = lastDays(28), vals = days.map(d => pDay(s, d)), goals = days.map(d => goalMsOn(s, dayKey(d))), top = Math.max(...goals, ...vals, 60000) * 1.1;
   return `<div class="stack">
@@ -1202,7 +1208,7 @@ function vReports() {
       <div class="muted">${esc(instrumentLabel(s.instrument, ''))} · Teacher: ${esc(studio.teacherName)}</div></div>
       <div style="text-align:right"><b>Progress report</b><div class="muted small">${fmtDate(start, { day: 'numeric', month: 'long' })} – ${fmtDate(end, { day: 'numeric', month: 'long', year: 'numeric' })}</div></div></div>
     <section><h3>Practice</h3>
-      ${s.linkedAt ? `<div class="stats">
+      ${s.linkedAt || (leftAt(s) && s.practice) ? `<div class="stats">
         <div class="stat"><b>${mins(P.total)}</b><span>total${P.manual ? ` (${mins(P.manual)} logged by hand)` : ''}</span></div>
         <div class="stat"><b>${mins(P.total / (range / 7))}</b><span>per week</span></div>
         <div class="stat"><b>${P.days} of ${range}</b><span>days practiced</span></div>
@@ -1248,6 +1254,7 @@ function bindView() {
     calendar: () => calendarEmailModal(),
     addEvent: () => eventModal(null, route.view === 'student' ? route.id : null),
     unarchive: () => api.patchStudent(route.id, { archived: false }),
+    archiveLeft: () => { if (confirm(`Archive ${students[route.id].name}? You can restore them any time from the Students page.`)) api.patchStudent(route.id, { archived: true }).then(() => toast('Archived')); },
     star: () => cheerModal(route.id, 'star'), award: () => cheerModal(route.id, 'badge'), challenge: () => challengeModal(route.id),
     badgeRules: () => badgeRulesModal(), settings: () => studioModal(), feedback: () => feedbackModal(),
     import: () => importModal(), invites: () => invitesModal(), terms: () => termsModal(),

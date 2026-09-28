@@ -256,7 +256,7 @@ const trendTxt = (a, b) => { if (a == null || b == null) return ''; const d = Ma
 
 // One line that tells the teacher how the week went, in the order a teacher cares about (numbers only – safe as HTML)
 function weekLine(s, todayKey) {
-  if (!s.linkedAt) return 'Not connected to the app yet';
+  if (!s.linkedAt) return s.consent?.withdrawnAt ? `Family disconnected on ${fmtDay(s.consent.withdrawnAt.slice(0, 10))}` : 'Not connected to the app yet';
   const c = week(s, todayKey), p = week(s, todayKey, 1), parts = [`${c.days} of ${plannedDays(s)} planned days · ${minsText(c.total)}${c.manual ? ` <span style="color:#6e7385">(${minsText(c.manual)} by hand)</span>` : ''}`];
   for (const [m, label] of [['focus', 'focus'], ['tune', 'in tune'], ['rhythm', 'rhythm']]) { const t = scoreTxt(s, m, label, c, p); if (t) parts.push(t); }
   return parts.join(' · ');
@@ -320,7 +320,8 @@ function digestEmail(env, feed, students, now, test) {
   const upcoming = Object.values(Object.fromEntries(students.flatMap(s => Object.entries(s.upcoming || {}).map(([id, e]) => [id, e]))))
     .filter(e => e.date >= now.key && e.date <= addKey(now.key, 21)).sort((a, b) => a.date.localeCompare(b.date));
   const lessonsNext = Array.from({ length: 7 }, (_, i) => todaysLessons(students, addKey(now.key, i + 1)).length).reduce((a, b) => a + b, 0);
-  const unlinked = students.length - linked.length;
+  const left = students.filter(s => !s.linkedAt && s.consent?.withdrawnAt && s.consent.withdrawnAt.slice(0, 10) > addKey(now.key, -7));
+  const unlinked = students.length - linked.length - left.length;
 
   let body = '';
   body += section('This week’s wins', topWins.length ? topWins.map(w => `<p style="margin:8px 0;font-size:15px;line-height:1.5">★ ${w}</p>`).join('')
@@ -334,6 +335,7 @@ function digestEmail(env, feed, students, now, test) {
   body += section('Coming up', [
     `<p style="margin:8px 0;font-size:15px">${lessonsNext} ${lessonsNext === 1 ? 'lesson' : 'lessons'} next week.</p>`,
     ...upcoming.map(e => `<p style="margin:8px 0;font-size:15px"><b>${esc(e.title)}</b> · ${fmtDay(e.date)}${e.time ? ' at ' + fmtTime(e.time) : ''}</p>`),
+    ...left.map(s => `<p style="margin:8px 0;font-size:14px;color:#c0612b">${esc(s.name)}’s family disconnected from your studio on ${fmtDay(s.consent.withdrawnAt.slice(0, 10))}${s.consent.removedData ? ' and removed the practice they’d shared' : ''}. You can archive ${esc(first(s.name))} in Allegrow Studio.</p>`),
     unlinked ? `<p style="margin:8px 0;font-size:14px;color:#6e7385">${unlinked} ${unlinked === 1 ? 'student hasn’t' : 'students haven’t'} connected the app yet – their invite link is on their page.</p>` : ''
   ].join(''));
   const change = prevTotal ? (total >= prevTotal ? ` (up from ${minsText(prevTotal)})` : '') : '';

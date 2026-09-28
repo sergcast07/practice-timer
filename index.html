@@ -1905,7 +1905,9 @@ async function releaseTeacher(sid, wipe) {
   if (teacherData[sid]?.missing) return;
   try {
     await loadFirebase();
-    await F.updateDoc(F.doc(db, 'students', sid), { linkedAt: null, ...(wipe ? { practice: null, badges: null, photo: null } : {}) });
+    // Recorded as the parent withdrawing consent, so the teacher can see the family left (and when)
+    await F.updateDoc(F.doc(db, 'students', sid), { linkedAt: null, consent: { by: 'parent', withdrawnAt: new Date().toISOString(), removedData: !!wipe, version: 1 },
+      ...(wipe ? { practice: null, badges: null, photo: null } : {}) });
   } catch (e) { console.error(e); }
 }
 function unlink(k) {
