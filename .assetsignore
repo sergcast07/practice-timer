@@ -9,3 +9,4 @@ firestore.rules
 wrangler.toml
 .assetsignore
 node_modules
+site-worker.js

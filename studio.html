@@ -518,7 +518,8 @@ const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
 const EMULATOR = LOCAL && params.has('emulator');
 const FIREBASE = EMULATOR ? { apiKey: 'demo-key', authDomain: 'localhost', projectId: 'demo-practice' } : {
   apiKey: 'AIzaSyAUn6GqVxRR-m9i5kjTH9dY7-nGWCo1374',
-  authDomain: 'music-practice-tracker-d77f7.firebaseapp.com',
+  // Sign-in runs through our own address (site-worker.js passes it to Firebase), so Google shows allegrowmusic.com
+  authDomain: location.hostname === 'allegrowmusic.com' ? 'allegrowmusic.com' : 'music-practice-tracker-d77f7.firebaseapp.com',
   projectId: 'music-practice-tracker-d77f7',
   storageBucket: 'music-practice-tracker-d77f7.firebasestorage.app',
   messagingSenderId: '933602552014',
