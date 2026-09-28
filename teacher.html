@@ -112,11 +112,25 @@
   .account .who { flex: 1; min-width: 0; font-size: 13.5px; }
   .account .who b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .account .who span { color: var(--muted); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #view { padding: 32px 36px 72px; max-width: 1120px; width: 100%; min-width: 0; }
+  #view { padding: 32px 36px 72px; max-width: 1120px; width: 100%; min-width: 0; container-type: inline-size; }
   .demoBar { background: color-mix(in srgb, var(--gold) 16%, var(--card)); color: var(--ink); border-radius: 12px; padding: 10px 14px;
              font-size: 13.5px; display: flex; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 18px; flex-wrap: wrap; }
   .mobileOnly { display: none !important; }       /* before the phone rules below, which turn these on */
-  @media (max-width: 860px) {
+  .navShort { display: none; }
+  /* Tablets (and phones turned sideways): a slim rail down the left – icons with short labels, settings at the bottom */
+  @media (min-width: 701px) and (max-width: 1180px) {
+    #shell { grid-template-columns: 96px 1fr; }
+    aside { padding: 16px 8px; align-items: stretch; overflow-y: auto; }
+    .brand { justify-content: center; padding: 2px 0 14px; }
+    .brand > div, .planBox, .account .who { display: none !important; }
+    nav button { flex-direction: column; gap: 4px; font-size: 11.5px; padding: 10px 4px; min-height: 58px; text-align: center; line-height: 1.2; }
+    nav button .ic { width: 23px; height: 23px; }
+    .navLong { display: none; } .navShort { display: inline; }
+    .account { flex-direction: column; padding: 12px 0 0; gap: 4px; }
+    .account button { width: 44px; height: 44px; }
+    #view { padding: max(24px, env(safe-area-inset-top)) 28px 56px; }
+  }
+  @media (max-width: 700px) {
     #shell { grid-template-columns: 1fr; }
     aside { position: fixed; top: auto; bottom: 0; left: 0; right: 0; height: auto; z-index: 5; flex-direction: row; padding: 6px 6px max(6px, env(safe-area-inset-bottom));
             border-right: 0; border-top: 1px solid var(--line); }
@@ -126,7 +140,7 @@
     nav button .ic { width: 22px; height: 22px; }
     #view { padding: max(20px, env(safe-area-inset-top)) 16px 100px; }
     .mobileOnly { display: inline-flex !important; }
-    .mobileHide { display: none; }
+    .mobileHide, .navLong { display: none; } .navShort { display: inline; }
   }
 
   /* Page parts */
@@ -137,8 +151,8 @@
   .card > h2 { margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .stack { display: grid; gap: 16px; }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  @media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } }
-  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+  @container (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
   .kpi { background: var(--card); border-radius: 16px; padding: 16px 18px; box-shadow: var(--shadow); }
   .kpi .v { font-family: var(--serif); font-size: 30px; font-weight: 600; line-height: 1.1; margin: 4px 0 2px; font-variant-numeric: tabular-nums; }
   .kpi .l { font-size: 13px; color: var(--muted); font-weight: 600; }
@@ -194,7 +208,7 @@
   .byHand { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; color: var(--muted); margin-left: 6px; }
   .byHand .ic { width: 12px; height: 12px; }
   .lbl-m { display: none; font-size: 11.5px; color: var(--muted); font-weight: 600; }
-  @media (max-width: 760px) {
+  @container (max-width: 680px) {
     .ptr.head { display: none; }
     .ptr { grid-template-columns: 1fr 1fr 1fr; row-gap: 8px; }
     .ptr .name { grid-column: 1 / -1; }
@@ -339,7 +353,7 @@
   .planBox b { color: var(--ink); }
   .planBox button { justify-self: start; padding: 6px 10px; font-size: 13px; }
   .planBox:empty { display: none; }
-  @media (max-width: 860px) { .planBox { display: none; } }
+  @media (max-width: 1180px) { .planBox { display: none; } }
   .adminList .assign code { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 14px; font-weight: 700; letter-spacing: .03em; }
   /* Getting started + import */
   .welcome { border: 1.5px solid color-mix(in srgb, var(--leaf) 30%, transparent); }
@@ -460,7 +474,7 @@
       <button data-go="overview"><svg class="ic"><use href="#i-home"/></svg>Overview</button>
       <button data-go="students"><svg class="ic"><use href="#i-users"/></svg>Students</button>
       <button data-go="schedule"><svg class="ic"><use href="#i-calendar"/></svg>Schedule</button>
-      <button data-go="events"><svg class="ic"><use href="#i-award"/></svg><span class="mobileHide">Performances &amp; exams</span><span class="mobileOnly">Events</span></button>
+      <button data-go="events"><svg class="ic"><use href="#i-award"/></svg><span class="navLong">Performances &amp; exams</span><span class="navShort">Events</span></button>
       <button data-go="reports"><svg class="ic"><use href="#i-report"/></svg>Reports</button>
       <button data-go="admin" id="adminNav" hidden><svg class="ic"><use href="#i-settings"/></svg>Beta admin</button>
     </nav>

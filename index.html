@@ -288,6 +288,11 @@
   .days { display: flex; gap: 5px; margin-top: 6px; }
   .days span { flex: 1; text-align: center; font-size: 11px; color: var(--muted); }
   .footnote { font-size: 12.5px; color: var(--muted); margin-top: 12px; line-height: 1.5; }
+  .teacherBox { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--soft); border-radius: 14px; padding: 12px 14px; margin-top: 12px; }
+  .teacherBox .grow { flex: 1; min-width: 140px; display: grid; }
+  .btnPair { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btnPair button { padding: 9px 12px; font-size: 14.5px; }
+  button.dangerText { color: var(--danger); }
   .footnote .how summary { cursor: pointer; color: var(--accent); font-weight: 600; margin-top: 6px; }
   .footnote .how p { margin: 8px 0 0; }
   .stats b .tword { font-size: 14px; white-space: normal; line-height: 1.25; } .tword.up { color: var(--good); } .tword.down { color: var(--warn); }
@@ -1370,8 +1375,10 @@ function renderParent() {
         <div class="opt"><span>Photo<br><small class="muted">A small picture so ${k.link ? 'the teacher' : 'a teacher'} can tell who’s who</small></span>
           <span style="display:flex;gap:6px"><button class="secondary" data-photo="${k.id}">${k.photo ? 'Change' : 'Add'}</button>${k.photo ? `<button class="ghost" data-unphoto="${k.id}">Remove</button>` : ''}</span></div>
         <label class="opt">Chime at goal <input type="checkbox" class="toggle" data-chime="${k.id}" ${k.chime !== false ? 'checked' : ''}></label>
-        ${k.link ? `<div class="opt"><span class="small">${icon('link', 'sm')} ${(t => t?.missing ? 'Teacher removed this connection' : t ? 'Teacher: ' + esc(t.teacherName) : 'Connected to a teacher')(teacherData[k.link])}</span>
-          <button class="ghost small" data-unlink="${k.id}">Disconnect</button></div>`
+        ${k.link ? (t => `<div class="teacherBox"><div class="grow"><span class="muted small">Teacher</span>
+            <b>${t?.missing ? 'Connection removed by the teacher' : t ? esc(t.teacherName) : 'Connected to a teacher'}</b>${t && !t.missing ? `<span class="muted small">${esc(t.studioName || '')}</span>` : ''}</div>
+          <div class="btnPair">${t?.missing ? '' : `<button class="secondary" data-switch="${k.id}">Switch teacher</button>`}
+            <button class="secondary dangerText" data-unlink="${k.id}">${t?.missing ? 'Remove' : 'Disconnect'}</button></div></div>`)(teacherData[k.link])
           : `<button class="secondary" data-link="${k.id}">${icon('link', 'sm')}Connect to teacher</button>`}
       </div>
     </div>`).join('') || '<div class="muted">Add each child who practices.</div>';
@@ -1383,10 +1390,11 @@ function renderParent() {
   document.querySelectorAll('[data-tuning]').forEach(c => c.onchange = () => {
     kids.find(k => k.id === c.dataset.tuning).tuning = c.checked; saveKids();
   });
-  document.querySelectorAll('[data-link]').forEach(b => b.onclick = () => {
-    const code = prompt('Enter the code your teacher sent you:');
-    if (code) startLink(code, kids.find(k => k.id === b.dataset.link));
-  });
+  // A teacher's invite: the link they sent (…#link=code) or just the code
+  const askInvite = (k, msg) => { const v = prompt(msg); const code = v && (v.match(/link=([a-z0-9-]{20,})/i)?.[1] || v); if (code) startLink(code, k); };
+  document.querySelectorAll('[data-link]').forEach(b => b.onclick = () => askInvite(kids.find(k => k.id === b.dataset.link), 'Paste the invite link or code your teacher sent you:'));
+  document.querySelectorAll('[data-switch]').forEach(b => b.onclick = () => askInvite(kids.find(k => k.id === b.dataset.switch),
+    'Moving to a new teacher? Paste the invite link or code from your new teacher:'));
   document.querySelectorAll('[data-unlink]').forEach(b => b.onclick = () => unlink(kids.find(k => k.id === b.dataset.unlink)));
   document.querySelectorAll('[data-photo]').forEach(b => b.onclick = () => pickPhoto(kids.find(k => k.id === b.dataset.photo)));
   document.querySelectorAll('[data-unphoto]').forEach(b => b.onclick = () => {
@@ -1848,9 +1856,12 @@ async function startLink(code, forKid) {
   if (!t) return alert('That teacher invite isn’t valid. Please check the link or code with your teacher.');
   // A parent must agree before a child's practice is shared with a teacher (recorded on the student record)
   const card = $('linkCard'), choices = forKid ? [forKid] : kids;
+  const old = forKid?.link && forKid.link !== code ? teacherData[forKid.link] : null;
   card.innerHTML = `<div class="medal" style="--kid:var(--accent)">${icon('users')}</div>
     <h2 style="text-align:center">Connect to ${esc(t.teacherName)}</h2>
     <p class="muted" style="text-align:center">${esc(t.studioName)} invited <b>${esc(t.name)}</b>.${forKid ? '' : ' Which player is this?'}</p>
+    ${old && !old.missing ? `<p class="small" style="text-align:center;margin-top:8px">This replaces ${esc(forKid.name)}’s connection to <b>${esc(old.teacherName)}</b>, who will stop seeing new practice.</p>
+      <label class="consent"><input type="checkbox" id="lkWipe"><span>Also remove the practice history, badges and photo already shared with ${esc(old.teacherName)}.</span></label>` : ''}
     <label class="consent"><input type="checkbox" id="lkConsent"><span>I’m this child’s parent or guardian. I agree to share their practice time, practice scores, badges and photo (if I add one) with
       ${esc(t.teacherName)}, and to receive their assignments and lesson times, as described in the <a href="privacy.html" target="_blank" rel="noopener">privacy policy</a>.
       Sound is never recorded or sent anywhere.</span></label>
@@ -1866,7 +1877,10 @@ async function startLink(code, forKid) {
     if (b.dataset.pick !== 'cancel' && !$('lkConsent').checked) return ($('lkErr').textContent = 'Please tick the box to agree first.');
     $('linkDlg').hidden = true;
     if (b.dataset.pick === 'cancel') return;
+    const wipe = !!$('lkWipe')?.checked;
+    $('linkDlg').hidden = true;
     const k = kids.find(x => x.id === b.dataset.pick) || newKid(firstWord(t.name), t.instrument || '');
+    if (k.link && k.link !== code) await releaseTeacher(k.link, wipe);          // moving from another teacher
     await finishLink(k, code, t);
   });
 }
@@ -1886,11 +1900,37 @@ async function finishLink(k, code, t) {
   $('linkDlg').hidden = false;
   $('linkOk').onclick = () => { $('linkDlg').hidden = true; show(screen === 'parent' ? 'parent' : 'home'); };
 }
+// Tell the old teacher's record the family has left; optionally take back what was shared with them
+async function releaseTeacher(sid, wipe) {
+  if (teacherData[sid]?.missing) return;
+  try {
+    await loadFirebase();
+    await F.updateDoc(F.doc(db, 'students', sid), { linkedAt: null, ...(wipe ? { practice: null, badges: null, photo: null } : {}) });
+  } catch (e) { console.error(e); }
+}
 function unlink(k) {
-  if (!confirm(`Disconnect ${k.name} from their teacher? The teacher will stop seeing new practice.`)) return;
-  const sid = k.link; k.link = null; saveKids();
-  if (db && !teacherData[sid]?.missing) F.updateDoc(F.doc(db, 'students', sid), { linkedAt: null }).catch(() => {});
-  watchTeachers(); renderParent();
+  const t = teacherData[k.link], card = $('linkCard');
+  if (t?.missing) { k.link = null; saveKids(); watchTeachers(); return renderParent(); }
+  const who = t ? esc(t.teacherName) : 'the teacher';
+  card.innerHTML = `<div class="medal" style="--kid:var(--muted)">${icon('link')}</div>
+    <h2 style="text-align:center">Disconnect ${esc(k.name)} from ${who}?</h2>
+    <ul class="small muted" style="margin:4px 0 0;padding-left:18px;line-height:1.55">
+      <li>${who} stops seeing ${esc(k.name)}’s new practice.</li>
+      <li>${esc(k.name)} stops seeing their assignments, lesson times and badges from ${who}.</li>
+      <li>Practice history stays on this device, and you can connect to a new teacher any time.</li></ul>
+    <label class="consent"><input type="checkbox" id="ulWipe"><span>Also remove the practice history, badges and photo already shared with ${who}.</span></label>
+    <div class="pickList" style="margin-top:12px">
+      <button class="secondary block dangerText" id="ulGo">Disconnect</button>
+      <button class="ghost block" id="ulNo">Cancel</button></div>`;
+  $('linkDlg').hidden = false;
+  $('ulNo').onclick = () => { $('linkDlg').hidden = true; };
+  $('ulGo').onclick = async () => {
+    const sid = k.link, wipe = $('ulWipe').checked;
+    $('linkDlg').hidden = true;
+    k.link = null; saveKids();
+    await releaseTeacher(sid, wipe);
+    watchTeachers(); renderParent();
+  };
 }
 
 // Next lesson from the weekly slot plus any changes the teacher made (canceled / moved / extra)
