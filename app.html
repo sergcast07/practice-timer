@@ -340,6 +340,24 @@
   .fieldRow { display: grid; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted); text-align: left; margin-top: 12px; }
   /* Badges */
   .medalArt.locked { opacity: .8; }
+  /* Tuner */
+  .tunerCard { display: grid; gap: 8px; justify-items: center; text-align: center; padding: 26px 18px; }
+  .tuNote { font-family: var(--serif); font-size: 84px; font-weight: 600; line-height: 1; min-height: 84px; }
+  .tuNote sub { font-size: 30px; color: var(--muted); margin-left: 2px; }
+  .tuState { font-weight: 700; min-height: 1.4em; color: var(--muted); } .tuState.ok { color: var(--good); } .tuState.near { color: var(--warn); } .tuState.far { color: var(--danger); }
+  .tuMeter { position: relative; width: 100%; max-width: 360px; height: 16px; border-radius: 8px; background: var(--track); margin-top: 8px; }
+  .tuZone { position: absolute; left: 45%; width: 10%; top: 0; bottom: 0; background: var(--good); opacity: .25; border-radius: 8px; }
+  .tuMid { position: absolute; left: 50%; top: -6px; bottom: -6px; width: 2px; margin-left: -1px; background: var(--muted); opacity: .6; }
+  .tuNeedle { position: absolute; left: 50%; top: -7px; width: 10px; height: 30px; margin-left: -5px; border-radius: 5px; background: var(--muted); transition: left .12s ease-out, background .2s; opacity: .35; }
+  .tuNeedle.live { opacity: 1; } .tuNeedle.ok { background: var(--good); } .tuNeedle.near { background: var(--warn); } .tuNeedle.far { background: var(--danger); }
+  .tuScale { display: flex; justify-content: space-between; width: 100%; max-width: 360px; font-size: 12px; color: var(--muted); }
+  .tuStrings, .tuRefs { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 10px; }
+  .tuStrings button { min-width: 58px; padding: 12px 10px; font-size: 17px; background: var(--card); border: 1.5px solid var(--line); }
+  .tuStrings button.near { border-color: var(--kid); color: var(--kid); } .tuStrings button.lock { background: var(--kid); border-color: var(--kid); color: #fff; }
+  .tuStrings button sub { font-size: 11px; opacity: .7; }
+  .tuSettings { display: grid; gap: 14px; }
+  #tuA { white-space: nowrap; font-size: 15px; min-width: 96px; text-align: center; }
+  .tunerEntry .thMini { font-family: var(--serif); font-size: 22px; font-weight: 700; }
   /* Music theory */
   .theoryEntry .thMini { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; flex: none;
     background: color-mix(in srgb, var(--kid) 14%, transparent); color: var(--kid); font-family: 'Noto Music', serif; font-size: 30px; line-height: 1; }
@@ -561,6 +579,7 @@
     <div class="card" id="teacherCard" hidden></div>
     <button class="card badgeEntry" id="badgeEntry"></button>
     <button class="card badgeEntry theoryEntry" id="theoryEntry"></button>
+    <button class="card badgeEntry tunerEntry" id="tunerEntry"></button>
     <div class="card">
       <div class="metroHead">
         <div class="label"><svg class="ic"><use href="#i-metronome"/></svg>Metronome</div>
@@ -604,6 +623,25 @@
       </div>
       <div id="manualList"></div>
     </div>
+    </div>
+  </section>
+
+  <!-- TUNER -->
+  <section class="screen" id="tunerScreen" hidden>
+    <header><button class="ghost back" id="tunerBack"><svg class="ic"><use href="#i-back"/></svg>Back</button><span class="lvl" id="tuInstr"></span></header>
+    <div class="card tunerCard">
+      <div class="tuNote"><span id="tuName">–</span><sub id="tuOct"></sub></div>
+      <div class="tuState" id="tuState">Play a note</div>
+      <div class="tuMeter"><div class="tuZone"></div><div class="tuMid"></div><div class="tuNeedle" id="tuNeedle"></div></div>
+      <div class="tuScale"><span>♭ flat</span><span>in tune</span><span>sharp ♯</span></div>
+      <div class="small muted" id="tuHz">&nbsp;</div>
+      <div class="tuStrings" id="tuStrings"></div>
+      <div class="tuRefs" id="tuRefs"></div>
+    </div>
+    <div class="card tuSettings">
+      <div class="opt"><span>Reference pitch<br><small class="muted">Most music uses A = 440 Hz; some orchestras use 442</small></span>
+        <div class="stepper"><button id="tuAdown" aria-label="Lower"><svg class="ic"><use href="#i-minus"/></svg></button><span class="val" id="tuA"></span><button id="tuAup" aria-label="Higher"><svg class="ic"><use href="#i-plus"/></svg></button></div></div>
+      <label class="opt" id="tuWrittenRow" hidden><span>Show notes as written<br><small class="muted" id="tuWrittenHelp"></small></span><input type="checkbox" class="toggle" id="tuWritten"></label>
     </div>
   </section>
 
@@ -1097,6 +1135,7 @@ let screen = 'home';
 function show(name) {
   if (listening) stopAudio();
   if (name !== 'quiz' && quiz) endQuiz(true);
+  if (name !== 'tunerScreen') stopTuner();
   screen = name;
   for (const s of document.querySelectorAll('.screen')) s.hidden = s.id !== name;
   ({ home: renderHome, history: renderHistory, parent: renderParent, practice: () => { renderPractice(); renderTeacherCard(); renderManualList(); renderBadgeEntry(); setTimeout(showNextCheer, 400); }, badges: renderBadges, theory: renderTheory }[name] || (() => {}))();
@@ -2442,7 +2481,7 @@ function finishedChallenges(k) {
 }
 
 function renderBadgeEntry() {
-  renderTheoryEntry();
+  renderTheoryEntry(); renderTunerEntry();
   const el = $('badgeEntry');
   if (!kid || listening) { el.hidden = true; return; }
   const bs = kidBadges(kid), earned = bs.filter(b => b.tier >= 0).sort((a, b) => b.tier - a.tier);
@@ -2454,6 +2493,112 @@ function renderBadgeEntry() {
       <span>${close ? `Next: ${esc(close.b.name)} – ${close.b.unit(close.b.next)}` : 'All badges at the top level!'}</span></div>${icon('chev', 'go')}`;
   el.onclick = () => show('badges');
 }
+// ---------- Tuner (for every instrument) ----------
+// Chromatic: the nearest note, cents sharp or flat, and the frequency. String instruments also get their open strings
+// (it picks the string you're playing, or tap one to lock onto it). Reference tones to tune by ear. Uses the same YIN
+// pitch detector as practice; everything happens on the device.
+const TUNER_STRINGS = { violin: ['G3', 'D4', 'A4', 'E5'], viola: ['C3', 'G3', 'D4', 'A4'], cello: ['C2', 'G2', 'D3', 'A3'],
+  guitar: ['E2', 'A2', 'D3', 'G3', 'B3', 'E4'], ukulele: ['G4', 'C4', 'E4', 'A4'] };
+const WRITTEN_KEY = { clarinet: 'B♭ clarinet', trumpet: 'B♭ trumpet', saxophone: 'E♭ alto sax' };
+const nameMidi = n => { const m = n.match(/^([A-G])([♯♭]?)(-?\d)$/); return 12 * (+m[3] + 1) + LETTER_PC['CDEFGAB'.indexOf(m[1])] + (m[2] === '♯' ? 1 : m[2] === '♭' ? -1 : 0); };
+const midiName = m => [PC_NAMES[mod(Math.round(m), 12)], Math.floor(Math.round(m) / 12) - 1];
+let tun = null;
+const aRef = () => Math.min(450, Math.max(430, +settings.aRef || 440));
+
+function renderTunerEntry() {
+  const el = $('tunerEntry');
+  if (!kid || listening) { el.hidden = true; return; }
+  el.hidden = false;
+  const strs = TUNER_STRINGS[kid.instrument];
+  el.innerHTML = `<div class="thMini" aria-hidden="true">A</div><div class="grow"><b>Tuner</b>
+    <span>${strs ? `Tune your ${esc(instrumentLabel(kid.instrument).toLowerCase())}: ${strs.map(s => s.replace(/-?\d$/, '')).join(' ')}` : 'Check any note, sharp or flat'}</span></div>${icon('chev', 'go')}`;
+  el.onclick = () => { show('tunerScreen'); startTuner(); };
+}
+async function startTuner() {
+  stopTuner();
+  const k = kid, T = TRANSPOSE[k?.instrument] || 0;
+  document.body.style.setProperty('--kid', kidColor(k));
+  $('tuInstr').textContent = instrumentLabel(k.instrument, 'Any instrument');
+  $('tuA').textContent = `A = ${aRef()} Hz`;
+  $('tuWrittenRow').hidden = !T;
+  $('tuWrittenHelp').textContent = T ? `Notes as your ${WRITTEN_KEY[k.instrument] || 'instrument'} music shows them (otherwise concert pitch)` : '';
+  $('tuWritten').checked = !!settings.tunerWritten;
+  const strs = TUNER_STRINGS[k.instrument] || [];
+  $('tuStrings').innerHTML = strs.map(n => `<button data-str="${n}">${n.replace(/(-?\d)$/, '<sub>$1</sub>')}</button>`).join('');
+  $('tuRefs').innerHTML = strs.length ? `<button class="secondary" id="tuPlay">${icon('play', 'sm')}<span id="tuPlayLbl">Hear the string</span></button>`
+    : `<button class="secondary" data-ref="A4">${icon('play', 'sm')}Hear A</button><button class="secondary" data-ref="B♭4">${icon('play', 'sm')}Hear B♭</button>`;
+  $('tuName').textContent = '–'; $('tuOct').textContent = ''; $('tuHz').innerHTML = '&nbsp;'; $('tuNeedle').className = 'tuNeedle'; $('tuNeedle').style.left = '50%';
+  $('tuState').textContent = 'Getting the microphone ready…'; $('tuState').className = 'tuState';
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } }); }
+  catch { $('tuState').textContent = 'The tuner needs the microphone – allow it for this site in your browser settings.'; return; }
+  if (screen !== 'tunerScreen') { stream.getTracks().forEach(t => t.stop()); return; }
+  const ctx = new AudioContext(), an = ctx.createAnalyser(); an.fftSize = 4096; ctx.createMediaStreamSource(stream).connect(an);
+  tun = { k, T, ctx, stream, an, buf: new Float32Array(4096), strs: strs.map(n => ({ n, m: nameMidi(n) })), lock: null, hist: [], cents: 0, target: null, quietSince: 0, paused: false };
+  tun.timer = setInterval(tunerTick, 50);
+  $('tuState').textContent = 'Play a note';
+  $('tuStrings').querySelectorAll('[data-str]').forEach(b => b.onclick = () => {
+    tun.lock = tun.lock === b.dataset.str ? null : b.dataset.str;
+    $('tuStrings').querySelectorAll('[data-str]').forEach(x => x.classList.toggle('lock', x.dataset.str === tun.lock));
+    const lbl = $('tuPlayLbl'); if (lbl) lbl.textContent = tun.lock ? `Hear ${tun.lock.replace(/-?\d$/, '')}` : 'Hear the string';
+  });
+  $('tuPlay')?.addEventListener('click', () => playRef(nameMidi(tun.lock || tun.target?.n || strs[strs.length - 1])));
+  $('tuRefs').querySelectorAll('[data-ref]').forEach(b => b.onclick = () => playRef(nameMidi(b.dataset.ref)));
+}
+function stopTuner() {
+  if (!tun) return;
+  clearInterval(tun.timer); tun.stream.getTracks().forEach(t => t.stop()); tun.ctx.close(); tun = null;
+}
+// A reference tone at the chosen A (the tuner stops listening while it plays, so it doesn't hear itself)
+async function playRef(midi) {
+  const z = tun; if (!z) return;
+  if (z.ctx.state === 'suspended') await z.ctx.resume();
+  z.paused = true;
+  const t = z.ctx.currentTime, o = z.ctx.createOscillator(), g = z.ctx.createGain();
+  o.type = 'triangle'; o.frequency.value = aRef() * Math.pow(2, (midi - 69) / 12);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.45, t + 0.04); g.gain.setValueAtTime(0.45, t + 1.6); g.gain.exponentialRampToValueAtTime(0.0001, t + 2);
+  o.connect(g); g.connect(z.ctx.destination); o.start(t); o.stop(t + 2.05);
+  const [nm, oc] = midiName(midi + (z.T && settings.tunerWritten ? -z.T : 0));
+  $('tuName').textContent = nm; $('tuOct').textContent = oc; $('tuState').textContent = 'Listen…'; $('tuState').className = 'tuState';
+  setTimeout(() => { if (tun === z) { z.paused = false; z.hist = []; } }, 2200);
+}
+function tunerTick() {
+  const z = tun; if (!z || z.paused) return;
+  z.an.getFloatTimeDomainData(z.buf);
+  let rms = 0; for (const v of z.buf) rms += v * v; rms = Math.sqrt(rms / z.buf.length);
+  const f = rms > 0.006 ? yin(z.buf, z.ctx.sampleRate, 50) : null;
+  const needle = $('tuNeedle'), now = performance.now();
+  if (!f || f < 45 || f > 2500) {
+    if (!z.quietSince) z.quietSince = now;
+    if (now - z.quietSince > 700) { needle.className = 'tuNeedle'; z.hist = []; if ($('tuState').textContent !== 'Listen…') { $('tuState').textContent = 'Play a note'; $('tuState').className = 'tuState'; } }
+    return;
+  }
+  z.quietSince = 0;
+  z.hist.push(f); if (z.hist.length > 5) z.hist.shift();
+  const hz = [...z.hist].sort((a, b) => a - b)[z.hist.length >> 1];            // median: ignores the odd stray reading
+  const mf = 69 + 12 * Math.log2(hz / aRef());
+  // What we're tuning to: the locked string, the nearest string (within a few half steps), or simply the nearest note
+  let target = null;
+  if (z.lock) target = z.strs.find(s => s.n === z.lock);
+  else if (z.strs.length) { const near = z.strs.reduce((a, s) => Math.abs(s.m - mf) < Math.abs(a.m - mf) ? s : a); if (Math.abs(near.m - mf) <= 3.5) target = near; }
+  const tm = target ? target.m : Math.round(mf), c = (mf - tm) * 100;
+  if (z.target?.m !== tm) { z.cents = c; z.target = target ? { ...target } : { m: tm }; } else z.cents = z.cents * 0.55 + c * 0.45;
+  const cents = Math.round(z.cents), a = Math.abs(cents);
+  const [nm, oc] = midiName(tm + (z.T && settings.tunerWritten ? -z.T : 0));
+  $('tuName').textContent = nm; $('tuOct').textContent = oc;
+  $('tuHz').textContent = `${hz.toFixed(1)} Hz${z.T && settings.tunerWritten ? ' · written pitch' : ''}`;
+  const cls = a <= 5 ? 'ok' : a <= 15 ? 'near' : 'far';
+  needle.className = 'tuNeedle live ' + cls;
+  needle.style.left = (50 + Math.max(-50, Math.min(50, cents))) + '%';
+  $('tuState').className = 'tuState ' + cls;
+  $('tuState').textContent = a <= 5 ? 'In tune' : a > 50 ? (cents < 0 ? 'Too low – tune up' : 'Too high – tune down') : `${a} ${a === 1 ? 'cent' : 'cents'} ${cents < 0 ? 'flat' : 'sharp'}`;
+  $('tuStrings').querySelectorAll('[data-str]').forEach(b => b.classList.toggle('near', !z.lock && b.dataset.str === target?.n));
+}
+$('tunerBack').onclick = () => show('practice');
+$('tuAdown').onclick = () => { settings.aRef = aRef() - 1; saveSettings(); $('tuA').textContent = `A = ${aRef()} Hz`; };
+$('tuAup').onclick = () => { settings.aRef = aRef() + 1; saveSettings(); $('tuA').textContent = `A = ${aRef()} Hz`; };
+$('tuWritten').onchange = () => { settings.tunerWritten = $('tuWritten').checked; saveSettings(); };
+
 // ---------- Music theory (games and levels in theory.js) ----------
 const kidTheory = k => (theory[k.id] ??= {});
 function saveTheory() { store.set('pt-theory', theory); pushRemote({ theory }); }
