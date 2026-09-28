@@ -255,6 +255,15 @@
   .modal footer { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding-top: 4px; }
   .modal footer .right { display: flex; gap: 8px; margin-left: auto; }
   @keyframes pop { from { transform: translateY(12px) scale(.97); opacity: 0; } to { transform: none; opacity: 1; } }
+  .slotRow { display: grid; grid-template-columns: 1.2fr 1fr .9fr auto; gap: 6px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .slotRow select[data-f="term"] { grid-column: 1 / 2; } .slotRow input[type=date] { min-width: 0; }
+  .slotRow [data-f="start"] { grid-column: 2 / 3; } .slotRow [data-f="end"] { grid-column: 3 / 5; }
+  @media (max-width: 520px) { .slotRow { grid-template-columns: 1fr 1fr auto; } .slotRow select[data-f="term"] { grid-column: 1 / -1; }
+    .slotRow [data-f="start"] { grid-column: 1 / 2; } .slotRow [data-f="end"] { grid-column: 2 / 4; } }
+  .termRow { display: grid; grid-template-columns: 1.4fr 1fr 1fr auto; gap: 6px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+  .badgeRow { display: flex; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+  .badgeRow .grow { flex: 1; min-width: 0; } .badgeRow .grow span { display: block; font-size: 12.5px; color: var(--muted); }
+  .badgeEdit { background: var(--soft); border-radius: 14px; padding: 14px; display: grid; gap: 12px; margin: 8px 0; }
   .presetRow { display: flex; gap: 6px; flex-wrap: wrap; }
   .presetRow button { font-size: 12.5px; padding: 5px 10px; font-weight: 500; border-radius: 999px; }
   .planInputs { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
@@ -401,7 +410,7 @@
 <div class="overlay" id="modal" hidden><div class="card modal" id="modalCard" role="dialog" aria-modal="true"></div></div>
 <div id="toast"></div>
 
-<script src="badges.js?v=3"></script>
+<script src="badges.js?v=4"></script>
 <script>
 // ============================================================================================
 // Practice Timer for Teachers
@@ -586,14 +595,14 @@ function lessonsBetween(start, end, sid) {
   const out = {};
   for (const s of active()) {
     if (sid && s.id !== sid) continue;
-    const L = s.lesson;
-    if (!L || L.day == null || L.day === '' || !L.time) continue;
-    let d = addDays(start, (Number(L.day) - start.getDay() + 7) % 7);
-    for (; d <= end; d = addDays(d, 7)) {
-      const k = dayKey(d);
-      if (L.start && k < L.start) continue;
-      const id = `${s.id}_${k}`;
-      out[id] = { id, sid: s.id, date: k, time: L.time, length: L.length || 30, status: 'scheduled', ...(lessons[id] || {}) };
+    for (const L of lessonSlots(s)) {                  // each weekly lesson time, between its start and end dates
+      let d = addDays(start, (Number(L.day) - start.getDay() + 7) % 7);
+      for (; d <= end; d = addDays(d, 7)) {
+        const k = dayKey(d);
+        if ((L.start && k < L.start) || (L.end && k > L.end)) continue;
+        const id = `${s.id}_${k}`;
+        out[id] = { id, sid: s.id, date: k, time: L.time, length: L.length || 30, status: 'scheduled', ...(lessons[id] || {}) };
+      }
     }
   }
   for (const l of Object.values(lessons)) {             // one-off / moved lessons
@@ -741,8 +750,15 @@ function vStudents() {
     <div class="list" style="margin-top:10px">${archived.map(s => `<button class="rowLink" data-student="${s.id}" style="--kid:${s.color}"><div class="avatar sm">${initial(s.name)}</div><div class="grow">${esc(s.name)}</div></button>`).join('')}</div></details>` : ''}`;
 }
 const planLine = s => `Plan: ${planText(planOfStudent(s))}`;
-const lessonText = s => s.lesson && s.lesson.day !== '' && s.lesson.day != null && s.lesson.time
-  ? `${DAYS[s.lesson.day]}s at ${fmtTime(s.lesson.time)}, ${s.lesson.length || 30} min` : 'No regular lesson time';
+// The lesson time that's running now (or the next one to start)
+const currentSlot = s => { const t = dayKey(); return lessonSlots(s).filter(l => !l.end || l.end >= t).sort((a, b) => (a.start || '').localeCompare(b.start || ''))[0] || null; };
+function lessonText(s) {
+  const L = currentSlot(s), t = dayKey();
+  if (!L) return lessonSlots(s).length ? 'No lessons scheduled (last term ended)' : 'No regular lesson time';
+  const short = k => fmtDate(k, { day: 'numeric', month: 'short' });
+  return `${DAYS[L.day]}s at ${fmtTime(L.time)}, ${L.length || 30} min${L.start && L.start > t ? ` · from ${short(L.start)}` : ''}${L.end ? ` · until ${short(L.end)}` : ''}`;
+}
+const termName = (start, end) => (studio.terms || []).find(tm => tm.start === start && tm.end === end)?.name || '';
 
 function vStudent() {
   const s = students[route.id];
@@ -1015,15 +1031,41 @@ function studentModal(sid) {
         <div class="planInputs">${PLAN_ORDER.map(i => `<label><span>${PLAN_DAYS[i]}</span><input type="number" min="0" max="180" step="5" data-day="${i}" value="${planOfStudent(s)[i]}"></label>`).join('')}</div>
         <span class="small muted" id="fPlanText" style="font-weight:500"></span></div>
       <div class="field">Color <div class="swatches">${COLORS.map(c => `<button type="button" data-color="${c}" style="background:${c}" class="${c === color ? 'on' : ''}" aria-label="Color"></button>`).join('')}</div></div>
-      <div class="fields three">
-        <label class="field">Lesson day <select id="fDay"><option value="">No regular lesson</option>${[1, 2, 3, 4, 5, 6, 0].map(d => `<option value="${d}" ${String(s.lesson?.day) === String(d) ? 'selected' : ''}>${DAYS[d]}</option>`).join('')}</select></label>
-        <label class="field">Time <input type="time" id="fTime" value="${s.lesson?.time || '16:00'}"></label>
-        <label class="field">Length <select id="fLen">${[20, 30, 45, 60, 90].map(n => `<option value="${n}" ${(s.lesson?.length || 30) === n ? 'selected' : ''}>${n} min</option>`).join('')}</select></label>
-      </div>
+      <div class="field">Lesson times <span class="small muted" style="font-weight:500">Weekly lessons, each running between two dates – add one per term.${(studio.terms || []).length ? '' : ' Set up your terms in Settings → Terms to pick them here.'}</span>
+        <div id="slotList"></div>
+        <button type="button" class="secondary" id="addSlot" style="justify-self:start">${icon('plus', 'sm')}Add a lesson time</button></div>
       <div class="gateErr" id="fErr"></div>
     </div>
     <footer>${sid ? `<button class="danger" id="fArchive">${s.archived ? 'Delete permanently' : 'Archive student'}</button>` : ''}
       <div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="fSave">${sid ? 'Save' : 'Add student'}</button></div></footer>`, m => {
+    // lesson times editor
+    const orig = lessonSlots(s).map(l => ({ ...l }));
+    let slots = sid ? orig.map((l, i) => ({ ...l, _o: i })) : [];      // _o: which original lesson time this row started as
+    const defTerm = () => (studio.terms || []).filter(tm => tm.end >= dayKey()).sort((a, b) => a.start.localeCompare(b.start))[0];
+    const drawSlots = () => {
+      m.querySelector('#slotList').innerHTML = slots.map((L, i) => `<div class="slotRow" data-i="${i}">
+        <select data-f="day" aria-label="Day">${[1, 2, 3, 4, 5, 6, 0].map(d => `<option value="${d}" ${+L.day === d ? 'selected' : ''}>${DAYS[d]}</option>`).join('')}</select>
+        <input type="time" data-f="time" value="${L.time}" aria-label="Time">
+        <select data-f="length" aria-label="Length">${[20, 30, 45, 60, 90].map(n => `<option value="${n}" ${(+L.length || 30) === n ? 'selected' : ''}>${n} min</option>`).join('')}</select>
+        <button type="button" class="ghost icon" data-rm="${i}" aria-label="Remove this lesson time">${icon('trash')}</button>
+        <select data-f="term" aria-label="Term"><option value="">Custom dates</option>${(studio.terms || []).map(tm => `<option value="${tm.id}" ${L.start === tm.start && L.end === tm.end ? 'selected' : ''}>${esc(tm.name)}</option>`).join('')}</select>
+        <input type="date" data-f="start" value="${L.start || ''}" aria-label="From">
+        <input type="date" data-f="end" value="${L.end || ''}" aria-label="Until" title="Leave empty for no end date">
+      </div>`).join('') || '<div class="empty" style="padding:4px 0">No regular lesson time.</div>';
+      m.querySelectorAll('.slotRow [data-f]').forEach(el => el.onchange = () => {
+        const L = slots[+el.closest('.slotRow').dataset.i], f = el.dataset.f;
+        if (f === 'term') { const tm = (studio.terms || []).find(x => x.id === el.value); if (tm) { L.start = tm.start; L.end = tm.end; drawSlots(); } return; }
+        L[f] = f === 'day' || f === 'length' ? +el.value : el.value;
+        if (f === 'start' || f === 'end') drawSlots();
+      });
+      m.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { slots.splice(+b.dataset.rm, 1); drawSlots(); });
+    };
+    m.querySelector('#addSlot').onclick = () => {
+      const last = slots[slots.length - 1], tm = defTerm();
+      slots.push({ day: last ? +last.day : 1, time: last?.time || '16:00', length: last?.length || 30, start: tm?.start || dayKey(), end: tm?.end || '' });
+      drawSlots();
+    };
+    drawSlots();
     const readPlan = () => { const p = Array(7).fill(0); m.querySelectorAll('[data-day]').forEach(i => p[+i.dataset.day] = Math.max(0, Math.min(180, +i.value || 0))); return p; };
     const showPlan = () => { const p = readPlan(); m.querySelector('#fPlanText').textContent = `${planText(p)} · ${mins(planTotal(p) * 60000)} a week`; };
     m.querySelectorAll('[data-day]').forEach(i => i.oninput = showPlan);
@@ -1032,17 +1074,27 @@ function studentModal(sid) {
     m.querySelectorAll('[data-color]').forEach(b => b.onclick = () => { color = b.dataset.color; m.querySelectorAll('[data-color]').forEach(x => x.classList.toggle('on', x === b)); });
     m.querySelector('#fSave').onclick = async () => {
       const name = val('fName'); if (!name) return (m.querySelector('#fErr').textContent = 'Please enter a name.');
-      const day = val('fDay');
       const plan = readPlan(); if (!planDayCount(plan)) return (m.querySelector('#fErr').textContent = 'Add minutes for at least one day.');
+      if (slots.some(L => !L.time || !L.start)) return (m.querySelector('#fErr').textContent = 'Each lesson time needs a time and a start date.');
+      if (slots.some(L => L.end && L.end < L.start)) return (m.querySelector('#fErr').textContent = 'A lesson time ends before it starts.');
+      // If a lesson time that already started changes day or time, keep its past lessons as they were:
+      // end the old one yesterday and start the new time today
+      const t0 = dayKey(), yesterday = dayKey(addDays(today(), -1)), final = [];
+      for (const { _o, ...L } of slots) {
+        const was = _o != null ? orig[_o] : null;
+        if (was && was.start < t0 && (+was.day !== +L.day || was.time !== L.time) && (!L.end || L.end >= t0)) {
+          final.push({ ...was, end: yesterday }, { ...L, start: t0 });
+        } else final.push({ ...L, end: L.end || '' });
+      }
+      final.sort((a, b) => a.start.localeCompare(b.start));
       const data = { name, instrument: val('fInstr'), color, plan, target: Math.round(planTotal(plan) / planDayCount(plan)),
-                     lesson: { day: day === '' ? '' : +day, time: val('fTime'), length: +val('fLen'), start: s.lesson?.start || dayKey() } };
+                     slots: final, lesson: currentSlot({ slots: final }) || final[final.length - 1] || null };
       if (sid) {
-        if (String(s.lesson?.day) !== String(data.lesson.day) || s.lesson?.time !== data.lesson.time) data.lesson.start = dayKey();
         await api.patchStudent(sid, data); closeModal(); toast('Saved');
       } else {
         const id = randomCode();
         await api.createStudent(id, { ...data, tz: TZ, studioId: me.uid, studioName: studio.studioName, teacherName: studio.teacherName,
-          assignments: {}, upcoming: {}, lessonChanges: {}, cheers: {}, challenges: {}, badgeRules: studio.badgeRules || {}, created: dayKey(), archived: false });
+          assignments: {}, upcoming: {}, lessonChanges: {}, cheers: {}, challenges: {}, badgeRules: studio.badgeRules || {}, badgeSet: studio.badgeSet || null, created: dayKey(), archived: false });
         closeModal(); sub = {}; go('student', { id }); setTimeout(() => inviteModal(id), 300);
       }
     };
@@ -1227,7 +1279,8 @@ function studioModal() {
       <label class="field">Studio name <input type="text" id="sName" value="${esc(studio.studioName)}" maxlength="60"></label>
       <label class="field">Your name, as students know you <input type="text" id="sTeacher" value="${esc(studio.teacherName)}" maxlength="60"></label>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="secondary" id="sCal" type="button">${icon('calendar', 'sm')}Calendar &amp; email</button>
-        <button class="secondary" id="sBadges" type="button">${icon('award', 'sm')}Default badges</button></div>
+        <button class="secondary" id="sTerms" type="button">${icon('calendar', 'sm')}Terms</button>
+        <button class="secondary" id="sBadges" type="button">${icon('award', 'sm')}Studio badges</button></div>
       <p class="small muted">Signed in as ${esc(me.email || me.displayName || '')}.</p>
     </div>
     <footer><button class="danger" id="sOut">Sign out</button><div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="sSave">Save</button></div></footer>`, m => {
@@ -1241,6 +1294,7 @@ function studioModal() {
     m.querySelector('#sOut').onclick = () => api.signOut();
     m.querySelector('#sCal').onclick = () => calendarEmailModal();
     m.querySelector('#sBadges').onclick = () => badgeRulesModal();
+    m.querySelector('#sTerms').onclick = () => termsModal();
   });
 }
 $('studioBtn').onclick = studioModal;
@@ -1259,7 +1313,8 @@ function tRewards(s) {
   const first = esc(firstName(s.name)), days = studentDays(s), ticks = studentTicks(s), goalMs = key => (s.practice?.plan ? planOf(s.practice.plan)[parseDay(key).getDay()] * 60000 : goalMsOn(s, key));
   const ch = Object.entries(s.challenges || {}).map(([id, c]) => ({ id, c, p: challengeProgress(c, days, goalMs, ticks), done: s.challengeDone?.[id] }))
     .sort((a, b) => b.c.start.localeCompare(a.c.start));
-  const earned = Object.entries(s.badges || {}).map(([id, b]) => ({ ...b, def: BADGES.find(x => x.id === id) })).filter(b => b.def).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const defs = [...badgeSetFor(s.badgeSet, s.badgeRules || {}), ...badgeSetFor(null)];
+  const earned = Object.entries(s.badges || {}).map(([id, b]) => ({ ...b, def: defs.find(x => x.id === id) })).filter(b => b.def).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   const cheers = Object.entries(s.cheers || {}).sort((a, b) => b[1].date.localeCompare(a[1].date));
   return `<div class="stack">
     <div class="card"><h2>Encourage ${first}</h2>
@@ -1275,9 +1330,9 @@ function tRewards(s) {
         <div class="pbar ${p.done ? 'done' : ''}"><div style="width:${Math.min(p.value / c.target, 1) * 100}%"></div></div></div>
         <button class="ghost icon" data-ch-edit="${id}" aria-label="Edit challenge">${icon('edit')}</button></div>`; }).join('')
         : '<div class="empty">No challenges yet. Short ones work best – “Practice on 5 days this week” is a great start.</div>'}</div>
-    <div class="card"><h2>Badges earned <button class="ghost small" data-act="badgeRules">Default badges ${icon('chev', 'sm')}</button></h2>
+    <div class="card"><h2>Badges earned <button class="ghost small" data-act="badgeRules">Studio badges ${icon('chev', 'sm')}</button></h2>
       ${earned.length ? `<div class="medalGrid">${earned.map(b => `<div>${medalSvg(b.def.icon, BADGE_TIERS[b.tier].color, { size: 56 })}<b>${esc(b.def.name)}</b>
-        <span>${BADGE_TIERS[b.tier].name} · ${b.def.unit((s.badgeRules?.tiers?.[b.def.id] || b.def.tiers)[b.tier])}</span>${b.date ? `<span>${fmtDate(b.date, { day: 'numeric', month: 'short' })}</span>` : ''}</div>`).join('')}</div>`
+        <span>${BADGE_TIERS[b.tier].name}${b.def.tiers[b.tier] ? ' · ' + b.def.unit(b.def.tiers[b.tier]) : ''}</span>${b.date ? `<span>${fmtDate(b.date, { day: 'numeric', month: 'short' })}</span>` : ''}</div>`).join('')}</div>`
         : `<div class="empty">${s.linkedAt ? `Badges appear here as ${first} earns them.` : 'Badges appear once the family connects the app.'}</div>`}</div>
     <div class="card"><h2>Stars &amp; awards sent</h2>
       ${cheers.length ? cheers.map(([id, c]) => `<div class="assign">${medalSvg(c.kind === 'badge' ? c.icon || 'award' : 'star', c.kind === 'badge' ? BADGE_TIERS[4].color : BADGE_TIERS[2].color, { size: 40 })}
@@ -1360,30 +1415,112 @@ function challengeModal(sid, cid) {
   });
 }
 
-// Studio-wide badge settings: switch badges off, or change the levels (copied onto every student)
+// Studio badges: every studio starts with the standard set. A teacher can clear it, reset it, or build
+// their own (name, picture, what it measures, levels). Saved on the studio and copied onto every student.
 function badgeRulesModal() {
-  const rules = structuredClone(studio.badgeRules || {});
-  openModal(`${mhead('Default badges')}
-    <p class="small muted" style="margin-top:-6px">Students earn these automatically from their practice. Switch off any you don’t want, or change the levels (up to 5, lowest first).</p>
-    <div>${BADGES.map(b => `<div class="ruleRow">
-      <input type="checkbox" data-on="${b.id}" ${rules.off?.[b.id] ? '' : 'checked'} aria-label="${esc(b.name)}">
-      <div class="grow">${medalSvg(b.icon, BADGE_TIERS[2].color, { size: 28 })} <b style="display:inline">${esc(b.name)}</b><span style="display:block">${esc(b.about)}</span></div>
-      <input type="text" data-tiers="${b.id}" value="${(rules.tiers?.[b.id] || b.tiers).join(', ')}" aria-label="Levels for ${esc(b.name)}"></div>`).join('')}</div>
-    <footer><button class="ghost" id="brReset">Reset to defaults</button><div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="brSave">Save</button></div></footer>`, m => {
-    m.querySelector('#brReset').onclick = () => { m.querySelectorAll('[data-on]').forEach(c => c.checked = true); BADGES.forEach(b => m.querySelector(`[data-tiers="${b.id}"]`).value = b.tiers.join(', ')); };
-    m.querySelector('#brSave').onclick = async () => {
-      const out = { off: {}, tiers: {} };
-      for (const b of BADGES) {
-        if (!m.querySelector(`[data-on="${b.id}"]`).checked) out.off[b.id] = true;
-        const t = m.querySelector(`[data-tiers="${b.id}"]`).value.split(/[,\s]+/).map(Number).filter(n => n > 0).sort((a, c) => a - c).slice(0, 5);
-        if (t.length && t.join() !== b.tiers.join()) out.tiers[b.id] = t;
+  let set = badgeSetFor(studio.badgeSet, studio.badgeRules || {}).map(({ id, metric, name, icon, tiers }) => ({ id, metric, name, icon, tiers: [...tiers] }));
+  let editing = null;                                   // index being edited, or 'new'
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const standard = () => BADGES.map(({ id, metric, name, icon, tiers }) => ({ id, metric, name, icon, tiers: [...tiers] }));
+  const editor = b => `<div class="badgeEdit">
+      <label class="field">Name <input type="text" id="bName" maxlength="30" value="${esc(b.name)}" placeholder="e.g. Scale master"></label>
+      <div class="field">Picture <div class="iconPick">${BADGE_ICONS.map(i => `<button type="button" data-bicon="${i}" class="${i === b.icon ? 'on' : ''}" aria-label="${i}">${medalSvg(i, BADGE_TIERS[2].color, { size: 38 })}</button>`).join('')}</div></div>
+      <div class="fields two">
+        <label class="field">Earned for <select id="bMetric">${Object.entries(BADGE_METRICS).map(([k, v]) => `<option value="${k}" ${b.metric === k ? 'selected' : ''}>${v.label}</option>`).join('')}</select></label>
+        <label class="field">Levels (up to 5, lowest first) <input type="text" id="bTiers" value="${b.tiers.join(', ')}" placeholder="e.g. 5, 10, 20"></label>
+      </div>
+      <p class="small muted" id="bHelp"></p>
+      <div style="display:flex;gap:8px"><button type="button" class="primary" id="bDone">Done</button><button type="button" class="ghost" id="bCancel">Cancel</button></div></div>`;
+  const draw = () => {
+    openModal(`${mhead('Studio badges')}
+      <p class="small muted" style="margin-top:-6px">Students earn these automatically from their practice – you don’t have to award them. Every studio starts with the standard set. You can also award one-off badges by hand from a student’s page.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="secondary" id="bReset" ${same(set, standard()) ? 'disabled' : ''}>${icon('refresh', 'sm')}Reset to standard set</button>
+        <button type="button" class="secondary" id="bClear" ${set.length ? '' : 'disabled'}>${icon('trash', 'sm')}Clear all</button></div>
+      <div>${set.map((b, i) => editing === i ? editor(b) : `<div class="badgeRow">${medalSvg(b.icon, BADGE_TIERS[2].color, { size: 40 })}
+        <div class="grow"><b>${esc(b.name)}</b><span>${esc(BADGE_METRICS[b.metric]?.label || '')} · levels ${b.tiers.join(', ')}</span></div>
+        <button type="button" class="ghost icon" data-bedit="${i}" aria-label="Edit">${icon('edit')}</button>
+        <button type="button" class="ghost icon" data-bdel="${i}" aria-label="Delete">${icon('trash')}</button></div>`).join('')
+        || '<div class="empty">No automatic badges. Add your own below, or reset to the standard set.</div>'}
+        ${editing === 'new' ? editor({ name: '', icon: 'star', metric: 'days', tiers: [5, 15, 30] }) : ''}</div>
+      ${editing === null ? `<button type="button" class="secondary" id="bAdd" style="justify-self:start">${icon('plus', 'sm')}Add a badge</button>` : ''}
+      <div class="gateErr" id="bErr"></div>
+      <footer><div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="bSave">Save for all students</button></div></footer>`, m => {
+      m.querySelector('#bReset').onclick = () => { set = standard(); editing = null; draw(); };
+      m.querySelector('#bClear').onclick = () => { if (confirm('Remove all automatic badges? Badges students already earned stay on their record.')) { set = []; editing = null; draw(); } };
+      m.querySelector('#bAdd')?.addEventListener('click', () => { editing = 'new'; draw(); });
+      m.querySelectorAll('[data-bedit]').forEach(b => b.onclick = () => { editing = +b.dataset.bedit; draw(); });
+      m.querySelectorAll('[data-bdel]').forEach(b => b.onclick = () => { set.splice(+b.dataset.bdel, 1); draw(); });
+      if (editing !== null) {
+        let pickIcon = editing === 'new' ? 'star' : set[editing].icon;
+        const help = () => { const x = BADGE_METRICS[m.querySelector('#bMetric').value]; const t = [...new Set(m.querySelector('#bTiers').value.split(/[,\s]+/).map(Number).filter(n => n > 0))].sort((a, b) => a - b);
+          m.querySelector('#bHelp').textContent = `${x.about} Levels: ${t.slice(0, 5).map((n, i) => `${BADGE_TIERS[i].name} = ${x.unit(n)}`).join(', ') || '–'}.`; };
+        m.querySelectorAll('[data-bicon]').forEach(b => b.onclick = () => { pickIcon = b.dataset.bicon; m.querySelectorAll('[data-bicon]').forEach(x => x.classList.toggle('on', x === b)); });
+        m.querySelector('#bMetric').onchange = help; m.querySelector('#bTiers').oninput = help; help();
+        m.querySelector('#bCancel').onclick = () => { editing = null; draw(); };
+        m.querySelector('#bDone').onclick = () => {
+          const name = m.querySelector('#bName').value.trim(), tiers = [...new Set(m.querySelector('#bTiers').value.split(/[,\s]+/).map(Number).filter(n => n > 0))].sort((a, b) => a - b).slice(0, 5);
+          if (!name || !tiers.length) return (m.querySelector('#bErr').textContent = 'Give the badge a name and at least one level.');
+          const b = { id: editing === 'new' ? 'c' + newId() : set[editing].id, metric: m.querySelector('#bMetric').value, name, icon: pickIcon, tiers };
+          if (editing === 'new') set.push(b); else set[editing] = b;
+          editing = null; draw();
+        };
       }
-      studio.badgeRules = out;
-      await api.updateStudio({ badgeRules: out });
-      for (const s of Object.values(students)) await api.patchStudent(s.id, { badgeRules: out });
-      closeModal(); toast('Badges updated for all students');
+      m.querySelector('#bSave').onclick = async () => {
+        if (editing !== null) return (m.querySelector('#bErr').textContent = 'Finish editing the badge first (Done or Cancel).');
+        const badgeSet = same(set, standard()) ? null : set;          // null = the standard set
+        studio.badgeSet = badgeSet; studio.badgeRules = null;
+        await api.updateStudio({ badgeSet, badgeRules: null });
+        for (const st of Object.values(students)) await api.patchStudent(st.id, { badgeSet, badgeRules: null });
+        closeModal(); toast('Badges updated for all students');
+      };
+    });
+  };
+  draw();
+}
+
+// Terms (semesters): named date ranges to pick when setting a student's lesson time
+function termsModal() {
+  let terms = (studio.terms || []).map(t => ({ ...t }));
+  const draw = () => openModal(`${mhead('Terms')}
+    <p class="small muted" style="margin-top:-6px">Name your terms or semesters once, then pick them when you set a student’s lesson time. Lessons only appear between a term’s dates.</p>
+    <div>${terms.map((t, i) => `<div class="termRow" data-i="${i}"><input type="text" data-f="name" value="${esc(t.name)}" placeholder="e.g. Fall 2026" aria-label="Name">
+      <input type="date" data-f="start" value="${t.start}" aria-label="Starts"><input type="date" data-f="end" value="${t.end}" aria-label="Ends">
+      <button type="button" class="ghost icon" data-rm="${i}" aria-label="Remove">${icon('trash')}</button>
+      ${t.start ? `<button type="button" class="ghost small" data-roll="${i}" style="grid-column:1 / -1;justify-self:start">${icon('refresh', 'sm')}Copy students’ current lesson times into ${esc(t.name || 'this term')}</button>` : ''}</div>`).join('')
+      || '<div class="empty">No terms yet.</div>'}</div>
+    <button type="button" class="secondary" id="tAdd" style="justify-self:start">${icon('plus', 'sm')}Add a term</button>
+    <div class="gateErr" id="tErr"></div>
+    <footer><div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="tSave">Save</button></div></footer>`, m => {
+    m.querySelectorAll('.termRow [data-f]').forEach(el => el.oninput = () => { terms[+el.closest('.termRow').dataset.i][el.dataset.f] = el.value; });
+    m.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { terms.splice(+b.dataset.rm, 1); draw(); });
+    m.querySelector('#tAdd').onclick = () => {
+      const last = terms[terms.length - 1], s0 = last?.end ? dayKey(addDays(parseDay(last.end), 21)) : dayKey();
+      terms.push({ id: newId(), name: '', start: s0, end: dayKey(addDays(parseDay(s0), 7 * 15)) }); draw();
     };
+    const valid = () => {
+      for (const t of terms) if (!t.name.trim() || !t.start || !t.end || t.end < t.start) { m.querySelector('#tErr').textContent = 'Each term needs a name, a start date and an end date after it.'; return false; }
+      return true;
+    };
+    const save = async () => { terms.sort((a, b) => a.start.localeCompare(b.start)); studio.terms = terms; await api.updateStudio({ terms }); };
+    m.querySelector('#tSave').onclick = async () => { if (!valid()) return; await save(); closeModal(); toast('Terms saved'); };
+    // Roll over: give every student a lesson time in this term, copied from their latest one
+    m.querySelectorAll('[data-roll]').forEach(b => b.onclick = async () => {
+      if (!valid()) return;
+      const t = terms[+b.dataset.roll], list = active().filter(st => {
+        const sl = lessonSlots(st); return sl.length && !sl.some(L => (!L.end || L.end >= t.start) && L.start <= t.end);
+      });
+      if (!list.length) return toast('Everyone already has a lesson time in this term');
+      if (!confirm(`Add a lesson time in ${t.name} (${fmtDate(t.start)} – ${fmtDate(t.end)}) for ${list.length} ${list.length === 1 ? 'student' : 'students'}, same day and time as their latest one? You can change any of them afterwards.`)) return;
+      await save();
+      for (const st of list) {
+        const sl = lessonSlots(st), last = [...sl].sort((a, c) => (a.start || '').localeCompare(c.start || '')).pop();
+        await api.patchStudent(st.id, { slots: [...sl, { day: +last.day, time: last.time, length: last.length || 30, start: t.start, end: t.end }] });
+      }
+      closeModal(); toast(`Lesson times added for ${list.length} ${list.length === 1 ? 'student' : 'students'}`);
+    });
   });
+  draw();
 }
 
 // ============================================================================================
@@ -1399,12 +1536,14 @@ const plusMin = (key, time, m) => { const [h, mm] = (time || '12:00').split(':')
 function studioIcs() {
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, ''), from = dayKey(addDays(today(), -28)), ev = [];
   for (const s of active()) {
-    const L = s.lesson || {}, ch = s.lessonChanges || {}, len = L.length || 30, title = `${s.name} – ${INSTRUMENTS[s.instrument] || 'Music'} lesson`;
-    if (L.day !== '' && L.day != null && L.time) {
+    const ch = s.lessonChanges || {}, len = lessonSlots(s)[0]?.length || 30, title = `${s.name} – ${INSTRUMENTS[s.instrument] || 'Music'} lesson`;
+    for (const L of lessonSlots(s)) {
+      if (L.end && L.end < from) continue;
       let d = parseDay(L.start && L.start > from ? L.start : from);
       while (d.getDay() !== +L.day) d = addDays(d, 1);
-      const first = dayKey(d), ex = Object.keys(ch).filter(k => k >= first && parseDay(k).getDay() === +L.day);
-      ev.push([`lesson-${s.id}-${first}`, first, L.time, len, title, 'FREQ=WEEKLY', ex, '', '']);
+      const first = dayKey(d); if (L.end && first > L.end) continue;
+      const ex = Object.keys(ch).filter(k => k >= first && parseDay(k).getDay() === +L.day && (!L.end || k <= L.end));
+      ev.push([`lesson-${s.id}-${first}`, first, L.time, L.length || 30, title, 'FREQ=WEEKLY' + (L.end ? `;UNTIL=${L.end.replace(/-/g, '')}T235959` : ''), ex, '', '']);
     }
     for (const [k, c] of Object.entries(ch)) if (c.status === 'extra' && k >= from) ev.push([`extra-${s.id}-${k}`, k, c.time, len, title, '', [], '', '']);
   }
@@ -1545,6 +1684,9 @@ function enter() {
 // ---------- Demo data ----------
 function seedDemo() {
   studio = { studioName: 'Riverside Strings & Keys', teacherName: 'Ms. Alvarez' };
+  const yr = new Date().getFullYear(), fallStart = `${yr}-08-31`, fallEnd = `${yr}-12-18`;
+  studio.terms = [{ id: 't1', name: `Spring ${yr}`, start: `${yr}-01-12`, end: `${yr}-05-22` }, { id: 't2', name: `Fall ${yr}`, start: fallStart, end: fallEnd },
+                  { id: 't3', name: `Spring ${yr + 1}`, start: `${yr + 1}-01-11`, end: `${yr + 1}-05-21` }];
   const t = today(), rnd = (a, b) => a + Math.random() * (b - a);
   const kids = [
     ['Maya Chen', 'violin', 0, 2, '16:00', 30, 25, .9], ['Leo Park', 'cello', 1, 2, '16:45', 45, 30, .7], ['Sam Rivera', 'piano', 3, 3, '15:30', 30, 20, .5],
@@ -1566,7 +1708,8 @@ function seedDemo() {
     const man = {};                                   // some practice logged by hand on days the app wasn't used
     if (keen > 0) for (let d = 1; d < 60; d++) { const k = dayKey(addDays(t, -d)); if (!log[k] && Math.random() < .18) man[k] = Math.round(rnd(10, 25)) * 60000; }
     const plan = [[0, 30, 30, 30, 30, 30, 0], [0, 60, 30, 60, 30, 60, 0], PLAN_PRESETS[0][1], [0, 30, 0, 30, 0, 30, 30], [0, 45, 45, 45, 45, 45, 45], [0, 20, 20, 20, 20, 20, 20]][i];
-    students[id] = { id, name, instrument, color: COLORS[ci], target, plan, studioId: 'demo', lesson: { day, time, length, start: '2025-01-01' },
+    const slots = [{ day, time, length, start: dayKey(addDays(t, -140)), end: fallEnd }];
+    students[id] = { id, name, instrument, color: COLORS[ci], target, plan, studioId: 'demo', slots, lesson: slots[0],
       practice: keen > 0 ? { log, stats: st, manual: man } : null, linkedAt: keen > 0 ? '2026-01-10' : null, kidName: firstName(name),
       assignments: {}, progress: {}, upcoming: {}, lessonChanges: {}, archived: false };
     const L = students[id].lesson;

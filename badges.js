@@ -1,8 +1,9 @@
 // Practice Timer – badges (shared by the family app and the teacher studio)
 //
-// Badges are earned automatically from practice data. Each badge has levels (tiers); the child always
-// sees the next one, so there's always something within reach. Teachers can switch badges off or change
-// the thresholds for their studio (studio.badgeRules → mirrored to each student as student.badgeRules).
+// Badges are earned automatically from practice data. Each badge measures one thing (its metric) and has
+// levels (tiers); the child always sees the next level, so there's always something within reach.
+// A studio starts with the default set below. A teacher can clear it, reset it, or build their own set
+// (studio.badgeSet → copied onto each student as student.badgeSet).
 
 const BADGE_TIERS = [
   { name: 'Bronze', color: '#b27a4c' },
@@ -12,28 +13,55 @@ const BADGE_TIERS = [
   { name: 'Diamond', color: '#7a63db' }
 ];
 
+// What a badge can measure (all worked out from practice data, nothing to award by hand)
+const BADGE_METRICS = {
+  streak:   { label: 'Days in a row', unit: n => `${n} days in a row`, about: 'Practice on days in a row. Planned rest days don’t break it.' },
+  days:     { label: 'Practice days (total)', unit: n => `${n} practice ${n === 1 ? 'day' : 'days'}`, about: 'Every day with some practice counts.' },
+  goals:    { label: 'Days the goal was reached', unit: n => n === 1 ? 'first goal reached' : `${n} goals reached`, about: 'Reach the day’s practice goal.' },
+  hours:    { label: 'Hours practiced (total)', unit: n => `${n} ${n === 1 ? 'hour' : 'hours'} practiced`, about: 'All practice time added up.' },
+  focus:    { label: 'Minutes without stopping', unit: n => `${n} min without stopping`, about: 'Play for a long stretch without stopping.' },
+  tune:     { label: '% of notes in tune in a day', unit: n => `${n}% in tune in a day`, strings: true, about: 'Play most notes in tune in one day (at least 50 notes).' },
+  rhythm:   { label: '% steady with the metronome', unit: n => `${n}% steady with the metronome`, about: 'Keep a steady beat with the metronome in one day (at least 40 notes).' },
+  early:    { label: 'Mornings before 8 am', unit: n => `${n} ${n === 1 ? 'morning' : 'mornings'} before 8 am`, about: 'Practice before 8 in the morning.' },
+  weekend:  { label: 'Full weekends', unit: n => `${n} full ${n === 1 ? 'weekend' : 'weekends'}`, about: 'Practice on both Saturday and Sunday.' },
+  comeback: { label: 'Comebacks after a break', unit: n => n === 1 ? 'came back after a break' : `${n} comebacks`, about: 'Start again after a few days off – that takes grit.' },
+  homework: { label: 'Days of assignments ticked', unit: n => `${n} days of assignments`, about: 'Tick off the teacher’s assignments.' }
+};
+
+// The default set every studio starts with
 const BADGES = [
-  { id: 'streak', name: 'On a roll', icon: 'flame', tiers: [3, 7, 14, 30, 60], unit: n => `${n} days in a row`,
-    about: 'Practice on days in a row. Practice logged by hand counts too.' },
-  { id: 'goals', name: 'Goal getter', icon: 'flag', tiers: [1, 10, 25, 50, 100], unit: n => n === 1 ? 'first daily goal' : `${n} daily goals`,
-    about: 'Reach your daily goal.' },
-  { id: 'hours', name: 'Time invested', icon: 'clock', tiers: [1, 5, 10, 25, 50], unit: n => `${n} ${n === 1 ? 'hour' : 'hours'} practiced`,
-    about: 'All your practice time added up.' },
-  { id: 'focus', name: 'Deep focus', icon: 'target', tiers: [10, 20, 30, 45], unit: n => `${n} min without stopping`,
-    about: 'Play for a long stretch without stopping.' },
-  { id: 'tune', name: 'Sweet spot', icon: 'tune', tiers: [80, 88, 94], unit: n => `${n}% in tune in a day`, strings: true,
-    about: 'Play most of your notes in tune in one day (at least 50 notes).' },
-  { id: 'rhythm', name: 'Steady beat', icon: 'metronome', tiers: [75, 85, 92], unit: n => `${n}% steady with the metronome`,
-    about: 'Keep a steady beat with the metronome in one day (at least 40 notes).' },
-  { id: 'early', name: 'Early bird', icon: 'sun', tiers: [1, 5, 20], unit: n => `${n} ${n === 1 ? 'morning' : 'mornings'} before 8 am`,
-    about: 'Practice before 8 in the morning.' },
-  { id: 'weekend', name: 'Weekend warrior', icon: 'calendar', tiers: [1, 4, 12], unit: n => `${n} full ${n === 1 ? 'weekend' : 'weekends'}`,
-    about: 'Practice on both Saturday and Sunday.' },
-  { id: 'comeback', name: 'Comeback', icon: 'refresh', tiers: [1, 5], unit: n => n === 1 ? 'came back after a break' : `${n} comebacks`,
-    about: 'Start again after a few days off – that takes grit.' },
-  { id: 'homework', name: 'Homework hero', icon: 'book', tiers: [5, 20, 50, 100], unit: n => `${n} days of assignments`,
-    about: 'Tick off your teacher’s assignments.' }
+  { id: 'streak', metric: 'streak', name: 'On a roll', icon: 'flame', tiers: [3, 7, 14, 30, 60] },
+  { id: 'goals', metric: 'goals', name: 'Goal getter', icon: 'flag', tiers: [1, 10, 25, 50, 100] },
+  { id: 'hours', metric: 'hours', name: 'Time invested', icon: 'clock', tiers: [1, 5, 10, 25, 50] },
+  { id: 'focus', metric: 'focus', name: 'Deep focus', icon: 'target', tiers: [10, 20, 30, 45] },
+  { id: 'tune', metric: 'tune', name: 'Sweet spot', icon: 'tune', tiers: [80, 88, 94] },
+  { id: 'rhythm', metric: 'rhythm', name: 'Steady beat', icon: 'metronome', tiers: [75, 85, 92] },
+  { id: 'early', metric: 'early', name: 'Early bird', icon: 'sun', tiers: [1, 5, 20] },
+  { id: 'weekend', metric: 'weekend', name: 'Weekend warrior', icon: 'calendar', tiers: [1, 4, 12] },
+  { id: 'comeback', metric: 'comeback', name: 'Comeback', icon: 'refresh', tiers: [1, 5] },
+  { id: 'homework', metric: 'homework', name: 'Homework hero', icon: 'book', tiers: [5, 20, 50, 100] }
 ];
+// Pictures for badges (auto or awarded by hand)
+const BADGE_ICONS = ['star', 'trophy', 'award', 'flame', 'flag', 'clock', 'target', 'tune', 'metronome', 'sun', 'calendar', 'refresh', 'book', 'heart', 'spark', 'note'];
+
+// A badge with its metric's wording filled in
+const badgeDef = b => { const m = BADGE_METRICS[b.metric || b.id] || BADGE_METRICS.days; return { ...b, metric: b.metric || b.id, unit: m.unit, about: b.about || m.about, strings: !!m.strings }; };
+
+// The badges in effect for a student: the studio's own set if it has one, otherwise the defaults
+// (with any older per-badge on/off and level changes applied)
+function badgeSetFor(set, rules = {}) {
+  if (Array.isArray(set)) return set.map(badgeDef);
+  return BADGES.filter(b => !rules.off?.[b.id]).map(b => badgeDef({ ...b, tiers: rules.tiers?.[b.id]?.length ? rules.tiers[b.id] : b.tiers }));
+}
+
+// ---------- Lesson times ----------
+// A student can have several weekly lesson times, each running between two dates (e.g. one per semester):
+//   slots: [{ day: 0–6 (Sunday first), time: 'HH:MM', length: minutes, start: 'YYYY-MM-DD', end: 'YYYY-MM-DD' or '' }]
+// Older records have a single `lesson` with the same fields (and no end date).
+const lessonSlots = s => (Array.isArray(s?.slots) && s.slots.length ? s.slots : s?.lesson ? [s.lesson] : [])
+  .filter(l => l && l.day !== '' && l.day != null && l.time);
+// The weekly lesson (if any) on this day key
+const slotOn = (s, key) => lessonSlots(s).find(l => _dow(key) === +l.day && (!l.start || key >= l.start) && (!l.end || key <= l.end)) || null;
 
 // ---------- Weekly practice plan ----------
 // Minutes for each day of the week, Sunday first (JavaScript's getDay order); 0 = rest day.
@@ -59,7 +87,7 @@ const PLAN_PRESETS = [
   ['4 days × 30 min', [0, 30, 0, 30, 0, 30, 30]]
 ];
 
-// Icons a teacher can pick for a badge they award themselves
+// Icons a teacher can pick for a badge they award by hand
 const AWARD_ICONS = ['star', 'trophy', 'award', 'note', 'heart', 'spark', 'target', 'flame'];
 
 // Kinds of challenge a teacher can set for one student, measured over the challenge's dates
@@ -104,7 +132,7 @@ function badgeMetrics({ days, goalFor, goalMs, tickDays = new Set() }) {
   let weekends = 0;
   for (const k of on) if (_dow(k) === 6 && set.has(_addKey(k, 1))) weekends++;
   const m = { streak: best, goals: days.filter(d => g(d.key) > 0 && d.ms >= g(d.key)).length, hours: Math.floor(days.reduce((a, d) => a + d.ms, 0) / 36e5),
-              focus: 0, tune: 0, rhythm: 0, early: 0, weekend: weekends, comeback: comebacks, homework: tickDays.size };
+              days: on.length, focus: 0, tune: 0, rhythm: 0, early: 0, weekend: weekends, comeback: comebacks, homework: tickDays.size };
   for (const d of days) {
     const s = d.stats || {};
     m.focus = Math.max(m.focus, Math.floor((s.longest || 0) / 60000));
@@ -115,14 +143,15 @@ function badgeMetrics({ days, goalFor, goalMs, tickDays = new Set() }) {
   return m;
 }
 
-// Which level of each badge is reached, and what's next. rules = { off: {id: true}, tiers: {id: [numbers]} }
-function badgeLevels(metrics, rules = {}, { strings = true } = {}) {
-  return BADGES.filter(b => !rules.off?.[b.id] && (strings || !b.strings)).map(b => {
-    const tiers = (rules.tiers?.[b.id]?.length ? rules.tiers[b.id] : b.tiers).slice(0, BADGE_TIERS.length);
-    const value = metrics[b.id] || 0;
+// Which level of each badge is reached, and what's next. set = a studio's own badges (array) or null for the
+// defaults; rules = older { off, tiers } tweaks to the defaults.
+function badgeLevels(metrics, rules = {}, { strings = true } = {}, set = null) {
+  return badgeSetFor(set, rules).filter(b => strings || !b.strings).map(b => {
+    const tiers = (b.tiers || []).map(Number).filter(n => n > 0).slice(0, BADGE_TIERS.length);
+    const value = metrics[b.metric] || 0;
     let tier = -1; tiers.forEach((t, i) => { if (value >= t) tier = i; });
     return { ...b, tiers, value, tier, next: tiers[tier + 1] ?? null, prev: tier >= 0 ? tiers[tier] : 0 };
-  });
+  }).filter(b => b.tiers.length);
 }
 
 function challengeProgress(c, days, goalFor, tickDays = new Set()) {

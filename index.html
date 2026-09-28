@@ -599,7 +599,7 @@
   </div>
 </div>
 
-<script src="badges.js?v=3"></script>
+<script src="badges.js?v=4"></script>
 <script>
 const $ = id => document.getElementById(id);
 const CIRC = 2 * Math.PI * 52;
@@ -1710,15 +1710,15 @@ function unlink(k) {
 
 // Next lesson from the weekly slot plus any changes the teacher made (canceled / moved / extra)
 function nextLesson(t) {
-  const L = t.lesson || {}, ch = t.lessonChanges || {}, now = new Date();
-  for (let i = 0; i < 35; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i), k = dayKey(d), c = ch[k];
-    let time = null;
+  const ch = t.lessonChanges || {}, now = new Date();
+  for (let i = 0; i < 60; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i), k = dayKey(d), c = ch[k], slot = slotOn(t, k);
+    let time = null, len = slot?.length || 30;
     if (c?.status === 'extra') time = c.time;
-    else if (L.day !== '' && L.day != null && L.time && d.getDay() === +L.day && (!L.start || k >= L.start) && !(c && ['cancelled', 'moved'].includes(c.status))) time = L.time;
+    else if (slot && !(c && ['cancelled', 'moved'].includes(c.status))) time = slot.time;
     if (!time) continue;
     const [h, m] = time.split(':').map(Number), when = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m);
-    if (when.getTime() + (L.length || 30) * 60000 > now.getTime()) return when;
+    if (when.getTime() + len * 60000 > now.getTime()) return when;
   }
   return null;
 }
@@ -1786,15 +1786,18 @@ const at = (key, time) => { const [h, m] = (time || '12:00').split(':').map(Numb
 
 // This player's lessons and recitals, as calendar events (a weekly repeating lesson, minus canceled/moved dates)
 function lessonCalendar(k, t) {
-  const evs = [], L = t.lesson || {}, ch = t.lessonChanges || {}, len = L.length || 30;
+  const evs = [], ch = t.lessonChanges || {}, len = lessonSlots(t)[0]?.length || 30;
   const title = `${(INSTRUMENTS[k.instrument] || 'Music').replace(/ \(.*/, '')} lesson – ${k.name}`, desc = `With ${t.teacherName}, ${t.studioName}`;
-  if (L.day !== '' && L.day != null && L.time) {
+  lessonSlots(t).forEach((L, n) => {                   // one repeating event per lesson time, ending on its end date
+    if (L.end && L.end < dayKey()) return;
     const from = L.start && L.start > dayKey() ? parseDay(L.start) : parseDay(dayKey());
     while (from.getDay() !== +L.day) from.setDate(from.getDate() + 1);
+    if (L.end && dayKey(from) > L.end) return;
     const start = at(dayKey(from), L.time);
-    const exdates = Object.keys(ch).filter(key => parseDay(key).getDay() === +L.day && at(key, L.time) >= start).map(key => at(key, L.time));
-    evs.push({ uid: `lesson-${k.link}@practice-timer`, start, minutes: len, title, desc, rrule: 'FREQ=WEEKLY', exdates });
-  }
+    const exdates = Object.keys(ch).filter(key => parseDay(key).getDay() === +L.day && at(key, L.time) >= start && (!L.end || key <= L.end)).map(key => at(key, L.time));
+    const until = L.end ? `;UNTIL=${L.end.replace(/-/g, '')}T235959` : '';
+    evs.push({ uid: `lesson-${k.link}-${n}-${L.start || ''}@practice-timer`, start, minutes: L.length || 30, title, desc, rrule: 'FREQ=WEEKLY' + until, exdates });
+  });
   for (const [key, c] of Object.entries(ch)) if (c.status === 'extra' && key >= dayKey())
     evs.push({ uid: `extra-${k.link}-${key}@practice-timer`, start: at(key, c.time), minutes: len, title, desc });
   for (const [id, e] of Object.entries(t.upcoming || {})) if (e.date >= dayKey())
@@ -1892,7 +1895,7 @@ function tickDays(k) {
   for (const days of Object.values(t?.progress || {})) for (const d of Object.keys(days)) out.add(d);
   return out;
 }
-const kidBadges = k => badgeLevels(badgeMetrics({ days: kidDays(k), goalFor: goalMsFor(k), tickDays: tickDays(k) }), teacherOf(k)?.badgeRules || {}, { strings: tracksPitch(k) });
+const kidBadges = k => badgeLevels(badgeMetrics({ days: kidDays(k), goalFor: goalMsFor(k), tickDays: tickDays(k) }), teacherOf(k)?.badgeRules || {}, { strings: tracksPitch(k) }, teacherOf(k)?.badgeSet);
 
 // Badge levels reached since we last looked. The very first time, it just records what's already earned.
 function newBadges(k) {
@@ -1925,8 +1928,9 @@ function finishedChallenges(k) {
 function renderBadgeEntry() {
   const el = $('badgeEntry');
   if (!kid || listening) { el.hidden = true; return; }
-  el.hidden = false;
   const bs = kidBadges(kid), earned = bs.filter(b => b.tier >= 0).sort((a, b) => b.tier - a.tier);
+  if (!bs.length && !Object.keys(teacherOf(kid)?.cheers || {}).length) { el.hidden = true; return; }   // teacher switched badges off
+  el.hidden = false;
   const close = bs.filter(b => b.next != null).map(b => ({ b, f: (b.value - b.prev) / (b.next - b.prev) })).sort((a, b) => b.f - a.f)[0];
   el.innerHTML = `<div class="mini">${(earned.length ? earned.slice(0, 3) : bs.slice(0, 3)).map(b => medalSvg(b.icon, BADGE_TIERS[Math.max(b.tier, 0)].color, { size: 38, locked: b.tier < 0 })).join('')}</div>
     <div class="grow"><b>${earned.length ? `${earned.length} ${earned.length === 1 ? 'badge' : 'badges'}` : 'Badges'}</b>
@@ -1938,7 +1942,7 @@ function renderBadges() {
   document.body.style.setProperty('--kid', kidColor(k));
   const bs = kidBadges(k), earned = bs.filter(b => b.tier >= 0).length, t = teacherOf(k);
   $('bTitle').textContent = `${k.name}’s badges`;
-  $('bSub').textContent = earned ? `${earned} of ${bs.length} earned so far.` : 'Your first badge is one practice away.';
+  $('bSub').textContent = !bs.length ? 'Stars and badges from your teacher show up here.' : earned ? `${earned} of ${bs.length} earned so far.` : 'Your first badge is one practice away.';
   const awards = Object.entries(t?.cheers || {}).filter(([, c]) => c.kind === 'badge').sort((a, b) => b[1].date.localeCompare(a[1].date));
   const stars = Object.values(t?.cheers || {}).filter(c => c.kind === 'star').length;
   const doneCh = Object.entries(t?.challenges || {}).filter(([id]) => t.challengeDone?.[id]);

@@ -114,10 +114,13 @@ const fmtTime = t => { const [h, m] = t.split(':').map(Number); return `${(h + 1
 const fmtDay = k => keyDate(k).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
 const INSTRUMENTS = { piano: 'Piano', violin: 'Violin', viola: 'Viola', cello: 'Cello', other: 'Music' };
 
+// A student's weekly lesson times, each between a start and (optional) end date – e.g. one per semester
+const lessonSlots = s => (Array.isArray(s.slots) && s.slots.length ? s.slots : s.lesson ? [s.lesson] : []).filter(l => l && l.day !== '' && l.day != null && l.time);
+const slotOn = (s, key) => lessonSlots(s).find(l => dow(key) === +l.day && (!l.start || key >= l.start) && (!l.end || key <= l.end)) || null;
 function lessonsOn(s, key) {
-  const L = s.lesson || {}, c = s.lessonChanges?.[key], len = L.length || 30;
+  const L = slotOn(s, key), c = s.lessonChanges?.[key], len = (L || lessonSlots(s)[0])?.length || 30;
   if (c?.status === 'extra') return [{ time: c.time, length: len }];
-  if (L.day === '' || L.day == null || !L.time || dow(key) !== +L.day || (L.start && key < L.start)) return [];
+  if (!L) return [];
   if (c && (c.status === 'cancelled' || c.status === 'moved')) return [];
   return [{ time: L.time, length: len }];
 }
@@ -151,12 +154,15 @@ const ics = text => new Response(text, { headers: { 'Content-Type': 'text/calend
 
 // Lessons for one student: a weekly repeating event (skipping canceled/moved dates) plus one-off extra lessons
 function studentLessonEvents(s, title, desc, fromKey) {
-  const out = [], L = s.lesson || {}, ch = s.lessonChanges || {}, len = L.length || 30;
-  if (L.day !== '' && L.day != null && L.time) {
+  const out = [], ch = s.lessonChanges || {}, len = lessonSlots(s)[0]?.length || 30;
+  for (const L of lessonSlots(s)) {                 // one repeating event per lesson time, stopping at its end date
+    if (L.end && L.end < fromKey) continue;
     let first = L.start && L.start > fromKey ? L.start : fromKey;
     while (dow(first) !== +L.day) first = addKey(first, 1);
-    out.push({ uid: `lesson-${s.id}-${first}@practice-timer`, date: first, time: L.time, minutes: len, title, desc, rrule: 'FREQ=WEEKLY',
-               exdates: Object.keys(ch).filter(k => k >= first && dow(k) === +L.day) });
+    if (L.end && first > L.end) continue;
+    out.push({ uid: `lesson-${s.id}-${first}@practice-timer`, date: first, time: L.time, minutes: L.length || 30, title, desc,
+               rrule: 'FREQ=WEEKLY' + (L.end ? `;UNTIL=${addKey(L.end, 1).replace(/-/g, '')}T060000Z` : ''),
+               exdates: Object.keys(ch).filter(k => k >= first && dow(k) === +L.day && (!L.end || k <= L.end)) });
   }
   for (const [k, c] of Object.entries(ch)) if (c.status === 'extra' && k >= fromKey)
     out.push({ uid: `extra-${s.id}-${k}@practice-timer`, date: k, time: c.time, minutes: len, title, desc });
