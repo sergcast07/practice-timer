@@ -224,7 +224,7 @@ function lastPracticed(s, todayKey) {
   return null;
 }
 // Music theory (the family app's theory.js): names for level-ups in emails
-const THEORY_NAMES = { notes: 'Note names', rhythm: 'Rhythm', symbols: 'Symbols & terms', keys: 'Key signatures', echo: 'Echo' };
+const THEORY_NAMES = { notes: 'Note names', rhythm: 'Rhythm', symbols: 'Symbols & terms', keys: 'Key signatures', intervals: 'Intervals', chords: 'Chords', echo: 'Echo' };
 function theoryWeek(t, todayKey) {
   const since = addKey(todayKey, -6), T = t?.practice?.theory || t?.theory || {};
   const rounds = (T.rounds || []).filter(r => r.at.slice(0, 10) >= since), ups = (T.ups || []).filter(u => u.at.slice(0, 10) >= since);

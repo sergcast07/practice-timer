@@ -803,7 +803,7 @@
 
 <script src="badges.js?v=8"></script>
 <script src="signin.js?v=1"></script>
-<script src="theory.js?v=2"></script>
+<script src="theory.js?v=3"></script>
 <script>
 const $ = id => document.getElementById(id);
 const CIRC = 2 * Math.PI * 52;
@@ -2607,7 +2607,7 @@ $('tuAup').onclick = () => { settings.aRef = aRef() + 1; saveSettings(); $('tuA'
 $('tuWritten').onchange = () => { settings.tunerWritten = $('tuWritten').checked; saveSettings(); };
 
 // ---------- Music theory (games and levels in theory.js) ----------
-const kidTheory = k => (theory[k.id] ??= {});
+const kidTheory = k => theoryMigrate(theory[k.id] ??= {});
 function saveTheory() { store.set('pt-theory', theory); pushRemote({ theory }); }
 const theoryPlanOf = k => teacherOf(k)?.theoryPlan || {};
 const theoryClefs = k => normClefs(theoryPlanOf(k).clefs || theoryPlanOf(k).clef || defaultClef(k.instrument));
@@ -2669,8 +2669,10 @@ $('quizStop').onclick = () => endQuiz();
 let quiz = null;
 async function startQuiz(deck, mode, set = null) {
   if (quiz) endQuiz(true);
-  const k = kid, st = kidTheory(k), total = set ? set.cards : THEORY_ROUND;
-  const z = quiz = { k, deck, mode, set, level: theoryLevel(st, deck), total, passAt: set ? theoryPassAt(total, set.pass) : THEORY_PASS, seconds: set?.seconds || 0,
+  const k = kid, st = kidTheory(k), level = theoryLevel(st, deck);
+  // the round is planned up front: new material, review and recent misses (theory.js)
+  const round = theoryRound(deck, level, { clefs: theoryClefs(k), instrument: k.instrument, mode, set, history: st.rounds || [] }), total = round.total;
+  const z = quiz = { k, deck, mode, set, level, round, total, passAt: set ? theoryPassAt(total, set.pass) : THEORY_PASS, seconds: set?.seconds || 0,
                      i: 0, right: 0, results: [], miss: [], started: performance.now(), q: null, listener: null };
   show('quiz');
   if (mode === 'play' || mode === 'echo') {
@@ -2698,7 +2700,7 @@ function drawProg() {
 function nextQuestion() {
   const z = quiz; if (!z) return;
   if (z.i >= z.total) return finishQuiz();
-  z.q = theoryQuestion(z.deck, z.level, { clefs: theoryClefs(z.k), instrument: z.k.instrument, mode: z.mode, last: z.q?.id, set: z.set });
+  z.q = z.round.next();
   z.tries = 0; z.done = false;
   drawProg();
   const q = z.q, p = q.prompt;
@@ -2740,7 +2742,7 @@ function judge(ok, why = '') {
   const z = quiz; if (!z || z.done) return;
   z.done = true; clearTimeout(z.timeout); z.listener?.pause();
   const bar = $('qTime'); if (bar) { bar.style.transitionDuration = '0s'; bar.style.width = getComputedStyle(bar).width; }
-  z.results.push(ok); if (ok) z.right++; else z.miss.push(z.q.id);
+  z.results.push(ok); if (ok) z.right++; else { z.miss.push(z.q.id); z.round.missed(z.q); }   // a miss comes back a couple of cards later
   const fb = $('qFb'); fb.className = 'feedback ' + (ok ? 'ok' : 'no');
   fb.textContent = ok ? pick(['Yes!', 'Nice!', 'That’s it!', 'Great!']) : `${why ? why + ' – ' : ''}it was ${z.q.answer}`;
   if (z.mode === 'play' || z.mode === 'echo') $('qHeard').textContent = z.q.answer;
@@ -2761,6 +2763,8 @@ function onHeard(pc) {
 async function playEcho() {
   const z = quiz; if (!z?.listener || z.done) return;
   z.echoing = true; z.listener.pause(); $('qHint').textContent = 'Listen…';
+  for (const m of z.q.before || []) { await theoryTone(z.listener.ctx, m, 0.45); if (quiz !== z) return; }   // do–mi–sol sets the key
+  if (z.q.before) await new Promise(r => setTimeout(r, 350));
   await theoryTone(z.listener.ctx, z.q.midi);
   if (quiz !== z) return;
   z.echoing = false;

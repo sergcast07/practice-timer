@@ -10,21 +10,30 @@
 //        echo – hear a note, play or sing it back (microphone). Sound is analyzed on the device, never recorded.
 
 const THEORY_ROUND = 10, THEORY_PASS = 8, PASSES_TO_LEVEL = 2;
+// Levels follow widely used teaching orders (`method` is shown to teachers). Each level adds a little new material;
+// a round leans on what's new, mixes in review of earlier levels and brings back what the student missed recently.
 const THEORY_DECKS = {
   notes:     { name: 'Note names', about: 'Read notes on the staff', modes: ['cards', 'place', 'play'],
-               levels: ['Lines', 'Spaces', 'The whole staff', 'Just above and below', 'Ledger lines', 'Sharps and flats', 'Everything', 'Grand staff', 'Grand staff with sharps and flats'] },
+               method: 'Landmark (guide) note reading, as in Faber Piano Adventures and The Music Tree: learn a few anchor notes – middle C, treble G and C, bass F and C – then read by step and by skip from them, before the whole staff, ledger lines and sharps and flats.',
+               levels: ['Landmark notes', 'Steps from the landmarks', 'Skips from the landmarks', 'The whole staff', 'Just above and below', 'Ledger lines', 'Sharps and flats', 'Grand staff', 'Grand staff with sharps and flats'] },
   rhythm:    { name: 'Rhythm', about: 'Notes, rests and how long they last', modes: ['cards'],
-               levels: ['Whole, half and quarter notes', 'Eighth and sixteenth notes', 'Rests', 'Dotted notes', 'Everything'] },
+               method: 'The order used in Kodály programs and the RCM and ABRSM syllabi: quarter, half and whole notes, then their rests, eighths, dotted notes and sixteenths – always naming the note and counting its beats.',
+               levels: ['Quarter, half and whole notes', 'Their rests', 'Eighth notes and rests', 'Dotted half and dotted quarter', 'Sixteenths and dotted eighths', 'Everything'] },
   symbols:   { name: 'Symbols & terms', about: 'Dynamics, tempo and signs', modes: ['cards'],
-               levels: ['Dynamics', 'Tempo words', 'Signs', 'Italian terms'] },
+               method: 'In the order students meet them in early method books and the RCM theory levels: p and f first, then sharps, flats and common signs, the full range of dynamics, tempo words and articulation.',
+               levels: ['p, f, mp and mf', 'Sharps, flats and signs', 'pp, ff, getting louder and softer', 'Tempo words', 'Articulation and Italian terms'] },
   keys:      { name: 'Key signatures', about: 'Name the key', modes: ['cards'],
-               levels: ['C, G and F', 'Up to 2 sharps or flats', 'Up to 3', 'Up to 4', 'Up to 6', 'Minor keys', 'Major and minor, up to 7'] },
+               method: 'Around the circle of fifths, a sharp and a flat at a time, with relative minors and the order of sharps and flats learned alongside the major keys (as in the RCM theory levels).',
+               levels: ['C, G and F major', 'D and B♭ major', 'Relative minors', 'Order of sharps and flats', '3 and 4 sharps or flats', '5 to 7 sharps or flats', 'Every key, major and minor'] },
   intervals: { name: 'Intervals', about: 'How far apart two notes are', modes: ['cards'],
-               levels: ['2nds and 3rds', '2nds to 5ths', 'Up to an octave', 'Major, minor and perfect', 'Every quality, with sharps and flats'] },
+               method: 'Size before quality: steps and skips (2nds and 3rds), then 4ths and 5ths, up to the octave. Qualities start with the major and perfect intervals above a keynote (the major scale), then minor, then augmented and diminished. Melodic and harmonic.',
+               levels: ['2nds and 3rds', '4ths and 5ths', '6ths, 7ths and octaves', 'Major and perfect, up from the keynote', 'Major, minor and perfect', 'Augmented and diminished'] },
   chords:    { name: 'Chords', about: 'Name the triad', modes: ['cards'],
-               levels: ['Major and minor', 'Diminished and augmented too', 'Inversions', 'Sharp and flat roots'] },
+               method: 'The primary triads first (C, F and G – I, IV and V in C major), then major and minor triads on every white key, diminished and augmented, inversions and finally roots with sharps and flats.',
+               levels: ['C, F and G major', 'Major and minor', 'Diminished and augmented', 'Inversions', 'Sharp and flat roots'] },
   echo:      { name: 'Echo', about: 'Hear a note, play or sing it back', modes: ['echo'],
-               levels: ['C to G', 'The C major scale', 'All 12 notes'] }
+               method: 'The Kodály order for pitch: sol and mi, then la, do and re (the pentatonic scale), then fa and ti, then all 12 notes. Each note is heard after a do–mi–sol so the ear has a key.',
+               levels: ['Sol and mi', 'Add la', 'Add do', 'Add re (pentatonic)', 'Add fa and ti', 'All 12 notes'] }
 };
 const THEORY_ORDER = ['notes', 'rhythm', 'symbols', 'keys', 'intervals', 'chords', 'echo'];
 const THEORY_MODES = { cards: 'Flash cards', place: 'Find it on the staff', play: 'Play it', echo: 'Echo' };
@@ -137,55 +146,114 @@ const RHYTHM = [
   { id: 'd-half', glyph: '𝅗𝅥', dot: true, name: 'Dotted half note', beats: '3' }, { id: 'd-quarter', glyph: '𝅘𝅥', dot: true, name: 'Dotted quarter note', beats: '1½' },
   { id: 'd-eighth', glyph: '𝅘𝅥𝅮', dot: true, name: 'Dotted eighth note', beats: '¾' }
 ];
-const RHYTHM_LEVELS = [['whole', 'half', 'quarter'], ['whole', 'half', 'quarter', 'eighth', 'sixteenth'], ['r-whole', 'r-half', 'r-quarter', 'r-eighth', 'quarter', 'half'],
-  ['d-half', 'd-quarter', 'd-eighth', 'half', 'quarter'], RHYTHM.map(r => r.id)];
+// What each level introduces (earlier levels stay in the mix as review)
+const RHYTHM_INTRO = [['quarter', 'half', 'whole'], ['r-quarter', 'r-half', 'r-whole'], ['eighth', 'r-eighth'], ['d-half', 'd-quarter'], ['sixteenth', 'd-eighth'], []];
 const SYMBOLS = [
-  [ { id: 'pp', show: 'pp', dyn: 1, mean: 'Very soft' }, { id: 'p', show: 'p', dyn: 1, mean: 'Soft' }, { id: 'mp', show: 'mp', dyn: 1, mean: 'Medium soft' },
-    { id: 'mf', show: 'mf', dyn: 1, mean: 'Medium loud' }, { id: 'f', show: 'f', dyn: 1, mean: 'Loud' }, { id: 'ff', show: 'ff', dyn: 1, mean: 'Very loud' } ],
+  [ { id: 'p', show: 'p', dyn: 1, mean: 'Soft' }, { id: 'f', show: 'f', dyn: 1, mean: 'Loud' }, { id: 'mp', show: 'mp', dyn: 1, mean: 'Medium soft' },
+    { id: 'mf', show: 'mf', dyn: 1, mean: 'Medium loud' } ],
+  [ { id: 'sharp', show: '♯', glyph: 1, mean: 'Raises a note a half step' }, { id: 'flat', show: '♭', glyph: 1, mean: 'Lowers a note a half step' },
+    { id: 'natural', show: '♮', glyph: 1, mean: 'Cancels a sharp or flat' }, { id: 'repeat', show: '𝄇', glyph: 1, mean: 'Repeat the music' },
+    { id: 'fermata', show: '𝄐', glyph: 1, mean: 'Hold the note longer' } ],
+  [ { id: 'pp', show: 'pp', dyn: 1, mean: 'Very soft' }, { id: 'ff', show: 'ff', dyn: 1, mean: 'Very loud' },
+    { id: 'cresc', show: '𝆒', glyph: 1, mean: 'Gradually louder' }, { id: 'decresc', show: '𝆓', glyph: 1, mean: 'Gradually softer' } ],
   [ { id: 'largo', show: 'Largo', mean: 'Very slow and broad' }, { id: 'adagio', show: 'Adagio', mean: 'Slow' }, { id: 'andante', show: 'Andante', mean: 'At a walking pace' },
     { id: 'moderato', show: 'Moderato', mean: 'At a moderate speed' }, { id: 'allegro', show: 'Allegro', mean: 'Fast and lively' }, { id: 'presto', show: 'Presto', mean: 'Very fast' } ],
-  [ { id: 'sharp', show: '♯', glyph: 1, mean: 'Raises a note a half step' }, { id: 'flat', show: '♭', glyph: 1, mean: 'Lowers a note a half step' },
-    { id: 'natural', show: '♮', glyph: 1, mean: 'Cancels a sharp or flat' }, { id: 'fermata', show: '𝄐', glyph: 1, mean: 'Hold the note longer' },
-    { id: 'repeat', show: '𝄇', glyph: 1, mean: 'Repeat the music' }, { id: 'cresc', show: '𝆒', glyph: 1, mean: 'Gradually louder' },
-    { id: 'decresc', show: '𝆓', glyph: 1, mean: 'Gradually softer' } ],
   [ { id: 'legato', show: 'legato', mean: 'Smooth and connected' }, { id: 'staccato', show: 'staccato', mean: 'Short and detached' },
     { id: 'crescendo', show: 'crescendo', mean: 'Gradually louder' }, { id: 'diminuendo', show: 'diminuendo', mean: 'Gradually softer' },
     { id: 'ritardando', show: 'ritardando', mean: 'Gradually slower' }, { id: 'atempo', show: 'a tempo', mean: 'Back to the original speed' },
     { id: 'dolce', show: 'dolce', mean: 'Sweetly' }, { id: 'dcalfine', show: 'D.C. al Fine', mean: 'Go back to the start and end at Fine' } ]
 ];
+const SYMBOL_BY_ID = Object.fromEntries(SYMBOLS.flat().map(s => [s.id, s]));
 const KEYS = [ { id: 'C', name: 'C major', sharps: 0 }, { id: 'G', name: 'G major', sharps: 1 }, { id: 'F', name: 'F major', flats: 1 },
   { id: 'D', name: 'D major', sharps: 2 }, { id: 'Bb', name: 'B♭ major', flats: 2 }, { id: 'A', name: 'A major', sharps: 3 }, { id: 'Eb', name: 'E♭ major', flats: 3 },
   { id: 'E', name: 'E major', sharps: 4 }, { id: 'Ab', name: 'A♭ major', flats: 4 }, { id: 'B', name: 'B major', sharps: 5 }, { id: 'Db', name: 'D♭ major', flats: 5 },
-  { id: 'Fs', name: 'F♯ major', sharps: 6 }, { id: 'Gb', name: 'G♭ major', flats: 6 } ];
-const KEY_LEVELS = [3, 5, 7, 9, 13];
-
-KEYS.push({ id: 'Cs', name: 'C♯ major', sharps: 7 }, { id: 'Cb', name: 'C♭ major', flats: 7 });
+  { id: 'Fs', name: 'F♯ major', sharps: 6 }, { id: 'Gb', name: 'G♭ major', flats: 6 }, { id: 'Cs', name: 'C♯ major', sharps: 7 }, { id: 'Cb', name: 'C♭ major', flats: 7 } ];
 const MINOR_OF = { C: 'A', G: 'E', F: 'D', D: 'B', Bb: 'G', A: 'F♯', Eb: 'C', E: 'C♯', Ab: 'F', B: 'G♯', Db: 'B♭', Fs: 'D♯', Gb: 'E♭', Cs: 'A♯', Cb: 'A♭' };
 const keyAcc = k => Math.max(k.sharps || 0, k.flats || 0);
+// Key signatures by level, around the circle of fifths ('X:m' is X's relative minor, 'order:♯' the order of sharps)
+const KEY_INTRO = [['C', 'G', 'F'], ['D', 'Bb'], ['C:m', 'G:m', 'F:m', 'D:m', 'Bb:m'], ['order:♯', 'order:♭'], ['A', 'Eb', 'E', 'Ab', 'A:m', 'Eb:m', 'E:m', 'Ab:m'],
+  ['B', 'Db', 'Fs', 'Gb', 'Cs', 'Cb', 'B:m', 'Db:m', 'Fs:m', 'Gb:m', 'Cs:m', 'Cb:m'], []];
+const SHARP_ORDER = 'FCGDAEB', FLAT_ORDER = 'BEADGCF';
+// Intervals by level: sizes, then qualities (L4 is the major scale above a keynote)
+const INTERVAL_INTRO = [['2', '3'], ['4', '5'], ['6', '7', '8'],
+  ['Major 2nd', 'Major 3rd', 'Perfect 4th', 'Perfect 5th', 'Major 6th', 'Major 7th', 'Perfect Octave'],
+  ['Minor 2nd', 'Minor 3rd', 'Minor 6th', 'Minor 7th'],
+  ['Augmented 2nd', 'Augmented 4th', 'Augmented 5th', 'Augmented 6th', 'Diminished 4th', 'Diminished 5th', 'Diminished 7th']];
+const ROOTS_NAT = LETTERS.split(''), ROOTS_ACC = ['B♭', 'E♭', 'A♭', 'D♭', 'F♯', 'C♯'];
+// Kodály order, with do = C
+const ECHO_INTRO = [[7, 4], [9], [0], [2], [5, 11], [1, 3, 6, 8, 10]];
+const SOLFA = { 0: 'do', 2: 're', 4: 'mi', 5: 'fa', 7: 'sol', 9: 'la', 11: 'ti' };
+// Landmark notes on each staff (positions): treble middle C, G and C · bass F, C and middle C · alto and tenor around C
+const LANDMARKS = { treble: [0, 4, 7], bass: [0, -4, -7], alto: [0, -4, 4], tenor: [0, -4, -6] };
+function landmarkPicks(clefs, reach) {
+  const out = new Set();
+  for (const c of normClefs(clefs)) {
+    const parts = c === 'grand' ? [['treble', p => p >= 0], ['bass', p => p <= 0]] : [[c, () => true]];
+    for (const [st, ok] of parts) {
+      const b = CLEFS[st].bottom;
+      for (const l of LANDMARKS[st]) for (let d = -reach; d <= reach; d++) { const p = l + d; if (p >= b - 3 && p <= b + 11 && ok(p)) out.add(c === 'grand' ? `grand:${st}:${p}` : `${st}:${p}`); }
+    }
+  }
+  return [...out];
+}
 
 const pick = a => a[Math.floor(Math.random() * a.length)];
 const shuffle = a => { a = [...a]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const choicesFrom = (answer, pool, n = 4) => shuffle([answer, ...shuffle([...new Set(pool)].filter(x => x && x !== answer)).slice(0, n - 1)]);
+const upTo = (intro, L) => intro.slice(0, L).flat();
 
 // ---------- What each built-in level asks (the same "spec" a teacher's own set uses) ----------
 function deckSpec(deck, level, clefs) {
-  const L = level, cl = normClefs(clefs);
+  const L = Math.max(1, level), cl = normClefs(clefs);
   if (deck === 'notes') {
-    const s = [{ ledger: -1, lines: 'lines' }, { ledger: -1, lines: 'spaces' }, { ledger: -1 }, { ledger: 0 }, { ledger: 1 }, { ledger: -1, acc: 'both' },
-               { ledger: 1, acc: 'both' }, { ledger: 1, grand: true }, { ledger: 1, acc: 'both', grand: true }][L - 1] || { ledger: 1 };
-    return { kind: 'name', clefs: s.grand ? ['grand'] : cl, ledger: s.ledger, lines: s.lines || 'both', acc: s.acc || 'none' };
+    if (L <= 3) return { kind: 'name', clefs: cl, picks: landmarkPicks(cl, L - 1), acc: 'none' };
+    const s = [{ ledger: -1 }, { ledger: 0 }, { ledger: 1 }, { ledger: 0, acc: 'both' }, { ledger: 1, grand: true }, { ledger: 2, acc: 'both', grand: true }][L - 4] || { ledger: 1 };
+    return { kind: 'name', clefs: s.grand ? ['grand'] : cl, ledger: s.ledger, lines: 'both', acc: s.acc || 'none' };
   }
-  if (deck === 'keys') return { kind: 'key', clefs: cl, keysMax: [1, 2, 3, 4, 6, 4, 7][L - 1] ?? 3, keyMode: L === 6 ? 'minor' : L === 7 ? 'both' : 'major' };
-  if (deck === 'intervals') return { kind: 'interval', clefs: cl, ledger: 0, sizes: [[2, 3], [2, 3, 4, 5], [2, 3, 4, 5, 6, 7, 8], [2, 3, 4, 5, 6, 7, 8], [2, 3, 4, 5, 6, 7, 8]][L - 1] || [2, 3],
-                                     quality: L >= 4, acc: L >= 5 ? 'both' : 'none' };
-  if (deck === 'chords') return { kind: 'chord', clefs: cl, chords: L >= 2 ? ['maj', 'min', 'dim', 'aug'] : ['maj', 'min'], inversions: L >= 3, accRoots: L >= 4 };
-  return { kind: deck, level: L };                                 // rhythm, symbols, echo
+  if (deck === 'keys') return { kind: 'key', clefs: cl, keys: upTo(KEY_INTRO, L) };
+  if (deck === 'intervals') return L <= 3 ? { kind: 'interval', clefs: cl, ledger: 0, items: upTo(INTERVAL_INTRO, L), harmonic: L > 1 }
+    : { kind: 'interval', clefs: cl, ledger: 0, quality: true, items: upTo(INTERVAL_INTRO, L).filter(x => isNaN(x)), tonics: L === 4 ? 'CDFG' : null, acc: L >= 6 ? 'both' : 'top' };
+  if (deck === 'chords') return { kind: 'chord', clefs: cl, roots: L === 1 ? ['C', 'F', 'G'] : L >= 5 ? [...ROOTS_NAT, ...ROOTS_ACC] : ROOTS_NAT,
+                                  chords: L === 1 ? ['maj'] : L === 2 ? ['maj', 'min'] : ['maj', 'min', 'dim', 'aug'], inversions: L >= 4 };
+  if (deck === 'rhythm') return { kind: 'rhythm', items: upTo(RHYTHM_INTRO, L) };
+  if (deck === 'symbols') return { kind: 'symbols', items: upTo(SYMBOLS.map(g => g.map(s => s.id)), L) };
+  if (deck === 'echo') return { kind: 'echo', items: upTo(ECHO_INTRO, L).map(String), solfa: L <= 5 };
+  return { kind: 'name', clefs: cl };
+}
+
+// Every "item" a spec can ask about – one note, interval, chord, key… Rounds are built from these.
+function specItems(spec) {
+  switch (spec.kind) {
+    case 'name': case 'place': case 'play': return [...new Set(noteCandidates(spec).map(c => `${c.staff}:${c.p}`))];
+    case 'interval': return intervalItems(spec);
+    case 'chord': return chordItems(spec);
+    case 'key': return spec.keys?.length ? spec.keys : KEYS.filter(k => keyAcc(k) <= spec.keysMax)
+      .flatMap(k => spec.keyMode === 'minor' ? [k.id + ':m'] : spec.keyMode === 'both' ? [k.id, k.id + ':m'] : [k.id]);
+    default: return spec.items?.length ? spec.items : [];
+  }
+}
+// The item a question id belongs to (question ids are what "trouble spots" store)
+function theoryItemOf(spec, id) {
+  const a = String(id).split(':');
+  if (a[0] === 'place') return `${a[1]}:${parseInt(a[2])}`;
+  if (CLEFS[a[0]]) return `${a[0]}:${parseInt(a[1])}`;
+  if (a[0] === 'int') {
+    const p1 = parseInt(a[2]), p2 = parseInt(a[3]), n = p2 - p1 + 1;
+    return spec.quality ? `${intervalQuality(n, noteMidi(p2, a[3].replace(/^-?\d+/, '')) - noteMidi(p1, a[2].replace(/^-?\d+/, '')))} ${ORD[n]}` : String(n);
+  }
+  if (a[0] === 'chord' || a[0] === 'chordinv') return `${a[1]}:${a[2]}`;
+  if (a[0] === 'keys') return a[2] === 'm' ? `${a[1]}:m` : a[1];
+  if (a[0] === 'order') return `order:${a[1]}`;
+  return a[1] ?? id;                                               // rhythm, symbols, echo
 }
 
 // ---------- Questions ----------
-// Each returns { id (for "trouble spots"), ask, prompt: { staff | glyph | text | dyn | listen }, answer, choices?, grid?, pc?, midi?, target? }
-function noteQuestion(spec, mode) {
-  const c = pick(noteCandidates(spec)), acc = mode === 'place' ? '' : pickAcc(spec.acc);
+// Each returns { id (for "trouble spots"), ask, prompt: { staff | glyph | text | dyn | listen }, answer, choices?, grid?, pc?, midi?, target? }.
+// `item` asks about that item; without it, any item of the spec.
+function noteQuestion(spec, mode, item) {
+  let cands = noteCandidates(spec);
+  if (item) { const f = cands.filter(c => `${c.staff}:${c.p}` === item); if (f.length) cands = f; }
+  const c = pick(cands), acc = mode === 'place' ? '' : pickAcc(spec.acc);
   const name = noteName(c.p, acc), full = name + posOctave(c.p), staffSvg = theoryStaff({ clef: c.display, notes: [{ staff: c.staff, p: c.p, acc }] });
   if (mode === 'place') return { id: `place:${c.staff}:${c.p}`, ask: `Tap where ${full} goes${c.display === 'grand' ? ' on the grand staff' : ''}`, answer: full,
     target: { staff: c.staff, p: c.p }, display: c.display, prompt: { staff: theoryStaff({ clef: c.display, place: true }), place: true } };
@@ -209,19 +277,41 @@ function intervalQuality(n, semis) {
   const d = semis - MAJOR_SEMIS[n];
   return PERFECT(n) ? { 0: 'Perfect', 1: 'Augmented', '-1': 'Diminished' }[d] : { 0: 'Major', '-1': 'Minor', 1: 'Augmented', '-2': 'Diminished' }[d];
 }
-function intervalQuestion(spec) {
+const qualSemis = (q, n) => MAJOR_SEMIS[n] + ({ Perfect: 0, Major: 0, Minor: -1, Augmented: 1 }[q] ?? (PERFECT(n) ? -1 : -2));
+function intervalItems(spec) {
+  if (spec.items?.length) return spec.items;
   const sizes = (spec.sizes?.length ? spec.sizes : [2, 3, 4, 5]).filter(n => n >= 2 && n <= 8);
-  for (let t = 0; t < 40; t++) {
-    const c = pick(noteCandidates({ ...spec, ledger: Math.min(spec.ledger ?? 0, 1) })), n = pick(sizes), p1 = c.p, p2 = p1 + n - 1, b = CLEFS[c.staff].bottom;
+  if (!spec.quality) return sizes.map(String);
+  // without sharps or flats only the qualities found between white keys
+  return sizes.flatMap(n => QUALITIES(n).filter(q => spec.acc !== 'none' || !['Augmented', 'Diminished'].includes(q) || (q === 'Augmented' && n === 4) || (q === 'Diminished' && n === 5))
+    .map(q => `${q} ${ORD[n]}`));
+}
+// Built-in quality levels use acc 'top' (a natural bottom note, the top spelled to fit) and `tonics` (bottom notes that are keynotes)
+function intervalQuestion(spec, item) {
+  const it = item ?? pick(intervalItems(spec)), m = String(it).match(/^(\w+) (.+)$/), qual = spec.quality && m ? m[1] : null, n = qual ? ORD.indexOf(m[2]) : +it;
+  if (!(n >= 2 && n <= 8)) return null;
+  let cands = noteCandidates({ ...spec, ledger: Math.min(spec.ledger ?? 0, 1) });
+  if (spec.tonics) cands = cands.filter(c => spec.tonics.includes(posLetter(c.p)));
+  if (!cands.length) return null;
+  const bottomAcc = spec.acc === 'top' ? 'none' : spec.acc, topAcc = spec.acc === 'top' ? 'both' : spec.acc;
+  for (let t = 0; t < 60; t++) {
+    const c = pick(cands), p1 = c.p, p2 = p1 + n - 1, b = CLEFS[c.staff].bottom;
     if (p2 > b + 11) continue;                                       // keep the top note near the staff
-    const a1 = spec.quality ? pickAcc(spec.acc) : '', a2 = spec.quality ? pickAcc(spec.acc) : '';
-    const q = intervalQuality(n, noteMidi(p2, a2) - noteMidi(p1, a1));
-    if (spec.quality && !q) continue;                                // (never "doubly augmented")
-    const answer = spec.quality ? `${q} ${ORD[n]}` : ORD[n];
-    const pool = spec.quality ? [...QUALITIES(n).map(w => `${w} ${ORD[n]}`), ...[n - 1, n + 1].filter(x => x >= 2 && x <= 8).map(x => `${pick(QUALITIES(x))} ${ORD[x]}`)]
-      : [...sizes, n - 1, n + 1].filter(x => x >= 2 && x <= 8).map(x => ORD[x]);
-    return { id: `int:${c.staff}:${p1}${a1}:${p2}${a2}`, ask: spec.quality ? 'Name the interval' : 'How far apart are these notes?', answer, choices: choicesFrom(answer, pool),
-             prompt: { staff: theoryStaff({ clef: c.display, notes: [{ staff: c.staff, p: p1, acc: a1, whole: true, col: 0 }, { staff: c.staff, p: p2, acc: a2, whole: true, col: 1 }] }) } };
+    let a1 = '', a2 = '';
+    if (qual) {
+      a1 = pickAcc(bottomAcc); if (['C♭', 'F♭', 'E♯', 'B♯'].includes(noteName(p1, a1))) continue;   // bottom notes students actually read
+      a2 = spellAt(p2, notePc(p1, a1) + qualSemis(qual, n));
+      if (a2 == null || (a2 && (topAcc === 'none' || (topAcc === 'sharps' && a2 !== '♯') || (topAcc === 'flats' && a2 !== '♭')))) continue;
+      if (intervalQuality(n, noteMidi(p2, a2) - noteMidi(p1, a1)) !== qual) continue;
+    }
+    const answer = qual ? `${qual} ${ORD[n]}` : ORD[n], harm = spec.harmonic !== false && n >= 3 && Math.random() < 0.4;
+    const pool = qual ? [...QUALITIES(n).map(w => `${w} ${ORD[n]}`), ...[n - 1, n + 1].filter(x => x >= 2 && x <= 8).map(x => `${pick(QUALITIES(x))} ${ORD[x]}`)]
+      : [...intervalItems(spec).map(x => ORD[+x]), ...[n - 1, n + 1].filter(x => x >= 2 && x <= 8).map(x => ORD[x])];
+    let k = 0;
+    const notes = harm ? [{ p: p2, acc: a2 }, { p: p1, acc: a1 }].map(x => ({ staff: c.staff, ...x, whole: true, col: 0, accX: x.acc ? 26 + 13 * (k++) : 0 }))
+      : [{ staff: c.staff, p: p1, acc: a1, whole: true, col: 0 }, { staff: c.staff, p: p2, acc: a2, whole: true, col: 1 }];
+    return { id: `int:${c.staff}:${p1}${a1}:${p2}${a2}`, ask: qual ? 'Name the interval' : 'How far apart are these notes?', answer, choices: choicesFrom(answer, pool),
+             prompt: { staff: theoryStaff({ clef: c.display, notes }) } };
   }
   return null;
 }
@@ -230,13 +320,20 @@ const CHORD_Q = { maj: { word: 'major', third: 4, fifth: 7 }, min: { word: 'mino
 const INVERSIONS = ['Root position', '1st inversion', '2nd inversion'];
 // The sharp or flat that turns the letter at p into pitch class pc (null if it would need a double sharp or flat)
 const spellAt = (p, pc) => { const d = mod(pc - LETTER_PC[mod(p, 7)] + 6, 12) - 6; return d === 0 ? '' : d === 1 ? '♯' : d === -1 ? '♭' : null; };
-function chordQuestion(spec) {
-  const quals = (spec.chords?.length ? spec.chords : ['maj', 'min']).filter(q => CHORD_Q[q]);
-  for (let t = 0; t < 60; t++) {
-    const c = pick(noteCandidates({ ...spec, ledger: 0 })), q = pick(quals), inv = spec.inversions ? pick([0, 1, 2]) : 0, b = CLEFS[c.staff].bottom;
-    const rp = c.p, ra = spec.accRoots ? pickAcc('both') : '', rpc = notePc(rp, ra);
+const chordSpells = (root, q) => { const p = LETTERS.indexOf(root[0]), pc = notePc(p, root.slice(1)); return spellAt(p + 2, pc + CHORD_Q[q].third) != null && spellAt(p + 4, pc + CHORD_Q[q].fifth) != null; };
+function chordItems(spec) {
+  const quals = (spec.chords?.length ? spec.chords : ['maj', 'min']).filter(q => CHORD_Q[q]), roots = spec.roots || (spec.accRoots ? [...ROOTS_NAT, ...ROOTS_ACC] : ROOTS_NAT);
+  return roots.flatMap(r => quals.filter(q => chordSpells(r, q)).map(q => `${r}:${q}`));
+}
+function chordQuestion(spec, item) {
+  const items = chordItems(spec), [root0, q] = String(item ?? pick(items)).split(':');
+  if (!CHORD_Q[q]) return null;
+  const cands = noteCandidates({ clefs: spec.clefs, ledger: 0 }).filter(c => posLetter(c.p) === root0[0]), ra = root0.slice(1);   // any line or space can hold a root
+  for (let t = 0; t < 40 && cands.length; t++) {
+    const c = pick(cands), inv = spec.inversions ? pick([0, 1, 2]) : 0, b = CLEFS[c.staff].bottom;
+    const rp = c.p, rpc = notePc(rp, ra);
     const a3 = spellAt(rp + 2, rpc + CHORD_Q[q].third), a5 = spellAt(rp + 4, rpc + CHORD_Q[q].fifth);
-    if (a3 == null || a5 == null) continue;
+    if (a3 == null || a5 == null) return null;
     let ns = [{ p: rp, acc: ra }, { p: rp + 2, acc: a3 }, { p: rp + 4, acc: a5 }];
     if (inv >= 1) ns = [ns[1], ns[2], { p: rp + 7, acc: ra }];
     if (inv === 2) ns = [ns[1], ns[2], { p: rp + 9, acc: a3 }];
@@ -247,55 +344,115 @@ function chordQuestion(spec) {
     const staff = theoryStaff({ clef: c.display, notes });
     if (spec.inversions && Math.random() < 0.35)
       return { id: `chordinv:${root}:${q}:${inv}`, ask: 'Which position is this chord in?', answer: INVERSIONS[inv], choices: INVERSIONS, prompt: { staff } };
+    const quals = [...new Set(items.map(x => x.split(':')[1]))];
     const others = [...quals.filter(x => x !== q).map(x => `${root} ${CHORD_Q[x].word}`), `${noteName(rp + 2, a3)} ${CHORD_Q[q].word}`, `${noteName(rp + 4, a5)} ${CHORD_Q[q].word}`,
-                    `${noteName(rp + 1)} ${CHORD_Q[q].word}`, `${root} ${CHORD_Q[q === 'maj' ? 'min' : 'maj'].word}`];
+                    `${noteName(rp + 1)} ${CHORD_Q[q].word}`, ...(quals.length > 1 ? [`${root} ${CHORD_Q[q === 'maj' ? 'min' : 'maj'].word}`] : [])];
     return { id: `chord:${root}:${q}:${inv}`, ask: 'What chord is this?', answer: name, choices: choicesFrom(name, others), prompt: { staff } };
   }
   return null;
 }
 
-function keyQuestion(spec) {
-  const max = Math.min(7, Math.max(1, spec.keysMax ?? 3)), pool = KEYS.filter(k => keyAcc(k) <= max);
-  const k = pick(pool), minor = spec.keyMode === 'minor' || (spec.keyMode === 'both' && Math.random() < 0.5);
-  const display = pick(normClefs(spec.clefs).filter(c => c !== 'tenor')) || 'treble', nameOf = kk => minor ? `${MINOR_OF[kk.id]} minor` : kk.name;
+function keyQuestion(spec, item) {
+  const items = specItems(spec), it = String(item ?? pick(items)), display = pick(normClefs(spec.clefs).filter(c => c !== 'tenor')) || 'treble';
+  if (it.startsWith('order:')) {                                    // what comes next in the order of sharps (or flats)?
+    const sharp = it.endsWith('♯'), order = sharp ? SHARP_ORDER : FLAT_ORDER, n = 1 + Math.floor(Math.random() * 7), acc = sharp ? '♯' : '♭';
+    const shown = KEYS.find(k => (sharp ? k.sharps : k.flats) === n - 1 && (n > 1 || k.id === 'C'));
+    const answer = order[n - 1] + acc;
+    return { id: `order:${acc}:${n}`, ask: n === 1 ? `Which ${sharp ? 'sharp' : 'flat'} comes first in a key signature?` : `Which ${sharp ? 'sharp' : 'flat'} comes next?`,
+             answer, choices: choicesFrom(answer, order.split('').map(l => l + acc)), prompt: { staff: theoryStaff({ clef: display, key: shown }) } };
+  }
+  const [id, m] = it.split(':'), k = KEYS.find(x => x.id === id) || KEYS[0], minor = m === 'm', nameOf = kk => minor ? `${MINOR_OF[kk.id]} minor` : kk.name;
+  const same = items.filter(x => !x.startsWith('order:') && x.endsWith(':m') === minor).map(x => KEYS.find(y => y.id === x.split(':')[0])).filter(Boolean);
+  const pool = same.length >= 4 ? same : [...same, ...KEYS.filter(x => keyAcc(x) <= Math.max(2, keyAcc(k) + 1))];
   return { id: `keys:${k.id}${minor ? ':m' : ''}`, ask: minor ? 'Which minor key is this?' : 'Which major key is this?', answer: nameOf(k),
            choices: choicesFrom(nameOf(k), pool.map(nameOf)), prompt: { staff: theoryStaff({ clef: display, key: k }) } };
 }
 
-function rhythmQuestion(level) {
-  const ids = RHYTHM_LEVELS[level - 1] || RHYTHM_LEVELS.at(-1), want = pick(ids), it = RHYTHM.find(r => r.id === want), pool = RHYTHM.filter(r => ids.includes(r.id));
-  const beats = level >= 2 && Math.random() < 0.45;
+function rhythmQuestion(spec, item) {
+  const ids = spec.items?.length ? spec.items : RHYTHM_INTRO[0], it = RHYTHM.find(r => r.id === (item ?? pick(ids))) || RHYTHM[0], pool = RHYTHM.filter(r => ids.includes(r.id));
+  const beats = Math.random() < 0.4;
   return { id: `rhythm:${it.id}${beats ? ':beats' : ''}`, prompt: { glyph: it.glyph, dot: it.dot }, ask: beats ? 'How many beats does it last? (in 4/4)' : 'What is this called?',
-           answer: beats ? it.beats : it.name, choices: beats ? choicesFrom(it.beats, ['4', '3', '2', '1½', '1', '¾', '½', '¼']) : choicesFrom(it.name, pool.map(r => r.name).concat(RHYTHM.map(r => r.name))) };
+           answer: beats ? it.beats : it.name, choices: beats ? choicesFrom(it.beats, [...pool.map(r => r.beats), '1', '2', '3', '4']) : choicesFrom(it.name, pool.map(r => r.name)) };
 }
-function symbolsQuestion(level) {
-  const set = SYMBOLS[Math.min(level, SYMBOLS.length) - 1], it = pick(set);
+function symbolsQuestion(spec, item) {
+  const ids = spec.items?.length ? spec.items : SYMBOLS[0].map(s => s.id), it = SYMBOL_BY_ID[item ?? pick(ids)] || SYMBOLS[0][0];
   return { id: `symbols:${it.id}`, prompt: it.dyn ? { dyn: it.show } : it.glyph ? { glyph: it.show } : { text: it.show }, ask: 'What does it mean?',
-           answer: it.mean, choices: choicesFrom(it.mean, set.map(s => s.mean)) };
+           answer: it.mean, choices: choicesFrom(it.mean, ids.map(i => SYMBOL_BY_ID[i]?.mean)) };
 }
-function echoQuestion(level, instrument) {
-  const pcs = [[0, 2, 4, 5, 7], [0, 2, 4, 5, 7, 9, 11], Array.from({ length: 12 }, (_, i) => i)][level - 1] || [0, 2, 4, 5, 7], pc = pick(pcs);
-  return { id: `echo:${pc}`, prompt: { listen: true }, ask: 'Listen, then play or sing it back', answer: PC_NAMES[pc], pc, midi: echoBase(instrument) + pc };
+// Echo: a do–mi–sol first gives the ear a key (`before`), then the note
+function echoQuestion(spec, instrument, item) {
+  const pc = +(item ?? pick(spec.items?.length ? spec.items : ['7', '4'])), base = echoBase(instrument);
+  return { id: `echo:${pc}`, prompt: { listen: true }, ask: 'Listen, then play or sing it back', answer: PC_NAMES[pc] + (spec.solfa && SOLFA[pc] ? ` (${SOLFA[pc]})` : ''),
+           pc, midi: base + pc, before: [base, base + 4, base + 7] };
 }
 
-function makeFromSpec(spec, mode, instrument) {
+function makeFromSpec(spec, mode, instrument, item) {
   switch (spec.kind) {
-    case 'name': case 'place': case 'play': return noteQuestion(spec, mode);
-    case 'interval': return intervalQuestion(spec);
-    case 'chord': return chordQuestion(spec);
-    case 'key': return keyQuestion(spec);
-    case 'rhythm': return rhythmQuestion(spec.level || 1);
-    case 'symbols': return symbolsQuestion(spec.level || 1);
-    case 'echo': return echoQuestion(spec.level || 1, instrument);
+    case 'name': case 'place': case 'play': return noteQuestion(spec, mode, item);
+    case 'interval': return intervalQuestion(spec, item);
+    case 'chord': return chordQuestion(spec, item);
+    case 'key': return keyQuestion(spec, item);
+    case 'rhythm': return rhythmQuestion(spec, item);
+    case 'symbols': return symbolsQuestion(spec, item);
+    case 'echo': return echoQuestion(spec, instrument, item);
   }
   return null;
 }
+function makeQuestion(spec, mode, instrument, item, last) {
+  let q = null;
+  for (let i = 0; i < 8; i++) { q = makeFromSpec(spec, mode, instrument, item) || q; if (q && q.id !== last) break; }   // not the same card twice in a row
+  if (!q) { const items = shuffle(specItems(spec)).slice(0, 12); for (const it of items) if ((q = makeFromSpec(spec, mode, instrument, it))) break; }   // that item can't be drawn here: another one
+  q = q || noteQuestion({ clefs: ['treble'] }, 'cards');
+  return { ...q, item: theoryItemOf(spec, q.id) };
+}
+const roundSpec = (deck, level, clefs, set) => set ? normalizeSet(set) : deckSpec(deck, level, clefs);
 // One question for a built-in deck at a level, or for a teacher's set ({ set })
 function theoryQuestion(deck, level, { clef, clefs, instrument = '', mode = 'cards', last = null, set = null } = {}) {
-  const spec = set ? normalizeSet(set) : deckSpec(deck, level, clefs || clef), m = set ? SET_KINDS[spec.kind].mode : mode;
-  let q = null;
-  for (let i = 0; i < 8; i++) { q = makeFromSpec(spec, m, instrument); if (q && q.id !== last) return q; }  // not the same thing twice in a row
-  return q || noteQuestion({ clefs: ['treble'] }, 'cards');
+  const spec = roundSpec(deck, level, clefs || clef, set), m = set ? SET_KINDS[spec.kind].mode : mode;
+  return makeQuestion(spec, m, instrument, pick(specItems(spec)), last);
+}
+
+// ---------- A round ----------
+// Structured, not random: every item comes up before any repeats; at a new level about 60% of the round is what the
+// level adds and the rest is review, starting with a familiar warm-up; up to 30% goes to items missed in the last
+// five rounds; and a miss comes back a couple of cards later in the same round.
+// Returns { total, next() → question, missed(question) }. `history` is the student's recorded rounds.
+function theoryRound(deck, level, { clef, clefs, instrument = '', mode = 'cards', set = null, history = [], total = 0 } = {}) {
+  const cl = clefs || clef, spec = roundSpec(deck, level, cl, set), m = set ? SET_KINDS[spec.kind].mode : mode;
+  const N = total || (set ? spec.cards : THEORY_ROUND), pool = specItems(spec), inPool = new Set(pool);
+  let fresh = [];
+  if (!set && level > 1) { const prev = new Set(specItems(deckSpec(deck, level - 1, cl))); fresh = pool.filter(x => !prev.has(x)); }
+  const review = fresh.length ? pool.filter(x => !fresh.includes(x)) : pool;
+  const counts = {};
+  history.filter(r => r.deck === deck).slice(-5).forEach(r => (r.miss || []).forEach(id => { const it = theoryItemOf(spec, id); if (inPool.has(it)) counts[it] = (counts[it] || 0) + 1; }));
+  const weak = Object.keys(counts).sort((a, b) => counts[b] - counts[a]).slice(0, Math.floor(N * 0.3));
+  const dealer = arr => { let deckOf = []; return () => { if (!deckOf.length) deckOf = shuffle(arr); return deckOf.pop(); }; };
+  const fromFresh = dealer(fresh), fromReview = dealer(review.length ? review : pool);
+  const nFresh = fresh.length ? Math.round((N - weak.length) * 0.6) : 0;
+  const warm = fresh.length && review.length ? [fromReview()] : [];
+  let rest = [...weak, ...Array.from({ length: nFresh }, fromFresh)];
+  while (warm.length + rest.length < N) rest.push(fromReview());
+  rest = shuffle(rest);
+  const plan = [...warm, ...rest].slice(0, N);
+  for (let i = 1; i < plan.length; i++) if (plan[i] === plan[i - 1]) {     // spread out repeats
+    const j = plan.findIndex((x, jj) => jj > i && x !== plan[i] && x !== plan[i - 1] && plan[jj - 1] !== plan[i] && plan[jj + 1] !== plan[i]);
+    if (j > 0) [plan[i], plan[j]] = [plan[j], plan[i]];
+  }
+  let at = 0, last = null;
+  const again = new Set();
+  return {
+    total: N, plan, fresh, weak,
+    next() { const q = makeQuestion(spec, m, instrument, plan[at++], last); last = q.id; return q; },
+    missed(q) { const j = Math.min(at + 2, plan.length - 1); if (q?.item && !again.has(q.item) && j > at) { again.add(q.item); plan[j] = q.item; } }
+  };
+}
+// Earlier versions had fewer levels in some games: move a student's levels onto the new ones
+const THEORY_REMAP = { rhythm: [1, 3, 3, 5, 6], symbols: [1, 2, 3, 5], intervals: [1, 2, 3, 5, 6], chords: [1, 3, 4, 5], echo: [4, 5, 6] };
+function theoryMigrate(st) {
+  if (!st || st.v >= 2) return st;
+  for (const [d, map] of Object.entries(THEORY_REMAP)) if (st.levels?.[d] > 1) st.levels[d] = map[Math.min(st.levels[d], map.length) - 1];
+  st.v = 2;
+  return st;
 }
 
 // ---------- A teacher's own set ----------
@@ -337,9 +494,10 @@ function theoryItemLabel(id) {
   if (a[0] === 'chord') return `${a[1]} ${CHORD_Q[a[2]]?.word || ''}${+a[3] ? `, ${INVERSIONS[+a[3]].toLowerCase()}` : ''}`;
   if (a[0] === 'chordinv') return `Position of ${a[1]} ${CHORD_Q[a[2]]?.word || ''} (${INVERSIONS[+a[3]]?.toLowerCase()})`;
   if (a[0] === 'rhythm') { const r = RHYTHM.find(x => x.id === a[1]); return r ? r.name + (a[2] ? ' (beats)' : '') : id; }
-  if (a[0] === 'symbols') { const s = SYMBOLS.flat().find(x => x.id === a[1]); return s ? `${s.show} – ${s.mean.toLowerCase()}` : id; }
+  if (a[0] === 'symbols') { const s = SYMBOL_BY_ID[a[1]]; return s ? `${s.show} – ${s.mean.toLowerCase()}` : id; }
+  if (a[0] === 'order') return `Order of ${a[1] === '♯' ? 'sharps' : 'flats'} (${a[2]}${['', 'st', 'nd', 'rd'][+a[2]] || 'th'} is ${(a[1] === '♯' ? SHARP_ORDER : FLAT_ORDER)[+a[2] - 1]}${a[1]})`;
   if (a[0] === 'keys') { const k = KEYS.find(x => x.id === a[1]); return k ? (a[2] === 'm' ? `${MINOR_OF[k.id]} minor` : k.name) : id; }
-  if (a[0] === 'echo') return `${PC_NAMES[+a[1]]} by ear`;
+  if (a[0] === 'echo') return `${PC_NAMES[+a[1]]}${SOLFA[+a[1]] ? ` (${SOLFA[+a[1]]})` : ''} by ear`;
   return id;
 }
 

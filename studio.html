@@ -243,6 +243,7 @@
   .thRow { display: grid; grid-template-columns: 1fr auto auto; gap: 8px 14px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
   .thRow.off .grow { opacity: .5; } .thRow select { width: auto; max-width: 210px; } .thOn { display: flex; gap: 6px; align-items: center; }
   @container (max-width: 620px) { .thRow { grid-template-columns: 1fr auto; } .thRow .grow { grid-column: 1 / -1; } }
+  .thMethod { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 4px; } .thMethod summary { cursor: pointer; font-weight: 600; } .thMethod p { margin: 8px 0 0; }
   .clefPick { display: flex; gap: 6px 14px; flex-wrap: wrap; align-items: center; margin-top: 4px; font-weight: 500; }
   .clefPick label { display: flex; gap: 6px; align-items: center; }
   .picker { border: 1.5px dashed var(--line); border-radius: 12px; padding: 6px; overflow-x: auto; }
@@ -509,7 +510,7 @@
 <div id="toast"></div>
 
 <script src="badges.js?v=8"></script>
-<script src="theory.js?v=2"></script>
+<script src="theory.js?v=3"></script>
 <script src="signin.js?v=1"></script>
 <script>
 // ============================================================================================
@@ -1163,7 +1164,7 @@ function tEvents(s) {
 
 // ---------- Music theory (games and levels in theory.js; results come from the family app in practice.theory) ----------
 function tTheory(s) {
-  const T = s.practice?.theory || {}, plan = s.theoryPlan || {}, first = esc(firstName(s.name));
+  const T = theoryMigrate(structuredClone(s.practice?.theory || {})), plan = s.theoryPlan || {}, first = esc(firstName(s.name));
   const clefs = normClefs(plan.clefs || plan.clef || defaultClef(s.instrument)), rounds = (T.rounds || []).slice().sort((a, b) => b.at.localeCompare(a.at));
   const since14 = dayKey(addDays(today(), -13)), since30 = dayKey(addDays(today(), -29));
   const g = plan.goal && THEORY_DECKS[plan.goal.deck] ? plan.goal : null, lv = d => Math.min(Math.max(T.levels?.[d] || 1, 1), THEORY_DECKS[d].levels.length);
@@ -1206,7 +1207,10 @@ function tTheory(s) {
       <div class="clefPick"><span class="small" style="font-weight:600">Clefs for notes, intervals and chords</span>
         ${Object.entries(CLEF_CHOICES).map(([c, l]) => `<label class="small"><input type="checkbox" data-thclef="${c}" ${clefs.includes(c) ? 'checked' : ''}> ${l}</label>`).join('')}</div>
       <p class="small muted" style="margin:6px 0 10px">With more than one clef, each card uses one of them at random. Levels go up by themselves: 8 of 10 right passes a round, and ${PASSES_TO_LEVEL} passed rounds unlock the next level. You can move ${first} up or down, or switch a game off.</p>
-      ${THEORY_ORDER.map(deckRow).join('')}</div>
+      ${THEORY_ORDER.map(deckRow).join('')}
+      <details class="thMethod"><summary class="small">How the games are sequenced</summary>
+        <p class="small">Each level adds a little, in the order most method books and exam syllabi teach it. A round isn’t random: about 60% is what the new level adds, the rest reviews earlier levels (starting with a familiar card), up to 3 cards go to what ${first} missed in recent rounds, and a missed card comes back a couple of cards later. Every item comes up before any repeats. Your own sets work the same way, minus the levels.</p>
+        ${THEORY_ORDER.map(d => `<p class="small"><b>${esc(THEORY_DECKS[d].name)}.</b> ${esc(THEORY_DECKS[d].method)}</p>`).join('')}</details></div>
     <div class="grid2">
       <div class="card"><h2>Trouble spots</h2>
         ${trouble.length ? `<div class="list">${trouble.map(([id, n]) => `<div class="assign"><div class="grow"><div class="t">${esc(theoryItemLabel(id))}</div></div><span class="chip bad">missed ${n}×</span></div>`).join('')}</div>
@@ -1344,7 +1348,7 @@ function theorySetModal(sid, setId, preset) {
 }
 function theoryGoalModal(sid) {
 
-  const s = students[sid], g = s.theoryPlan?.goal, lvNow = d => s.practice?.theory?.levels?.[d] || 1;
+  const s = students[sid], g = s.theoryPlan?.goal, lvNow = d => theoryMigrate(structuredClone(s.practice?.theory || {})).levels?.[d] || 1;
   const levelOpts = d => THEORY_DECKS[d].levels.map((n, i) => `<option value="${i + 1}" ${(g?.deck === d ? g.level : Math.min(lvNow(d) + 1, THEORY_DECKS[d].levels.length)) === i + 1 ? 'selected' : ''}>${i + 1} · ${esc(n)}</option>`).join('');
   openModal(`${mhead('Theory goal for ' + esc(firstName(s.name)))}
     <div class="fields">
