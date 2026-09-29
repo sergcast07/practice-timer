@@ -405,9 +405,9 @@
   .badgeEntry b { display: block; font-size: 16px; }
   .badgeEntry span { font-size: 13.5px; color: var(--muted); }
   .badgeGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
-  .badgeCard { background: var(--card); border-radius: 18px; padding: 16px 12px 14px; box-shadow: var(--shadow); text-align: center; display: grid; justify-items: center; gap: 4px; }
+  .badgeCard { background: var(--card); border-radius: 18px; padding: 16px 12px 14px; box-shadow: var(--shadow); text-align: center; display: grid; justify-items: center; align-content: start; gap: 4px; min-width: 0; }
   .badgeCard b { font-size: 14.5px; margin-top: 6px; }
-  .badgeCard .lvl { font-size: 12.5px; color: var(--ink-2); font-weight: 600; }
+  .badgeCard .lvl { font-size: 12.5px; color: var(--ink-2); font-weight: 600; white-space: normal; max-width: 100%; text-align: center; }
   .badgeCard.locked b, .badgeCard.locked .lvl { color: var(--muted); }
   .badgeCard .nxt { font-size: 11.5px; color: var(--muted); }
   .bbar { width: 100%; height: 5px; background: var(--track); border-radius: 3px; overflow: hidden; margin-top: 6px; }
@@ -2072,7 +2072,7 @@ const METRO_SOUNDS = {
   tick:  { label: 'Tick (soft)', noise: true, cut: 3500, decay: 0.03, peak: [0.4, 0.55] },
   bell:  { label: 'Bell (soft)', tones: [3600, 5200, 7100], accent: [4300, 6200, 8400], decay: 0.25, peak: [0.75, 0.95] }
 };
-const METRO_DEFAULT = 'loud';
+const METRO_DEFAULT = 'classic';
 // Italian tempo markings (common metronome ranges); choosing one sets a typical bpm for it
 const TEMPOS = [['Grave', 30, 44, 40], ['Largo', 45, 59, 50], ['Larghetto', 60, 65, 63], ['Adagio', 66, 75, 70], ['Andante', 76, 97, 88],
                 ['Moderato', 98, 111, 104], ['Allegretto', 112, 119, 116], ['Allegro', 120, 155, 132], ['Vivace', 156, 175, 164],
