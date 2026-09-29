@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>AlleGrow Studio for music teachers</title>
-<meta name="description" content="Know how every student’s week of practice really went – timed automatically while they play. Assignments, lessons, reports and encouragement in one place. Free during the beta.">
+<meta name="description" content="Know what really happened between lessons – practice counted only while the app hears music. Know how every student’s week of practice really went – timed automatically while they play. Assignments, lessons, reports and encouragement in one place. Free during the beta.">
 <meta name="theme-color" content="#f6f3ee" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#14171f" media="(prefers-color-scheme: dark)">
 <meta property="og:title" content="AlleGrow Studio for music teachers">
@@ -71,6 +71,7 @@
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-dollar" viewBox="0 0 24 24"><path d="M12 2.5v19M16.5 6.5c-.8-1.3-2.4-2-4.5-2-2.8 0-4.5 1.4-4.5 3.4 0 4.8 9.5 2.6 9.5 7.6 0 2-1.8 3.5-5 3.5-2.3 0-4-.8-5-2.3"/></symbol>
   <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M18.5 11a6.5 6.5 0 0 1-13 0M12 17.5V21"/></symbol>
   <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.2a6.5 6.5 0 0 1 3 5.8"/></symbol>
   <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21a2 2 0 0 1 2-2h13v2"/></symbol>
@@ -99,8 +100,9 @@
   <div class="hero">
     <div>
       <span class="chip">AlleGrow Studio · for music teachers</span>
-      <h1 style="margin-top:16px">Know how the week <span class="wm"><b>really</b></span> went.</h1>
-      <p class="lead">AlleGrow times your students’ practice automatically while they play – no practice logs to fill in, no guessing. Walk into every lesson knowing who practiced, what they worked on and where they need you.</p>
+      <h1 style="margin-top:16px">Know what <span class="wm"><b>really</b></span> happened between lessons.</h1>
+      <p class="lead">AlleGrow counts practice only while it hears music – so the minutes you see are minutes they played, not minutes someone wrote down. Walk into every lesson knowing who practiced, what they worked on and where they need you.</p>
+      <div class="proof"><span><svg class="ic"><use href="#i-mic"/></svg>Heard, not logged</span><span><svg class="ic"><use href="#i-check"/></svg>Hand-logged time is marked</span><span><svg class="ic"><use href="#i-lock"/></svg>Analyzed on the phone, never recorded</span></div>
       <div class="ctas"><a class="btn primary" href="studio">Start free</a><a class="btn secondary" href="studio?demo">Explore the demo studio</a></div>
       <p class="small">Free for up to 3 students. Beta partners get unlimited students, free. No card needed.</p>
     </div>
@@ -135,6 +137,19 @@
 </div></section>
 
 <section><div class="wrap">
+  <div class="card tonara">
+    <div><span class="chip">Coming from Tonara?</span>
+      <h2 style="margin-top:12px">Practice that’s heard, not logged – with a whole studio around it.</h2>
+      <p>Tonara closed in December 2023, and most of what replaced it asks students to log their own time. AlleGrow listens, like Tonara did: it counts real playing, not claims. Around it you get assignments your students can send recordings for, theory games with levels, lessons and a calendar feed, badges, reports and a simple billing ledger.</p></div>
+    <div class="list">
+      <div><svg class="ic"><use href="#i-check"/></svg><span><b>Paste your student list</b> from a spreadsheet and send every family their link in one go.</span></div>
+      <div><svg class="ic"><use href="#i-check"/></svg><span><b>Free for families,</b> no accounts for children.</span></div>
+      <div><svg class="ic"><use href="#i-check"/></svg><span><b>Free while we’re in beta.</b></span></div>
+    </div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
   <div class="sectionHead"><h2>Up and running in an afternoon</h2><p>No hardware, no installs, nothing for families to buy.</p></div>
   <div class="steps">
     <div class="card"><h3>Add your students</h3><p>Paste your list straight from a spreadsheet – names, instruments, lesson times, practice plans – or add them one by one.</p></div>
@@ -155,6 +170,12 @@
     <div class="card feature"><div class="icon"><svg class="ic"><use href="#i-book"/></svg></div><h3>Assignments on their practice screen</h3>
       <p>Set pieces, scales and tempos. They appear right where the student practices, with the metronome ready at your tempo.</p>
       <p class="more">Students tick them off, and you see what got done.</p></div>
+    <div class="card feature"><div class="icon"><svg class="ic"><use href="#i-mic"/></svg></div><h3>Hear their progress</h3>
+      <p>Students record an assignment and send it to you – up to 90 seconds. Listen in your studio and reply with a note they see in their app.</p>
+      <p class="more">Recordings stay off until a parent turns them on.</p></div>
+    <div class="card feature"><div class="icon"><svg class="ic"><use href="#i-dollar"/></svg></div><h3>Know who’s paid</h3>
+      <p>Set your lesson price and AlleGrow keeps a running balance from your schedule. Record payments, send a family their statement, export a CSV for your accounts.</p>
+      <p class="more">A ledger, not a payment system – families pay you the way they do now.</p></div>
     <div class="card feature"><div class="icon"><svg class="ic"><use href="#i-target"/></svg></div><h3>Practice plans that fit</h3>
       <p>Set days and minutes per week – say five days of 30 minutes, with rest days. Families can go above your plan, never below it.</p></div>
     <div class="card feature"><div class="icon"><svg class="ic"><use href="#i-calendar"/></svg></div><h3>Lessons, terms and your calendar</h3>
@@ -165,12 +186,12 @@
       <p>Send a star with a note, award your own badge, or set a challenge like “practice 5 days this week” that tracks itself. Students earn badges automatically too.</p></div>
     <div class="card feature"><div class="icon"><svg class="ic"><use href="#i-report"/></svg></div><h3>Progress reports</h3>
       <p>A clean report for any student over any period – practice, lessons, assignments, performances – to print or save as a PDF for parents.</p></div>
+    <div class="card feature"><div class="icon"><svg class="ic"><use href="#i-award"/></svg></div><h3>Performances &amp; exams</h3>
+      <p>Recitals, concerts, festivals, auditions and exams – with each student’s piece and result. Families see what’s coming up in their app.</p></div>
     <div class="card feature" style="grid-column:1/-1"><div class="icon"><svg class="ic"><use href="#i-note"/></svg></div><h3>Music theory games, with levels</h3>
       <p>Flash cards for note names (any clef, including the grand staff), rhythm, symbols, key signatures, intervals and chords – plus “Find it on the staff”, “Play it”, where the app shows a note and listens as they play it, and “Echo”, where they play back a note by ear. Students level up as they master each one.</p>
       <p class="more">The levels follow the order most teachers already use: landmark notes before the whole staff, keys around the circle of fifths with their relative minors, interval size before quality, and the Kodály sol–mi order for ear training. Each round mixes the new level with review, and anything a student misses comes back.</p>
       <p class="more">Or build your own sets: click the exact notes on the staff, mix treble, bass, alto, tenor and the grand staff, add intervals, chords or key signatures, and choose the number of cards, a time limit and the pass mark. Give a set to one student or your whole studio – or turn their trouble spots into a set with one click. You see every round, their levels and what they keep missing.</p></div>
-    <div class="card feature"><div class="icon"><svg class="ic"><use href="#i-award"/></svg></div><h3>Performances &amp; exams</h3>
-      <p>Recitals, concerts, festivals, auditions and exams – with each student’s piece and result. Families see what’s coming up in their app.</p></div>
   </div>
   <div class="grid2" style="margin-top:16px">
     <div class="card feature"><div class="icon"><svg class="ic"><use href="#i-sliders"/></svg></div><h3>Practice insights – on your terms</h3>
@@ -207,7 +228,8 @@
     <div class="card">
       <h3>Private by design</h3>
       <div class="list" style="margin-top:14px">
-        <div><svg class="ic"><use href="#i-lock"/></svg><span>Sound is analyzed <b>on the device</b>. Nothing is ever recorded or uploaded.</span></div>
+        <div><svg class="ic"><use href="#i-lock"/></svg><span>The practice timer analyzes sound <b>on the device</b> and never records it.</span></div>
+        <div><svg class="ic"><use href="#i-mic"/></svg><span>Recordings for you are off until a parent turns them on, and only sent when the student presses Send.</span></div>
         <div><svg class="ic"><use href="#i-check"/></svg><span>A parent agrees before a child is connected to you, and can disconnect any time – you’ll see if they do.</span></div>
         <div><svg class="ic"><use href="#i-check"/></svg><span>First names only for children. No ads, no tracking, no selling data.</span></div>
       </div>
@@ -246,7 +268,10 @@
   <h2 style="margin-bottom:22px">Teachers ask</h2>
   <details><summary>Do my families have to pay or sign up for anything?</summary><p>No. The family app is free, runs in any modern browser, and children don’t need accounts. A parent just opens your invite link and agrees to share.</p></details>
   <details><summary>What if a student doesn’t use the app?</summary><p>You can still manage their lessons, assignments, notes, performances and reports in your studio. Families can also log practice by hand, and it’s shown as “logged by hand” so you know.</p></details>
-  <details><summary>How does it know they’re really practicing?</summary><p>The app listens through the device’s microphone and uses a small sound-recognition model that runs on the device itself. The timer counts music, not talking or silence. Nothing is recorded or sent anywhere – only the minutes and scores.</p></details>
+  <details><summary>How does it know they’re really practicing?</summary><p>The app listens through the device’s microphone and uses a small sound-recognition model that runs on the device itself. The timer counts music, not talking or silence. The timer never records or sends sound – only the minutes and scores.</p></details>
+  <details><summary>Can students send me recordings?</summary><p>Yes, once a parent turns it on. A student taps Record on one of your assignments, listens back and sends it – up to 90 seconds. You’ll see it under “Needs attention” and on the student’s Assignments tab, and you can reply with a note they see in their app.</p></details>
+  <details><summary>Can AlleGrow handle billing?</summary><p>It keeps a simple ledger: set a price per lesson or per hour, and each student’s balance builds from the lessons on your schedule (canceled and moved lessons don’t count; no-shows are your choice). Record payments, add charges like recital fees, copy or email a statement with your payment link, and export everything as a CSV for your spreadsheet or accounting software. It doesn’t take card payments.</p></details>
+  <details><summary>I used Tonara. What’s different?</summary><p>Like Tonara, AlleGrow listens to count real practice. It adds a full studio around it – lessons and calendar, theory games, performances, reports and billing – and the family app is free with no accounts for children.</p></details>
   <details><summary>I teach young beginners. Won’t scores discourage them?</summary><p>You decide. Tuning, focus and rhythm scores can be shown as numbers, as gentle trends, or turned off – for your whole studio or just one student. Parents can also turn tuning off for their child.</p></details>
   <details><summary>Which instruments does it work with?</summary><p>Any instrument, including voice. Tuning scores are only used where the player shapes every note (strings, voice, winds and brass) – never for piano, guitar, ukulele or drums.</p></details>
   <details><summary>Can I bring my existing student list?</summary><p>Yes. Paste it straight from Excel, Google Sheets or Numbers, or upload a CSV file. AlleGrow checks it before adding anyone and gives you every family’s invite link in one place.</p></details>

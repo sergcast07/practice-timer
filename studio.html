@@ -77,6 +77,19 @@
   .fields { display: grid; gap: 14px; }
   .fields.two { grid-template-columns: 1fr 1fr; }
   .fields.three { grid-template-columns: 1fr 1fr 1fr; }
+  .linkBtn { background: none; border: 0; padding: 0; font: inherit; font-weight: 600; color: inherit; cursor: pointer; text-align: left; }
+  .linkBtn:hover { text-decoration: underline; }
+  .owe { color: var(--warn); } .credit { color: var(--good); }
+  .billTable td { vertical-align: middle; }
+  @container (max-width: 600px) { .billTable .wide { display: none; } }
+  .clipRow { padding: 10px 0; border-top: 1px solid var(--line); display: grid; gap: 8px; }
+  .clipRow:first-of-type { border-top: 0; }
+  .clipTop { display: flex; gap: 12px; align-items: center; }
+  .clipTop .t { font-weight: 600; } .clipTop .d { font-size: 13px; color: var(--muted); }
+  .clipReply { font-size: 14px; background: var(--soft); border-radius: 12px; padding: 8px 12px; }
+  .clipReplyBox { display: grid; gap: 8px; }
+  .dotNew { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-left: 4px; vertical-align: middle; }
+  .billPanel { display: grid; gap: 10px; background: var(--soft); border-radius: 14px; padding: 12px; }
   @media (max-width: 520px) { .fields.two, .fields.three { grid-template-columns: 1fr; } }
 
   /* Sign-in / setup */
@@ -418,6 +431,10 @@
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="i-note" viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></symbol>
+  <symbol id="i-dollar" viewBox="0 0 24 24"><path d="M12 2.5v19M16.5 6.5c-.8-1.3-2.4-2-4.5-2-2.8 0-4.5 1.4-4.5 3.4 0 4.8 9.5 2.6 9.5 7.6 0 2-1.8 3.5-5 3.5-2.3 0-4-.8-5-2.3"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 6.5 8.5 6.5 8.5-6.5"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3.5"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12.5-7.5z"/></symbol>
   <symbol id="i-home" viewBox="0 0 24 24"><path d="M3.5 10.5 12 3.5l8.5 7V20a1 1 0 0 1-1 1h-5v-6h-5v6h-5a1 1 0 0 1-1-1z"/></symbol>
   <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.2a6.5 6.5 0 0 1 3 5.8"/></symbol>
   <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="16" rx="2.5"/><path d="M16 3v4M8 3v4M3.5 10h17"/></symbol>
@@ -495,6 +512,7 @@
       <button data-go="schedule"><svg class="ic"><use href="#i-calendar"/></svg>Schedule</button>
       <button data-go="events"><svg class="ic"><use href="#i-award"/></svg><span class="navLong">Performances &amp; exams</span><span class="navShort">Events</span></button>
       <button data-go="reports"><svg class="ic"><use href="#i-report"/></svg>Reports</button>
+      <button data-go="billing"><svg class="ic"><use href="#i-dollar"/></svg>Billing</button>
       <button data-go="admin" id="adminNav" hidden><svg class="ic"><use href="#i-settings"/></svg>Beta admin</button>
     </nav>
     <div class="planBox" id="planBox"></div>
@@ -637,7 +655,7 @@ function trend(a, b) {
 }
 
 // ---------- State ----------
-let me = null, studio = null, students = {}, lessons = {}, events = {}, notes = {};
+let me = null, studio = null, students = {}, lessons = {}, events = {}, notes = {}, billing = {}, clips = {};
 const active = () => Object.values(students).filter(s => !s.archived).sort((a, b) => a.name.localeCompare(b.name));
 
 // ---------- Data layer: Firestore, or in-memory for the demo ----------
@@ -684,6 +702,20 @@ async function firebaseApi() {
       unsubs.push(F.onSnapshot(F.collection(db, 'studios', uid, 'events'), q => {
         events = {}; q.forEach(d => events[d.id] = { id: d.id, ...d.data() }); render();
       }, fail));
+      // recordings: one small listener per student (students/{sid}/clips)
+      const clipSubs = {};
+      unsubs.push(() => { for (const u of Object.values(clipSubs)) u(); });
+      unsubs.push(F.onSnapshot(F.query(F.collection(db, 'students'), F.where('studioId', '==', uid)), q => {
+        const ids = new Set(q.docs.filter(d => !d.data().archived).map(d => d.id));
+        for (const sid of Object.keys(clipSubs)) if (!ids.has(sid)) { clipSubs[sid](); delete clipSubs[sid]; for (const id in clips) if (clips[id].sid === sid) delete clips[id]; }
+        for (const sid of ids) if (!clipSubs[sid]) clipSubs[sid] = F.onSnapshot(F.collection(db, 'students', sid, 'clips'), cq => {
+          for (const id in clips) if (clips[id].sid === sid) delete clips[id];
+          cq.forEach(d => clips[d.id] = { id: d.id, sid, ...d.data() }); render();
+        }, e => console.error(e));
+      }, fail));
+      unsubs.push(F.onSnapshot(F.collection(db, 'studios', uid, 'billing'), q => {
+        billing = {}; q.forEach(d => billing[d.id] = d.data()); render();
+      }, fail));
       unsubs.push(F.onSnapshot(F.collection(db, 'studios', uid, 'notes'), q => {
         notes = {}; q.forEach(d => notes[d.id] = d.data().text || ''); render();
       }, fail));
@@ -703,6 +735,11 @@ async function firebaseApi() {
     saveEvent: (id, data) => F.setDoc(F.doc(db, 'studios', me.uid, 'events', id), data).catch(fail),
     deleteEvent: id => F.deleteDoc(F.doc(db, 'studios', me.uid, 'events', id)).catch(fail),
     saveNote: (sid, text) => F.setDoc(F.doc(db, 'studios', me.uid, 'notes', sid), { text }).catch(fail),
+    // a student's billing record: created empty if needed, then patched (dotted paths, DEL removes)
+    clipAudio: async (sid, id) => (await F.getDoc(F.doc(db, 'students', sid, 'clipData', id))).data(),
+    patchClip: (sid, id, patch) => F.updateDoc(F.doc(db, 'students', sid, 'clips', id), patch).catch(fail),
+    deleteClip: (sid, id) => Promise.all([F.deleteDoc(F.doc(db, 'students', sid, 'clipData', id)), F.deleteDoc(F.doc(db, 'students', sid, 'clips', id))]).catch(fail),
+    saveBilling: async (sid, patch) => { const ref = F.doc(db, 'studios', me.uid, 'billing', sid); await F.setDoc(ref, {}, { merge: true }); return F.updateDoc(ref, conv(patch)).catch(fail); },
     getFeed: async token => { const s = await F.getDoc(F.doc(db, 'feeds', token)); return s.exists() ? s.data() : null; },
     saveFeed: (token, data) => F.setDoc(F.doc(db, 'feeds', token), data, { merge: true }),
     // Beta: plan, codes, feedback
@@ -749,6 +786,10 @@ function demoApi() {
     saveEvent: async (id, d) => { events[id] = { id, ...structuredClone(d) }; later(); },
     deleteEvent: async id => { delete events[id]; later(); },
     saveNote: async (sid, t) => { notes[sid] = t; },
+    saveBilling: async (sid, p) => { applyPatch(billing[sid] ??= {}, p); later(); },
+    clipAudio: async () => demoClipAudio(),
+    patchClip: async (sid, id, p) => { Object.assign(clips[id], p); later(); },
+    deleteClip: async (sid, id) => { delete clips[id]; later(); },
     getFeed: async () => null,
     saveFeed: async () => {},
     isAdmin: async () => false,
@@ -898,11 +939,13 @@ function render() {
   if (!studio) return;
   $('studioName').textContent = studio.studioName;
   document.querySelectorAll('[data-go]').forEach(b => b.classList.toggle('on', b.dataset.go === (route.view === 'student' ? 'students' : route.view)));
-  const v = { overview: vOverview, students: vStudents, student: vStudent, schedule: vSchedule, events: vEvents, reports: vReports, admin: vAdmin }[route.view] || vOverview;
+  const v = { overview: vOverview, students: vStudents, student: vStudent, schedule: vSchedule, events: vEvents, reports: vReports, billing: vBilling, admin: vAdmin }[route.view] || vOverview;
   renderPlan();
   // Don't redraw under someone who is typing
   const ae = document.activeElement;
   if (ae && $('view').contains(ae) && ['TEXTAREA', 'INPUT'].includes(ae.tagName) && ae.dataset.keep) return;
+  // …or under a recording that's playing: redraw once it stops
+  if ([...$('view').querySelectorAll('audio')].some(a => !a.paused && !a.ended)) { renderAfterAudio = true; return; }
   $('view').innerHTML = (DEMO ? `<div class="demoBar noprint"><span><b>Demo studio.</b> Sample data – changes aren’t saved.</span><a href="${location.pathname}">Sign in to create your studio</a></div>` : '') + v();
   bindView();
 }
@@ -920,6 +963,7 @@ function vOverview() {
   const thisWeek = lessonsBetween(weekStart(t), addDays(weekStart(t), 6)).filter(countsAsLesson);
   const todays = lessonsBetween(t, t);
   const attention = [];
+  for (const s of all) { const n = newClips(s.id).length; if (n) attention.push([s, 'info', 'mic', n === 1 ? 'New recording' : `${n} new recordings`, clipsOf(s.id)[0].title ? `Latest: ${clipsOf(s.id)[0].title}` : 'Listen and reply', 'assignments']); }
   for (const s of all) {
     if (leftAt(s)) { attention.push([s, 'bad', 'link', leftText(s), s.consent.removedData ? 'They also removed the practice they’d shared. Archive the student, or send a new invite.' : 'Archive the student if they’ve moved on, or send a new invite.']); continue; }
     if (!s.linkedAt) { attention.push([s, 'info', 'link', 'Not connected yet', 'Send the family their invite link']); continue; }
@@ -949,8 +993,8 @@ function vOverview() {
       <section class="card"><h2>Today’s lessons <button class="ghost small" data-go2="schedule">Schedule ${icon('chev', 'sm')}</button></h2>
         <div class="list">${todays.length ? todays.map(lessonRow).join('') : '<div class="empty">No lessons today.</div>'}</div></section>
       <section class="card"><h2>Needs attention</h2>
-        <div class="list">${attention.length ? attention.slice(0, 7).map(([s, kind, ic, t1, t2]) => `
-          <button class="rowLink" data-student="${s.id}" style="--kid:${s.color}">
+        <div class="list">${attention.length ? attention.slice(0, 7).map(([s, kind, ic, t1, t2, stab]) => `
+          <button class="rowLink" data-student="${s.id}" ${stab ? `data-stab="${stab}"` : ''} style="--kid:${s.color}">
             <div class="avatar sm">${face(s)}</div>
             <div class="grow"><div class="t">${esc(s.name)} <span class="chip ${kind}">${icon(ic)}${t1}</span></div><div class="d">${esc(t2)}</div></div>
           </button>`).join('') : '<div class="empty">Everyone is on track. Nice.</div>'}</div></section>
@@ -1059,7 +1103,7 @@ function vStudent() {
   const s = students[route.id];
   if (!s) return `<div class="emptyBig">${icon('users', 'lg')}<p>This student isn’t in your studio.</p><button class="secondary" data-go2="students">Back to students</button></div>`;
   const tab = sub.tab || 'progress';
-  const tabs = [['progress', 'Progress'], ['assignments', 'Assignments'], ['rewards', 'Badges & stars'], ['lessons', 'Lessons'], ['events', 'Performances'], ['theory', 'Theory'], ['notes', 'Notes']];
+  const tabs = [['progress', 'Progress'], ['assignments', newClips(s.id).length ? `Assignments <span class="dotNew" title="New recordings"></span>` : 'Assignments'], ['rewards', 'Badges & stars'], ['lessons', 'Lessons'], ['events', 'Performances'], ['theory', 'Theory'], ['notes', 'Notes']];
   return `<div style="--kid:${s.color}">
     <button class="ghost" data-go2="students" style="margin-left:-10px;margin-bottom:10px">${icon('back', 'sm')}Students</button>
     <div class="studentHead">
@@ -1117,18 +1161,79 @@ function tAssignments(s) {
     <div class="grow"><div class="t">${esc(a.title)}</div>${a.details ? `<div class="det">${esc(a.details)}</div>` : ''}
       <div class="meta">${a.bpm ? `<span class="chip">${icon('metronome')}${a.bpm} bpm</span>` : ''}${a.minutes ? `<span class="chip">${icon('clock')}${a.minutes} min/day</span>` : ''}
         ${a.due ? `<span class="chip ${a.status === 'active' && a.due < dayKey() ? 'bad' : ''}">Due ${fmtDate(a.due)}</span>` : ''}
-        ${a.status === 'active' ? `<span class="chip good">${Object.keys(s.progress?.[a.id] || {}).length} days practiced</span>` : ''}</div>
+        ${a.status === 'active' ? `<span class="chip good">${Object.keys(s.progress?.[a.id] || {}).length} days practiced</span>` : ''}
+        ${(n => n ? `<span class="chip info">${icon('mic')}${n} ${n === 1 ? 'recording' : 'recordings'}</span>` : '')(clipsOf(s.id).filter(c => c.assignment === a.id).length)}</div>
       ${a.status === 'active' ? weekDots(s, a) : ''}</div>
     <div style="display:flex;gap:4px">
       ${a.status === 'active' ? `<button class="ghost icon" data-assign-done="${a.id}" title="Mark complete" aria-label="Mark complete">${icon('check')}</button>` : `<button class="ghost small" data-assign-reopen="${a.id}">Reopen</button>`}
       <button class="ghost icon" data-assign-edit="${a.id}" title="Edit" aria-label="Edit">${icon('edit')}</button>
     </div></div>`;
-  return `<div class="stack"><div class="card">
+  return `<div class="stack">${clipsCard(s)}<div class="card">
     <h2>Current assignments <button class="accent" data-act="addAssign">${icon('plus', 'sm')}New assignment</button></h2>
     ${act.length ? act.map(item).join('') : `<div class="empty">No current assignments. ${s.linkedAt ? '' : 'They’ll appear in the student’s app once the family connects.'}</div>`}
     <p class="small muted" style="margin-top:12px">Assignments appear on ${esc(firstName(s.name))}’s practice screen. They tick off each day they practice it.</p>
   </div>
   ${done.length ? `<details class="card"><summary style="cursor:pointer;font-weight:700">Completed (${done.length})</summary><div style="margin-top:8px">${done.map(item).join('')}</div></details>` : ''}</div>`;
+}
+
+// ---------- Recordings from students ----------
+// Short clips a student records for an assignment in the family app (students/{sid}/clips + clipData). The list comes
+// from one query over every student's clips; the audio is only fetched when you press Play.
+let renderAfterAudio = false;
+const clipUrls = {};                                 // recordings already fetched this session: id → object URL
+const clipsOf = sid => Object.values(clips).filter(c => c.sid === sid).sort((a, b) => b.at.localeCompare(a.at));
+const newClips = sid => clipsOf(sid).filter(c => !c.heard);
+const clipWhen = at => new Date(at).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+function clipsCard(s) {
+  const list = clipsOf(s.id);
+  if (!list.length) return '';
+  return `<div class="card"><h2>Recordings from ${esc(firstName(s.name))} ${newClips(s.id).length ? `<span class="chip info">${newClips(s.id).length} new</span>` : ''}</h2>
+    ${list.map(c => `<div class="clipRow" data-clipbox="${c.id}">
+      <div class="clipTop"><button class="secondary icon" data-clipplay="${c.id}" aria-label="Play">${icon('play')}</button>
+        <div class="grow"><div class="t">${esc(c.title || 'Recording')} ${c.heard ? '' : '<span class="chip info">New</span>'}</div>
+          <div class="d">${clipWhen(c.at)} · ${Math.floor((c.secs || 0) / 60)}:${pad((c.secs || 0) % 60)}</div></div>
+        <button class="ghost icon" data-clipdel="${c.id}" title="Delete" aria-label="Delete recording">${icon('trash')}</button></div>
+      <div class="clipAudio" id="ca-${c.id}">${clipUrls[c.id] ? `<audio controls src="${clipUrls[c.id]}" style="width:100%"></audio>` : ''}</div>
+      ${c.reply ? `<div class="clipReply"><b>You replied:</b> ${esc(c.reply)} <button class="ghost small" data-clipreply="${c.id}">Change</button></div>`
+        : `<button class="ghost small" data-clipreply="${c.id}">${icon('edit', 'sm')}Reply</button>`}
+    </div>`).join('')}
+    <p class="small muted" style="margin-top:10px">${esc(firstName(s.name))} records these from an assignment in their app. They see your reply there. The newest 12 are kept.</p></div>`;
+}
+const hookAudio = au => { au.onpause = au.onended = () => { if (renderAfterAudio) { renderAfterAudio = false; render(); } }; };
+function bindClips(V, sid) {
+  V.querySelectorAll('.clipAudio audio').forEach(hookAudio);
+  V.querySelectorAll('[data-clipplay]').forEach(b => { if (clipUrls[b.dataset.clipplay]) b.hidden = true; });
+  V.querySelectorAll('[data-clipplay]').forEach(b => b.onclick = async () => {
+    const c = clips[b.dataset.clipplay], box = V.querySelector('#ca-' + c.id);
+    if (box.firstChild) return;
+    box.textContent = 'Loading…';
+    try {
+      const d = await api.clipAudio(sid, c.id);
+      const bytes = Uint8Array.from(atob(d.data), ch => ch.charCodeAt(0)), url = clipUrls[c.id] = URL.createObjectURL(new Blob([bytes], { type: d.mime || c.mime }));
+      box.innerHTML = `<audio controls autoplay src="${url}" style="width:100%"></audio>`;
+      hookAudio(box.querySelector('audio'));
+      if (!c.heard) api.patchClip(sid, c.id, { heard: true });
+    } catch (e) { console.error(e); box.textContent = 'Couldn’t load this recording.'; }
+  });
+  V.querySelectorAll('[data-clipreply]').forEach(b => b.onclick = () => {
+    const c = clips[b.dataset.clipreply], wrap = V.querySelector(`[data-clipbox="${c.id}"]`);
+    b.outerHTML = `<div class="clipReplyBox"><textarea rows="2" data-keep="1" maxlength="1000" placeholder="e.g. Lovely tone! Watch the tempo in bar 12.">${esc(c.reply || '')}</textarea>
+      <div style="display:flex;gap:8px;justify-content:flex-end"><button class="primary small" data-clipsend>Send reply</button></div></div>`;
+    wrap.querySelector('.clipReply')?.remove();
+    const ta = wrap.querySelector('textarea'); ta.focus();
+    wrap.querySelector('[data-clipsend]').onclick = async () => { ta.blur(); await api.patchClip(sid, c.id, { reply: ta.value.trim(), replyAt: new Date().toISOString(), heard: true }); toast('Reply sent'); };
+  });
+  V.querySelectorAll('[data-clipdel]').forEach(b => b.onclick = async () => { if (confirm('Delete this recording? It’s removed for the family too.')) await api.deleteClip(sid, b.dataset.clipdel); });
+}
+// The demo's recordings: a few seconds of a scale, made on the spot as a WAV file
+function demoClipAudio() {
+  const sr = 16000, notes = [60, 62, 64, 65, 67, 69, 71, 72], len = sr * 0.45, n = notes.length * len, buf = new DataView(new ArrayBuffer(44 + n * 2));
+  const str = (o, t) => [...t].forEach((ch, i) => buf.setUint8(o + i, ch.charCodeAt(0)));
+  str(0, 'RIFF'); buf.setUint32(4, 36 + n * 2, true); str(8, 'WAVEfmt '); buf.setUint32(16, 16, true); buf.setUint16(20, 1, true); buf.setUint16(22, 1, true);
+  buf.setUint32(24, sr, true); buf.setUint32(28, sr * 2, true); buf.setUint16(32, 2, true); buf.setUint16(34, 16, true); str(36, 'data'); buf.setUint32(40, n * 2, true);
+  notes.forEach((m, k) => { const f = 440 * 2 ** ((m - 69) / 12); for (let i = 0; i < len; i++) { const env = Math.min(1, i / 400) * Math.exp(-i / (len * 0.6)); buf.setInt16(44 + 2 * (k * len + i), 9000 * env * (Math.sin(2 * Math.PI * f * i / sr) + 0.3 * Math.sin(4 * Math.PI * f * i / sr)), true); } });
+  let bin = ''; new Uint8Array(buf.buffer).forEach(x => bin += String.fromCharCode(x));
+  return { data: btoa(bin), mime: 'audio/wav' };
 }
 
 function tLessons(s) {
@@ -1494,15 +1599,207 @@ function vReports() {
   </div>`;
 }
 
+// ---------- Billing: a simple "lessons owed" ledger ----------
+// Not invoicing or payments: AlleGrow keeps a running balance per student from the lessons taught since billing was
+// turned on (studio.billing), minus the payments the teacher records. Kept private to the teacher in
+// studios/{uid}/billing/{sid} = { rate, per, opening, payments: {id: {date, amount, method, note}}, adjustments: {id: {date, amount, note}} }.
+// Lessons count when marked done, or when their time has passed and they weren't canceled or moved; no-shows count if
+// the studio says so. Families never see any of it unless the teacher sends them a statement.
+const CURRENCIES = ['USD', 'CAD', 'GBP', 'EUR', 'AUD', 'NZD'];
+const PAY_METHODS = ['Cash', 'Check', 'Card', 'Bank transfer', 'Venmo', 'Zelle', 'PayPal', 'Other'];
+const money = (n, cur = studio?.billing?.currency || 'USD') => new Intl.NumberFormat(undefined, { style: 'currency', currency: cur }).format(Math.round((n || 0) * 100) / 100);
+const lessonPast = l => `${l.date} ${l.time || '00:00'}` <= `${dayKey()} ${pad(new Date().getHours())}:${pad(new Date().getMinutes())}`;
+function billRate(sid) {
+  const B = studio?.billing || {}, b = billing[sid] || {};
+  return { rate: b.rate ?? B.rate ?? 0, per: b.per || B.per || 'lesson' };
+}
+// Every charge, adjustment and payment for one student since billing began, oldest first, with a running balance
+function ledger(sid) {
+  const B = studio?.billing, b = billing[sid] || {};
+  if (!B?.since) return { entries: [], balance: 0 };
+  const { rate, per } = billRate(sid), out = [];
+  if (b.opening) out.push({ date: B.since, kind: 'open', text: 'Balance carried over', amount: +b.opening });
+  for (const l of lessonsBetween(parseDay(B.since), today(), sid)) {
+    if (!countsAsLesson(l) || !lessonPast(l) || (l.status === 'noshow' && !B.noshow)) continue;
+    const amount = per === 'hour' ? rate * (l.length || 30) / 60 : rate;
+    out.push({ date: l.date, kind: 'lesson', id: l.id, text: `${l.status === 'noshow' ? 'No-show' : 'Lesson'} · ${l.length || 30} min`, amount });
+  }
+  for (const [id, a] of Object.entries(b.adjustments || {})) out.push({ date: a.date, kind: 'adj', id, text: a.note || (a.amount < 0 ? 'Credit' : 'Charge'), amount: +a.amount });
+  for (const [id, p] of Object.entries(b.payments || {})) out.push({ date: p.date, kind: 'pay', id, text: `Payment${p.method ? ' · ' + p.method : ''}${p.note ? ' · ' + p.note : ''}`, amount: -p.amount });
+  out.sort((x, y) => x.date.localeCompare(y.date) || (x.kind === 'pay') - (y.kind === 'pay'));
+  let run = 0; for (const e of out) e.balance = run = Math.round((run + e.amount) * 100) / 100;
+  return { entries: out, balance: run };
+}
+function vBilling() {
+  const B = studio?.billing;
+  if (!B?.since) return `<div class="pageHead"><div><div class="eyebrow">Lessons owed</div><h1>Billing</h1></div></div>
+    <div class="card" style="max-width:640px"><h2>Know who’s paid</h2>
+      <p>Set your lesson price and AlleGrow keeps a running balance for each student from the lessons on your schedule. Record payments as they come in, send a family their statement, or export everything for your accounting.</p>
+      <p class="small muted">It’s a ledger, not a payment system: families pay you the way they do now.</p>
+      <button class="accent" data-act="billSetup">${icon('plus', 'sm')}Set up billing</button></div>`;
+  const list = active(), monthStart = dayKey(new Date(today().getFullYear(), today().getMonth(), 1));
+  const rows = list.map(s => { const L = ledger(s.id), m = L.entries.filter(e => e.date >= monthStart);
+    return { s, L, charged: m.filter(e => e.amount > 0).reduce((a, e) => a + e.amount, 0), paid: -m.filter(e => e.kind === 'pay').reduce((a, e) => a + e.amount, 0), lessonsM: m.filter(e => e.kind === 'lesson').length }; });
+  const owed = rows.reduce((a, r) => a + Math.max(0, r.L.balance), 0), paidM = rows.reduce((a, r) => a + r.paid, 0), chargedM = rows.reduce((a, r) => a + r.charged, 0);
+  const { rate, per } = billRate('');
+  return `<div class="pageHead"><div><div class="eyebrow">${money(rate)} per ${per} · since ${fmtDate(B.since, { day: 'numeric', month: 'short', year: 'numeric' })}</div><h1>Billing</h1></div>
+    <div class="actions"><button class="secondary" data-act="billExport">${icon('share', 'sm')}Export CSV</button><button class="secondary" data-act="billSetup">${icon('settings', 'sm')}Settings</button></div></div>
+  <div class="stack">
+    <div class="card"><div class="stats">
+      <div class="stat"><b>${money(owed)}</b><span>owed to you now</span></div>
+      <div class="stat"><b>${money(chargedM)}</b><span>charged this month</span></div>
+      <div class="stat"><b>${money(paidM)}</b><span>paid this month</span></div></div></div>
+    <div class="card"><h2>Students</h2>
+      ${rows.length ? `<div class="tableWrap"><table class="impTable billTable"><thead><tr><th>Student</th><th>Balance</th><th class="wide">This month</th><th class="wide">Paid this month</th><th class="wide">Price</th><th></th></tr></thead><tbody>
+        ${rows.map(({ s, L, charged, paid, lessonsM }) => { const r = billRate(s.id);
+          return `<tr><td><button class="linkBtn" data-bill="${s.id}">${esc(s.name)}</button></td>
+            <td><b class="${L.balance > 0.004 ? 'owe' : L.balance < -0.004 ? 'credit' : ''}">${L.balance < -0.004 ? money(-L.balance) + ' credit' : money(L.balance)}</b></td>
+            <td class="wide">${money(charged)}<span class="muted small"> · ${lessonsM} ${lessonsM === 1 ? 'lesson' : 'lessons'}</span></td><td class="wide">${money(paid)}</td>
+            <td class="wide">${money(r.rate)}<span class="muted small"> / ${r.per}</span></td>
+            <td style="white-space:nowrap;text-align:right"><button class="secondary small" data-pay="${s.id}">${icon('plus', 'sm')}Payment</button> <button class="ghost small wide" data-bill="${s.id}">Details</button></td></tr>`; }).join('')}
+      </tbody></table></div>` : '<div class="empty">Add students to start billing.</div>'}
+      <p class="small muted" style="margin-top:10px">Lessons count once their time has passed, unless you mark them canceled or moved${B.noshow ? '' : ' or a no-show'}. Change a lesson’s status on the Schedule page.</p></div>
+  </div>`;
+}
+function billSetupModal() {
+  const B = studio.billing || {}, first = dayKey(new Date(today().getFullYear(), today().getMonth(), 1));
+  openModal(`${mhead('Billing settings')}
+    <div class="fields">
+      <div class="fields three"><label class="field">Price <input type="number" id="bRate" min="0" step="0.01" value="${B.rate ?? ''}" placeholder="e.g. 35"></label>
+        <label class="field">Per <select id="bPer"><option value="lesson" ${B.per !== 'hour' ? 'selected' : ''}>lesson</option><option value="hour" ${B.per === 'hour' ? 'selected' : ''}>hour (by lesson length)</option></select></label>
+        <label class="field">Currency <select id="bCur">${CURRENCIES.map(c => `<option ${(B.currency || 'USD') === c ? 'selected' : ''}>${c}</option>`).join('')}</select></label></div>
+      <label class="field">Start counting lessons from <input type="date" id="bSince" value="${B.since || first}"></label>
+      <label class="small" style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" id="bNoshow" style="width:auto" ${B.noshow !== false ? 'checked' : ''}><span>Charge for no-shows</span></label>
+      <label class="field">Payment link or instructions (optional) <input type="text" id="bPay" maxlength="200" value="${esc(B.payLink || '')}" placeholder="e.g. https://venmo.com/u/yourname or “Zelle to 555-0100”"></label>
+      <p class="small muted" style="margin:0">Each student can have their own price (open their details). Statements you send families include the payment link.</p>
+      <div class="gateErr" id="bErr"></div>
+    </div>
+    <footer><div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="bSave">Save</button></div></footer>`, m => {
+    m.querySelector('#bSave').onclick = async () => {
+      const rate = +val('bRate');
+      if (!(rate >= 0) || val('bRate') === '') return (m.querySelector('#bErr').textContent = 'Enter your lesson price.');
+      if (!val('bSince')) return (m.querySelector('#bErr').textContent = 'Choose a start date.');
+      studio.billing = { rate, per: val('bPer'), currency: val('bCur'), since: val('bSince'), noshow: m.querySelector('#bNoshow').checked, payLink: val('bPay') };
+      await api.updateStudio({ billing: studio.billing });
+      closeModal(); toast('Billing saved'); render();
+    };
+  });
+}
+function paymentModal(sid, pid) {
+  const s = students[sid], p = pid ? billing[sid]?.payments?.[pid] : null, bal = ledger(sid).balance;
+  openModal(`${mhead((p ? 'Edit payment · ' : 'Record payment · ') + esc(firstName(s.name)))}
+    <div class="fields">
+      <div class="fields three"><label class="field">Amount <input type="number" id="pAmt" min="0.01" step="0.01" value="${p ? p.amount : bal > 0 ? bal.toFixed(2) : ''}"></label>
+        <label class="field">Date <input type="date" id="pDate" value="${p?.date || dayKey()}"></label>
+        <label class="field">Method <select id="pMethod">${PAY_METHODS.map(x => `<option ${p?.method === x ? 'selected' : ''}>${x}</option>`).join('')}</select></label></div>
+      <label class="field">Note (optional) <input type="text" id="pNote" maxlength="80" value="${esc(p?.note || '')}" placeholder="e.g. September lessons"></label>
+      <div class="gateErr" id="pErr"></div>
+    </div>
+    <footer>${p ? '<button class="danger" id="pDel">Delete</button>' : ''}<div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="pSave">Save</button></div></footer>`, m => {
+    m.querySelector('#pSave').onclick = async () => {
+      const amount = Math.round(+val('pAmt') * 100) / 100;
+      if (!(amount > 0)) return (m.querySelector('#pErr').textContent = 'Enter the amount paid.');
+      await api.saveBilling(sid, { [`payments.${pid || newId()}`]: { amount, date: val('pDate') || dayKey(), method: val('pMethod'), note: val('pNote') } });
+      closeModal(); toast('Payment recorded');
+    };
+    m.querySelector('#pDel')?.addEventListener('click', async () => { if (!confirm('Delete this payment?')) return; await api.saveBilling(sid, { [`payments.${pid}`]: DEL }); closeModal(); });
+  });
+}
+// A plain-text statement a teacher can paste into a message or email to the family
+function statementText(sid, from) {
+  const s = students[sid], L = ledger(sid), B = studio.billing || {}, first = firstName(s.name);
+  const inRange = L.entries.filter(e => e.date >= from), before = L.entries.filter(e => e.date < from).at(-1)?.balance || 0;
+  const lessons = inRange.filter(e => e.kind === 'lesson'), charges = lessons.reduce((a, e) => a + e.amount, 0);
+  const lines = [`${first}’s lessons with ${studio.teacherName || studio.studioName} since ${fmtDate(from, { month: 'long', day: 'numeric' })}:`, ''];
+  if (Math.abs(before) > 0.004) lines.push(`Previous balance: ${money(before)}`);
+  lines.push(`${lessons.length} ${lessons.length === 1 ? 'lesson' : 'lessons'} (${lessons.map(e => fmtDate(e.date, { month: 'short', day: 'numeric' })).join(', ') || 'none'}): ${money(charges)}`);
+  for (const e of inRange.filter(e => e.kind === 'adj')) lines.push(`${e.text}: ${money(e.amount)}`);
+  for (const e of inRange.filter(e => e.kind === 'pay')) lines.push(`Paid ${fmtDate(e.date, { month: 'short', day: 'numeric' })}: −${money(-e.amount)}`);
+  lines.push('', L.balance > 0.004 ? `Balance due: ${money(L.balance)}` : L.balance < -0.004 ? `Credit: ${money(-L.balance)}` : 'All paid up – thank you!');
+  if (L.balance > 0.004 && B.payLink) lines.push(`You can pay here: ${B.payLink}`);
+  lines.push('', 'Thank you!', studio.teacherName || '');
+  return lines.join('\n').trim();
+}
+function billDetailModal(sid) {
+  const s = students[sid], b = billing[sid] || {}, L = ledger(sid), B = studio.billing || {}, r = billRate(sid);
+  const monthStart = dayKey(new Date(today().getFullYear(), today().getMonth(), 1)), from = [B.since, monthStart].sort().at(-1);
+  openModal(`${mhead('Billing · ' + esc(s.name))}
+    <div class="fields">
+      <div class="stats"><div class="stat"><b class="${L.balance > 0.004 ? 'owe' : ''}">${L.balance < -0.004 ? money(-L.balance) + ' credit' : money(L.balance)}</b><span>balance</span></div>
+        <div class="stat"><b>${money(r.rate)}</b><span>per ${r.per}${b.rate != null ? ' (their own price)' : ''}</span></div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="accent small" id="dPay">${icon('plus', 'sm')}Record payment</button><button class="secondary small" id="dAdj">Add a charge or credit</button>
+        <button class="secondary small" id="dStmt">${icon('copy', 'sm')}Statement for the family</button><button class="ghost small" id="dPrice">Price and opening balance</button></div>
+      <div class="billPanel" id="dPanel" hidden></div>
+      <div class="tableWrap" style="max-height:340px;overflow:auto"><table class="impTable"><thead><tr><th>Date</th><th>What</th><th style="text-align:right">Amount</th><th style="text-align:right">Balance</th></tr></thead><tbody>
+        ${L.entries.length ? L.entries.slice().reverse().map(e => `<tr><td style="white-space:nowrap">${fmtDate(e.date, { month: 'short', day: 'numeric', year: e.date.slice(0, 4) === String(today().getFullYear()) ? undefined : 'numeric' })}</td>
+          <td>${e.kind === 'pay' ? `<button class="linkBtn" data-editpay="${e.id}">${esc(e.text)}</button>` : e.kind === 'adj' ? `${esc(e.text)} <button class="ghost small" data-deladj="${e.id}" style="padding:0 4px" aria-label="Remove">${icon('x', 'sm')}</button>` : esc(e.text)}</td>
+          <td style="text-align:right;white-space:nowrap" class="${e.amount < 0 ? 'credit' : ''}">${e.amount < 0 ? '−' + money(-e.amount) : money(e.amount)}</td><td style="text-align:right;white-space:nowrap">${money(e.balance)}</td></tr>`).join('')
+          : '<tr><td colspan="4" class="muted">No lessons or payments yet.</td></tr>'}</tbody></table></div>
+    </div>
+    <footer><div class="right"><button class="secondary" data-close>Done</button></div></footer>`, m => {
+    const panel = m.querySelector('#dPanel');
+    const showPanel = html => { panel.innerHTML = html; panel.hidden = false; };
+    m.querySelector('#dPay').onclick = () => paymentModal(sid);
+    m.querySelectorAll('[data-editpay]').forEach(x => x.onclick = () => paymentModal(sid, x.dataset.editpay));
+    m.querySelectorAll('[data-deladj]').forEach(x => x.onclick = async () => { if (confirm('Remove this charge or credit?')) { await api.saveBilling(sid, { [`adjustments.${x.dataset.deladj}`]: DEL }); billDetailModal(sid); } });
+    m.querySelector('#dAdj').onclick = () => {
+      showPanel(`<div class="fields three"><label class="field">Amount <input type="number" id="aAmt" step="0.01" placeholder="e.g. 20"></label>
+          <label class="field">Type <select id="aKind"><option value="1">Charge (they owe more)</option><option value="-1">Credit (they owe less)</option></select></label>
+          <label class="field">Date <input type="date" id="aDate" value="${dayKey()}"></label></div>
+        <label class="field">What for <input type="text" id="aNote" maxlength="80" placeholder="e.g. Recital fee · Sheet music · Makeup credit"></label>
+        <div style="display:flex;gap:8px;justify-content:flex-end"><button class="primary small" id="aSave">Add</button></div>`);
+      panel.querySelector('#aSave').onclick = async () => {
+        const amt = Math.round(Math.abs(+val('aAmt')) * 100) / 100; if (!amt) return;
+        await api.saveBilling(sid, { [`adjustments.${newId()}`]: { amount: amt * +val('aKind'), date: val('aDate') || dayKey(), note: val('aNote') } });
+        billDetailModal(sid); toast('Added');
+      };
+    };
+    m.querySelector('#dPrice').onclick = () => {
+      showPanel(`<div class="fields three"><label class="field">${esc(firstName(s.name))}’s price <input type="number" id="rRate" min="0" step="0.01" value="${b.rate ?? ''}" placeholder="Studio price: ${B.rate ?? ''}"></label>
+          <label class="field">Per <select id="rPer"><option value="">Studio setting (${B.per === 'hour' ? 'hour' : 'lesson'})</option><option value="lesson" ${b.per === 'lesson' ? 'selected' : ''}>lesson</option><option value="hour" ${b.per === 'hour' ? 'selected' : ''}>hour</option></select></label>
+          <label class="field">Owed before ${fmtDate(B.since, { month: 'short', day: 'numeric' })} <input type="number" id="rOpen" step="0.01" value="${b.opening || ''}" placeholder="0"></label></div>
+        <p class="small muted" style="margin:0">Leave the price empty to use the studio price. A negative opening balance is a credit.</p>
+        <div style="display:flex;gap:8px;justify-content:flex-end"><button class="primary small" id="rSave">Save</button></div>`);
+      panel.querySelector('#rSave').onclick = async () => {
+        await api.saveBilling(sid, { rate: val('rRate') === '' ? DEL : Math.max(0, +val('rRate')), per: val('rPer') || DEL, opening: Math.round((+val('rOpen') || 0) * 100) / 100 });
+        billDetailModal(sid); toast('Saved');
+      };
+    };
+    m.querySelector('#dStmt').onclick = () => {
+      const text = statementText(sid, from), email = s.parentEmail || '';
+      showPanel(`<label class="field">Since <input type="date" id="sFrom" value="${from}"></label>
+        <textarea id="sText" rows="9" style="font-size:13.5px">${esc(text)}</textarea>
+        <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap"><button class="secondary small" id="sMail">${icon('mail', 'sm')}Email it</button><button class="primary small" id="sCopy">${icon('copy', 'sm')}Copy</button></div>`);
+      const mail = () => `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(`${firstName(s.name)}’s lessons – statement`)}&body=${encodeURIComponent(panel.querySelector('#sText').value)}`;
+      panel.querySelector('#sFrom').onchange = e => { panel.querySelector('#sText').value = statementText(sid, e.target.value || from); };
+      panel.querySelector('#sMail').onclick = e => { e.preventDefault(); location.href = mail(); };
+      panel.querySelector('#sCopy').onclick = async () => { try { await navigator.clipboard.writeText(panel.querySelector('#sText').value); toast('Statement copied'); } catch { panel.querySelector('#sText').select(); } };
+    };
+  }, { focus: false });
+}
+// Every ledger line for every student, for a spreadsheet, QuickBooks or another studio tool
+function billingCsv() {
+  const q = v => /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v);
+  const rows = [['Date', 'Student', 'Type', 'Description', 'Amount', 'Balance', 'Currency']];
+  for (const s of active()) for (const e of ledger(s.id).entries)
+    rows.push([e.date, s.name, { open: 'Opening balance', lesson: 'Lesson', adj: e.amount < 0 ? 'Credit' : 'Charge', pay: 'Payment' }[e.kind], e.text, e.amount.toFixed(2), e.balance.toFixed(2), studio.billing?.currency || 'USD']);
+  const blob = new Blob([rows.map(r => r.map(q).join(',')).join('\r\n')], { type: 'text/csv' }), a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = `allegrow-billing-${dayKey()}.csv`; document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
 // ============================================================================================
 // Interactions
 // ============================================================================================
 function bindView() {
   const V = $('view');
-  V.querySelectorAll('[data-student]').forEach(b => b.onclick = () => { sub = {}; go('student', { id: b.dataset.student }); });
+  V.querySelectorAll('[data-student]').forEach(b => b.onclick = () => { sub = b.dataset.stab ? { tab: b.dataset.stab } : {}; go('student', { id: b.dataset.student }); });
+  if (route.view === 'student' && students[route.id]) bindClips(V, route.id);
   V.querySelectorAll('[data-go2]').forEach(b => b.onclick = () => { sub = {}; go(b.dataset.go2); });
   V.querySelectorAll('[data-lesson]').forEach(b => b.onclick = () => lessonModal(b.dataset.lesson));
   V.querySelectorAll('[data-pedit]').forEach(b => b.onclick = () => practiceEditModal(route.id, b.dataset.pedit));
+  V.querySelectorAll('[data-bill]').forEach(b => b.onclick = () => billDetailModal(b.dataset.bill));
+  V.querySelectorAll('[data-pay]').forEach(b => b.onclick = () => paymentModal(b.dataset.pay));
   V.querySelectorAll('[data-thlevel]').forEach(sel => sel.onchange = () => api.patchStudent(route.id, { [`theoryPlan.levels.${sel.dataset.thlevel}`]: { level: +sel.value, at: new Date().toISOString() } }).then(() => toast('Level set')));
   V.querySelectorAll('[data-thdeck]').forEach(c => c.onchange = () => api.patchStudent(route.id, { [`theoryPlan.decks.${c.dataset.thdeck}`]: c.checked }));
   V.querySelectorAll('[data-thclef]').forEach(c => c.onchange = () => {
@@ -1528,6 +1825,7 @@ function bindView() {
     report: () => { sub = { sid: route.id }; go('reports'); }, addAssign: () => assignModal(route.id),
     addLesson: () => extraLessonModal(route.view === 'student' ? route.id : null),
     calendar: () => calendarEmailModal(),
+    billSetup: () => billSetupModal(), billExport: () => billingCsv(),
     addEvent: () => eventModal(null, route.view === 'student' ? route.id : null),
     unarchive: () => api.patchStudent(route.id, { archived: false }),
     thGoal: () => theoryGoalModal(route.id),
@@ -1681,7 +1979,7 @@ function studentModal(sid, scrollTo) {
     if (ar) ar.onclick = async () => {
       if (s.archived) {
         if (!confirm(`Delete ${s.name} permanently? Their family’s app will be disconnected. This can’t be undone.`)) return;
-        await api.deleteStudent(sid); closeModal(); go('students'); toast('Student deleted');
+        await Promise.all(clipsOf(sid).map(c => api.deleteClip(sid, c.id))); await api.deleteStudent(sid); closeModal(); go('students'); toast('Student deleted');
       } else { await api.patchStudent(sid, { archived: true }); closeModal(); toast('Archived'); }
     };
   });
@@ -2534,6 +2832,12 @@ function seedDemo() {
   studio.terms = [{ id: 't1', name: `Spring ${yr}`, start: `${yr}-01-12`, end: `${yr}-05-22` }, { id: 't2', name: `Fall ${yr}`, start: fallStart, end: fallEnd },
                   { id: 't3', name: `Spring ${yr + 1}`, start: `${yr + 1}-01-11`, end: `${yr + 1}-05-21` }];
   const t = today(), rnd = (a, b) => a + Math.random() * (b - a);
+  studio.billing = { rate: 35, per: 'lesson', currency: 'USD', noshow: true, since: dayKey(new Date(t.getFullYear(), t.getMonth() - 1, 1)), payLink: 'https://venmo.com/u/ms-alvarez' };
+  billing = {
+    'demo-student-0-xxxxxxxxxxxx': { payments: { p1: { amount: 140, date: dayKey(new Date(t.getFullYear(), t.getMonth(), 2)), method: 'Venmo', note: 'Last month' } } },
+    'demo-student-1-xxxxxxxxxxxx': { rate: 50, payments: { p1: { amount: 200, date: dayKey(addDays(t, -3)), method: 'Check' } } },
+    'demo-student-3-xxxxxxxxxxxx': { opening: 35, adjustments: { a1: { amount: 15, date: dayKey(addDays(t, -10)), note: 'Recital fee' } } }
+  };
   const kids = [
     ['Maya Chen', 'violin', 0, 2, '16:00', 30, 25, .9], ['Leo Park', 'cello', 1, 2, '16:45', 45, 30, .7], ['Sam Rivera', 'piano', 3, 3, '15:30', 30, 20, .5],
     ['Ava Johnson', 'violin', 5, 4, '17:00', 30, 20, .85], ['Noah Williams', 'voice', 2, 1, '16:00', 45, 30, .3], ['Zoe Martin', 'viola', 7, 4, '16:00', 30, 20, 0]
@@ -2618,6 +2922,13 @@ function seedDemo() {
   for (const id of ids) students[id].insights = insightsFor(null, students[id].insightOverride);
   students[ids[0]].cheers = { s1: { kind: 'star', note: 'Your shifting is so much smoother!', date: dayKey(addDays(t, -2)) }, b1: { kind: 'badge', title: 'Recital ready', icon: 'trophy', note: 'You know the Seitz by heart now.', date: dayKey(addDays(t, -9)) } };
   students[ids[0]].cheersSeen = { b1: dayKey(addDays(t, -8)) };
+  // two recordings from Maya: one new, one you've replied to
+  const mayaA = Object.values(students[ids[0]].assignments || {}).filter(x => x.status === 'active');
+  clips = {
+    c1: { id: 'c1', sid: ids[0], at: new Date(t.getTime() + 17.2 * 36e5 - 864e5).toISOString(), assignment: mayaA[0]?.id || null, title: mayaA[0]?.title || 'Recording', secs: 4, heard: false },
+    c2: { id: 'c2', sid: ids[0], at: new Date(t.getTime() + 16.5 * 36e5 - 4 * 864e5).toISOString(), assignment: mayaA[1]?.id || null, title: mayaA[1]?.title || 'Recording', secs: 4, heard: true,
+          reply: 'Lovely tone! Keep the bow closer to the bridge on the long notes.', replyAt: new Date(t.getTime() - 3 * 864e5).toISOString() }
+  };
 }
 
 start();

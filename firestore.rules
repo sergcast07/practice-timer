@@ -91,6 +91,30 @@ service cloud.firestore {
         // a photo is a small picture (about 10 KB), never a big file
         && (!('photo' in request.resource.data) || request.resource.data.photo == null
             || (request.resource.data.photo is string && request.resource.data.photo.size() < 40000));
+
+      // Recordings a student sends their teacher (short audio clips, made only when someone presses Record).
+      // clips/{id} = who, when, which assignment and the teacher's reply; clipData/{id} = the audio itself.
+      // The family (holds the code) sends and can delete them; only the student's teacher can reply.
+      function teacherOf() { return get(/databases/$(db)/documents/students/$(sid)).data.studioId; }
+      match /clips/{cid} {
+        allow get, list: if sid.size() >= 20;
+        allow create: if sid.size() >= 20
+          && request.resource.data.keys().hasOnly(['at', 'assignment', 'title', 'secs', 'mime', 'kidName', 'studioId'])
+          && request.resource.data.studioId == teacherOf()
+          && request.resource.data.secs is number && request.resource.data.secs <= 120
+          && request.resource.data.get('title', '').size() <= 200;
+        allow update: if request.auth != null && teacherOf() == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reply', 'replyAt', 'heard'])
+          && request.resource.data.get('reply', '').size() <= 1000;
+        allow delete: if sid.size() >= 20;
+      }
+      match /clipData/{cid} {
+        allow get: if sid.size() >= 20;
+        allow create: if sid.size() >= 20 && request.resource.data.keys().hasOnly(['data', 'mime'])
+          && request.resource.data.data is string && request.resource.data.data.size() < 900000;
+        allow delete: if sid.size() >= 20;
+        allow list, update: if false;
+      }
     }
   }
 }

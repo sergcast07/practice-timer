@@ -36,6 +36,11 @@
   .hero .lead { font-size: clamp(18px, 2.2vw, 21px); color: var(--ink-2); margin: 18px 0 28px; max-width: 34em; }
   .hero .ctas { display: flex; gap: 10px; flex-wrap: wrap; }
   .hero .small { margin-top: 14px; font-size: 14px; color: var(--muted); }
+  .proof { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: -12px 0 24px; font-size: 14.5px; font-weight: 600; color: var(--ink-2); }
+  .proof span { display: inline-flex; align-items: center; gap: 6px; }
+  .proof .ic { width: 17px; height: 17px; color: var(--leaf); }
+  .tonara { display: grid; grid-template-columns: 1.4fr 1fr; gap: 28px; align-items: center; }
+  @media (max-width: 760px) { .tonara { grid-template-columns: 1fr; } }
   @media (max-width: 860px) { .hero { grid-template-columns: 1fr; padding-top: 16px; } }
 
   /* the practice ring illustration */

@@ -453,6 +453,13 @@
   .aItem { padding: 12px 0; border-top: 1px solid var(--line); display: flex; gap: 12px; align-items: flex-start; }
   .tHead + .aItem { border-top: 0; }
   .aItem .grow { flex: 1; min-width: 0; }
+  .clipNote { display: flex; gap: 6px; align-items: flex-start; font-size: 13px; color: var(--ink-2); margin-top: 8px; }
+  .clipNote .who { font-weight: 700; }
+  .clipNote .ic { width: 15px; height: 15px; flex: none; margin-top: 2px; color: var(--kid); }
+  .recNow { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 28px; font-variant-numeric: tabular-nums; margin: 10px 0 16px; }
+  .recNow .muted { font-size: 16px; }
+  .recDot { width: 14px; height: 14px; border-radius: 50%; background: var(--danger); animation: recBlink 1s infinite; }
+  @keyframes recBlink { 50% { opacity: .25; } }
   .aItem b { display: block; font-size: 16px; }
   .aItem .det { font-size: 14px; color: var(--ink-2); margin-top: 2px; white-space: pre-wrap; }
   .aItem .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
@@ -1725,6 +1732,8 @@ function renderParent() {
         <div class="opt"><span>Photo<br><small class="muted">A small picture so ${k.link ? 'the teacher' : 'a teacher'} can tell who’s who</small></span>
           <span style="display:flex;gap:6px"><button class="secondary" data-photo="${k.id}">${k.photo ? 'Change' : 'Add'}</button>${k.photo ? `<button class="ghost" data-unphoto="${k.id}">Remove</button>` : ''}</span></div>
         <label class="opt">Chime at goal <input type="checkbox" class="toggle" data-chime="${k.id}" ${k.chime !== false ? 'checked' : ''}></label>
+        ${k.link && teacherData[k.link] && !teacherData[k.link].missing ? `<label class="opt"><span>Recordings for ${esc(teacherData[k.link].teacherName || 'the teacher')}<br><small class="muted">Lets ${esc(k.name)} record an assignment and send it. Only sent when they press Send.</small></span>
+          <input type="checkbox" class="toggle" data-allowrec="${k.id}" ${k.allowRec ? 'checked' : ''}></label>` : ''}
         ${k.link ? (t => `<div class="teacherBox"><div class="grow"><span class="muted small">Teacher</span>
             <b>${t?.missing ? 'Connection removed by the teacher' : t ? esc(t.teacherName) : 'Connected to a teacher'}</b>${t && !t.missing ? `<span class="muted small">${esc(t.studioName || '')}</span>` : ''}</div>
           <div class="btnPair">${t?.missing ? '' : `<button class="secondary" data-switch="${k.id}">Switch teacher</button>`}
@@ -1753,6 +1762,7 @@ function renderParent() {
     k.photo = null; saveKids(); pushTeacher(k); renderParent();
   });
   document.querySelectorAll('[data-plan]').forEach(b => b.onclick = () => planDialog(kids.find(k => k.id === b.dataset.plan), 'parent'));
+  document.querySelectorAll('[data-allowrec]').forEach(c => c.onchange = () => { kids.find(k => k.id === c.dataset.allowrec).allowRec = c.checked; saveKids(); });
   document.querySelectorAll('[data-chime]').forEach(c => c.onchange = () => {
     kids.find(k => k.id === c.dataset.chime).chime = c.checked; saveKids();
   });
@@ -2201,9 +2211,10 @@ const firstWord = s => (s || '').trim().split(/\s+/)[0];
 
 async function watchTeachers() {
   const want = new Set(kids.filter(k => k.link).map(k => k.link));
-  for (const sid of Object.keys(teacherUnsubs)) if (!want.has(sid)) { teacherUnsubs[sid](); delete teacherUnsubs[sid]; delete teacherData[sid]; }
+  for (const sid of Object.keys(teacherUnsubs)) if (!want.has(sid)) { teacherUnsubs[sid](); delete teacherUnsubs[sid]; delete teacherData[sid]; clipUnsubs[sid]?.(); delete clipUnsubs[sid]; delete clips[sid]; }
   if (!want.size) return;
   try { await loadFirebase(); } catch (e) { console.error(e); return; }
+  for (const sid of want) watchClips(sid);
   for (const sid of want) if (!teacherUnsubs[sid])
     teacherUnsubs[sid] = F.onSnapshot(F.doc(db, 'students', sid), snap => {
       teacherData[sid] = snap.exists() ? snap.data() : { missing: true };
@@ -2246,10 +2257,10 @@ async function startLink(code, forKid) {
     <h2 style="text-align:center">Connect to ${esc(t.teacherName)}</h2>
     <p class="muted" style="text-align:center">${esc(t.studioName)} invited <b>${esc(t.name)}</b>.${forKid ? '' : ' Which player is this?'}</p>
     ${old && !old.missing ? `<p class="small" style="text-align:center;margin-top:8px">This replaces ${esc(forKid.name)}’s connection to <b>${esc(old.teacherName)}</b>, who will stop seeing new practice.</p>
-      <label class="consent"><input type="checkbox" id="lkWipe"><span>Also remove the practice history, badges and photo already shared with ${esc(old.teacherName)}.</span></label>` : ''}
+      <label class="consent"><input type="checkbox" id="lkWipe"><span>Also remove the practice history, badges, photo and recordings already shared with ${esc(old.teacherName)}.</span></label>` : ''}
     <label class="consent"><input type="checkbox" id="lkConsent"><span>I’m this child’s parent or guardian. I agree to share their practice time, practice scores, badges and photo (if I add one) with
       ${esc(t.teacherName)}, and to receive their assignments and lesson times, as described in the <a href="privacy" target="_blank" rel="noopener">privacy policy</a>.
-      Sound is never recorded or sent anywhere.</span></label>
+      The practice timer never records sound; recordings for the teacher stay off unless you turn them on.</span></label>
     <p class="small" id="lkErr" style="color:var(--danger);min-height:1.2em;text-align:center"></p>
     <div class="pickList">
       ${choices.map(k => `<button class="secondary block" data-pick="${k.id}"><div class="avatar" style="--kid:${kidColor(k)}">${face(k)}</div>${forKid ? `Connect ${esc(k.name)}` : esc(k.name)}${k.link === code ? '<span class="muted small">(already connected)</span>' : ''}</button>`).join('')}
@@ -2293,6 +2304,8 @@ async function releaseTeacher(sid, wipe) {
     // Recorded as the parent withdrawing consent, so the teacher can see the family left (and when)
     await F.updateDoc(F.doc(db, 'students', sid), { linkedAt: null, consent: { by: 'parent', withdrawnAt: new Date().toISOString(), removedData: !!wipe, version: 1 },
       ...(wipe ? { practice: null, badges: null, photo: null } : {}) });
+    if (wipe) for (const d of (await F.getDocs(F.collection(db, 'students', sid, 'clips'))).docs)     // and the recordings sent
+      await Promise.all([F.deleteDoc(d.ref), F.deleteDoc(F.doc(db, 'students', sid, 'clipData', d.id))]);
   } catch (e) { console.error(e); }
 }
 function unlink(k) {
@@ -2305,7 +2318,7 @@ function unlink(k) {
       <li>${who} stops seeing ${esc(k.name)}’s new practice.</li>
       <li>${esc(k.name)} stops seeing their assignments, lesson times and badges from ${who}.</li>
       <li>Practice history stays on this device, and you can connect to a new teacher any time.</li></ul>
-    <label class="consent"><input type="checkbox" id="ulWipe"><span>Also remove the practice history, badges and photo already shared with ${who}.</span></label>
+    <label class="consent"><input type="checkbox" id="ulWipe"><span>Also remove the practice history, badges, photo and recordings already shared with ${who}.</span></label>
     <div class="pickList" style="margin-top:12px">
       <button class="secondary block dangerText" id="ulGo">Disconnect</button>
       <button class="ghost block" id="ulNo">Cancel</button></div>`;
@@ -2352,7 +2365,9 @@ function renderTeacherCard() {
       <div class="grow"><b>${esc(a.title)}</b>${a.details ? `<div class="det">${esc(a.details)}</div>` : ''}
         <div class="chips">${a.bpm ? `<button class="chipBtn" data-bpm="${a.bpm}" title="Set the metronome to ${a.bpm} bpm">${icon('metronome')}${a.bpm} bpm</button>` : ''}
           ${a.minutes ? `<span class="chipBtn">${icon('clock')}${a.minutes} min a day</span>` : ''}
-          ${a.due ? `<span class="chipBtn">Due ${parseDay(a.due).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}</span>` : ''}</div></div></div>`; }).join('')
+          ${a.due ? `<span class="chipBtn">Due ${parseDay(a.due).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}</span>` : ''}
+          <button class="chipBtn" data-rec="${a.id}" title="Record yourself playing it for ${esc(t.teacherName)}">${icon('mic')}Record</button></div>
+        ${(c => c ? `<div class="clipNote">${icon('mic')}<span>Sent ${new Date(c.at).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}${c.reply ? ` · <span class="who">${esc(t.teacherName)}:</span> “${esc(c.reply)}”` : c.heard ? ` · ${esc(t.teacherName)} listened` : ''}</span></div>` : '')((clips[kid.link] || []).find(c => c.assignment === a.id))}</div></div>`; }).join('')
       : '<p class="muted small" style="padding:4px 0 2px">No assignments right now.</p>'}
     ${nl ? `<div class="tInfo">${icon('calendar')}<span class="grow">Next lesson ${lessonLabel(nl)}</span><button class="ghost small" data-cal style="padding:4px 6px">Add to calendar</button></div>` : ''}
     ${evs.map(e => `<div class="tInfo">${icon('trophy')}<span>${esc(e.title)}${e.piece ? ' · ' + esc(e.piece) : ''} · <b>${countdown(e.date)}</b></span></div>`).join('')}
@@ -2364,7 +2379,97 @@ function renderTeacherCard() {
     F.updateDoc(F.doc(db, 'students', kid.link), { [`progress.${b.dataset.tick}.${today0}`]: on ? true : F.deleteField() }).catch(e => console.error(e));
   });
   card.querySelectorAll('[data-bpm]').forEach(b => b.onclick = () => { setBpm(+b.dataset.bpm); if (!metroOn) $('metroBtn').click(); });
+  card.querySelectorAll('[data-rec]').forEach(b => b.onclick = () => recordDialog(kid, t.assignments?.[b.dataset.rec]));
   card.querySelector('[data-cal]')?.addEventListener('click', () => calendarDialog(kid));
+}
+
+// ---------- Recordings for the teacher ----------
+// A student can record a short clip (up to 90 s) for an assignment and send it. It's kept with the student's record:
+// students/{sid}/clips/{id} (when, which assignment, the teacher's reply) and students/{sid}/clipData/{id} (the audio,
+// small and compressed). Only this family and the teacher can reach it, and the newest CLIPS_KEEP are kept.
+// The practice timer itself still never records: a recording is only made when someone presses Record.
+const CLIP_MAX_S = 90, CLIP_MAX_BYTES = 620000, CLIPS_KEEP = 12;
+let clips = {}, clipUnsubs = {};                 // {sid: [{id, at, assignment, title, secs, reply, heard, …}]} newest first
+function watchClips(sid) {
+  if (clipUnsubs[sid]) return;
+  clipUnsubs[sid] = F.onSnapshot(F.query(F.collection(db, 'students', sid, 'clips'), F.orderBy('at', 'desc'), F.limit(40)), q => {
+    clips[sid] = q.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (screen === 'practice' && !listening) renderTeacherCard();
+  }, e => console.error(e));
+}
+const clipMime = () => ['audio/webm;codecs=opus', 'audio/mp4', 'audio/ogg;codecs=opus', 'audio/webm'].find(x => window.MediaRecorder?.isTypeSupported?.(x)) || '';
+const blobToB64 = b => new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1] || ''); r.onerror = no; r.readAsDataURL(b); });
+const secsText = s => `${Math.floor(s / 60)}:${pad(Math.round(s) % 60)}`;
+function recordDialog(k, a) {
+  const t = teacherOf(k), card = $('linkCard'), sid = k.link;
+  if (!t || !window.MediaRecorder) { alert('Recording isn’t supported in this browser. Try Chrome or Safari.'); return; }
+  let stream = null, rec = null, chunks = [], size = 0, started = 0, timer = null, blob = null, url = null, secs = 0;
+  card.style.setProperty('--kid', kidColor(k));
+  if (!k.allowRec) {                                 // a recording is a child's voice or playing: a parent says yes first
+    card.innerHTML = `<div class="medal">${icon('mic')}</div><h2 style="text-align:center">Ask a parent first</h2>
+      <p class="muted" style="text-align:center">A parent can let ${esc(k.name)} send recordings to ${esc(t.teacherName)} in Parent settings.</p>
+      <div class="pickList"><button class="primary" id="rParent" style="--kid:var(--brand);color:var(--bg);justify-content:center">${icon('lock')}Parent settings</button>
+        <button class="ghost block" id="rCancel" style="justify-content:center">Not now</button></div>`;
+    card.querySelector('#rCancel').onclick = () => { $('linkDlg').hidden = true; };
+    card.querySelector('#rParent').onclick = () => { $('linkDlg').hidden = true; askPin(); };
+    $('linkDlg').hidden = false;
+    return;
+  }
+  const stopAll = () => { clearInterval(timer); try { rec?.state === 'recording' && rec.stop(); } catch {} stream?.getTracks().forEach(x => x.stop()); stream = null; };
+  const close = () => { stopAll(); if (url) URL.revokeObjectURL(url); $('linkDlg').hidden = true; };
+  const head = `<div class="medal">${icon('mic')}</div><h2 style="text-align:center">Record for ${esc(t.teacherName)}</h2>
+    <p class="muted" style="text-align:center;margin-top:-4px">${a ? esc(a.title) : 'A recording'} · up to ${CLIP_MAX_S} seconds</p>`;
+  const idle = (msg = '') => {
+    card.innerHTML = `${head}<p class="small" style="text-align:center;color:var(--danger);min-height:1.2em">${esc(msg)}</p>
+      <div class="pickList"><button class="primary" id="rStart" style="--kid:var(--brand);color:var(--bg);justify-content:center">${icon('mic')}Start recording</button>
+      <button class="ghost block" id="rCancel" style="justify-content:center">Cancel</button></div>
+      <p class="muted small" style="text-align:center;margin-top:8px">Only sent when you press Send. ${esc(t.teacherName)} can listen and reply.</p>`;
+    card.querySelector('#rCancel').onclick = close;
+    card.querySelector('#rStart').onclick = start;
+  };
+  async function start() {
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: true } }); }
+    catch { return idle('The microphone is blocked. Allow it for this site in your browser settings.'); }
+    const mime = clipMime();
+    rec = new MediaRecorder(stream, { ...(mime ? { mimeType: mime } : {}), audioBitsPerSecond: 48000 });
+    chunks = []; size = 0;
+    rec.ondataavailable = e => { if (e.data.size) { chunks.push(e.data); size += e.data.size; if (size > CLIP_MAX_BYTES && rec.state === 'recording') rec.stop(); } };
+    rec.onstop = () => { secs = Math.min(CLIP_MAX_S, (performance.now() - started) / 1000); stopAll(); blob = new Blob(chunks, { type: rec.mimeType || mime || 'audio/webm' }); review(); };
+    rec.start(1000); started = performance.now();
+    card.innerHTML = `${head}<div class="recNow"><span class="recDot"></span><b id="rTime">0:00</b><span class="muted"> / ${secsText(CLIP_MAX_S)}</span></div>
+      <div class="pickList"><button class="primary" id="rStop" style="--kid:var(--danger);color:#fff;justify-content:center">${icon('stop')}Stop</button></div>`;
+    card.querySelector('#rStop').onclick = () => rec.state === 'recording' && rec.stop();
+    timer = setInterval(() => { const s = (performance.now() - started) / 1000; const el = card.querySelector('#rTime'); if (el) el.textContent = secsText(s); if (s >= CLIP_MAX_S && rec.state === 'recording') rec.stop(); }, 250);
+  }
+  function review(msg = '') {
+    if (url) URL.revokeObjectURL(url);
+    url = URL.createObjectURL(blob);
+    card.innerHTML = `${head}<audio controls src="${url}" style="width:100%;margin:6px 0"></audio>
+      <p class="small" style="text-align:center;color:var(--danger);min-height:1.2em">${esc(msg)}</p>
+      <div class="pickList"><button class="primary" id="rSend" style="--kid:var(--brand);color:var(--bg);justify-content:center">Send to ${esc(t.teacherName)}</button>
+        <button class="secondary block" id="rAgain" style="justify-content:center">${icon('refresh')}Record again</button>
+        <button class="ghost block" id="rCancel" style="justify-content:center">Cancel</button></div>`;
+    card.querySelector('#rCancel').onclick = close;
+    card.querySelector('#rAgain').onclick = () => idle();
+    card.querySelector('#rSend').onclick = async e => {
+      e.target.disabled = true; e.target.textContent = 'Sending…';
+      try {
+        const data = await blobToB64(blob), id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6), b = F.writeBatch(db);
+        b.set(F.doc(db, 'students', sid, 'clipData', id), { data, mime: blob.type });
+        b.set(F.doc(db, 'students', sid, 'clips', id), { at: new Date().toISOString(), assignment: a?.id || null, title: a?.title || '', secs: Math.round(secs), mime: blob.type, kidName: k.name, studioId: t.studioId });
+        await b.commit();
+        // keep only the newest few (the teacher has had a chance to hear the older ones)
+        for (const old of (clips[sid] || []).slice(CLIPS_KEEP - 1)) {
+          F.deleteDoc(F.doc(db, 'students', sid, 'clipData', old.id)).catch(() => {}); F.deleteDoc(F.doc(db, 'students', sid, 'clips', old.id)).catch(() => {});
+        }
+        stopAll(); if (url) URL.revokeObjectURL(url);
+        card.innerHTML = `<div class="medal">${icon('check')}</div><h2 style="text-align:center">Sent!</h2><p class="muted" style="text-align:center">${esc(t.teacherName)} will see it in their studio.</p>`;
+        setTimeout(() => { $('linkDlg').hidden = true; }, 1600);
+      } catch (err) { console.error(err); review('Couldn’t send it. Check the connection and try again.'); }
+    };
+  }
+  $('linkDlg').hidden = false;
+  idle();
 }
 
 // ---------- Calendar ----------
