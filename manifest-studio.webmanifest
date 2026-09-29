@@ -1,8 +1,8 @@
 {
   "id": "./studio",
-  "name": "Allegrow Studio",
-  "short_name": "Allegrow Studio",
-  "description": "Allegrow for music teachers: students' practice, lessons, assignments, badges and reports.",
+  "name": "AlleGrow Studio",
+  "short_name": "AlleGrow Studio",
+  "description": "AlleGrow for music teachers: students' practice, lessons, assignments, badges and reports.",
   "start_url": "./studio",
   "scope": "./",
   "display": "standalone",

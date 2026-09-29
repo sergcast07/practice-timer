@@ -1,7 +1,7 @@
 {
   "id": "./app",
-  "name": "Allegrow",
-  "short_name": "Allegrow",
+  "name": "AlleGrow",
+  "short_name": "AlleGrow",
   "description": "A music practice timer that listens while you play, tracks your progress, and celebrates your practice.",
   "start_url": "./app",
   "scope": "./",

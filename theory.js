@@ -1,4 +1,4 @@
-// Allegrow – music theory games (shared by the family app and the studio)
+// AlleGrow – music theory games (shared by the family app and the studio)
 //
 // Built-in decks have levels: a round is 10 questions, 8 right passes it, and PASSES_TO_LEVEL passed rounds unlock
 // the next level. Teachers can also build their own sets (student.theoryPlan.sets): the kind of question, clefs

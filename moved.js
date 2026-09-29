@@ -1,4 +1,4 @@
-// Allegrow moved from sergcast07.github.io/practice-timer/ to allegrowmusic.com (September 2026).
+// AlleGrow moved from sergcast07.github.io/practice-timer/ to allegrowmusic.com (September 2026).
 // Loaded first on every page, before anything else runs.
 //
 // On the OLD address it forwards each page to the same page at the new one. The family app's data lives in this
@@ -43,11 +43,11 @@
   try {
     const data = JSON.parse(b64dec(m[1]));
     let mine = []; try { mine = JSON.parse(localStorage.getItem('pt-kids')) || []; } catch {}
-    if (!mine.length || confirm('Replace the players and practice history on this device with the ones from the old Allegrow address?')) {
+    if (!mine.length || confirm('Replace the players and practice history on this device with the ones from the old AlleGrow address?')) {
       for (const [k, v] of Object.entries(data)) if (KEYS.test(k) && typeof v === 'string') localStorage.setItem(k, v);
       localStorage.setItem('pt-moved-in', JSON.stringify(new Date().toISOString()));
     }
-  } catch (e) { console.error('Allegrow: couldn’t bring data over', e); }
+  } catch (e) { console.error('AlleGrow: couldn’t bring data over', e); }
   const rest = location.hash.replace(/^#/, '').replace(/(^|&)import=[A-Za-z0-9_-]+/, '').replace(/^&/, '');
   history.replaceState(null, '', location.pathname + location.search + (rest ? '#' + rest : ''));
 })();

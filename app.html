@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#f6f3ee" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#14171f" media="(prefers-color-scheme: dark)">
-<title>Allegrow</title>
+<title>AlleGrow</title>
 <meta name="description" content="A music practice timer that listens while you play, tracks progress, and celebrates practice.">
 <link rel="icon" href="brand/allegrow-icon.svg" type="image/svg+xml">
 <link rel="icon" href="brand/png/allegrow-icon-32.png" sizes="32x32" type="image/png">
@@ -14,7 +14,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Allegrow">
+<meta name="apple-mobile-web-app-title" content="AlleGrow">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -527,7 +527,7 @@
   <!-- HOME -->
   <section class="screen" id="home">
     <header>
-      <div class="brand"><img class="logo" src="brand/allegrow-icon.svg" alt=""><span class="wm">Alle<b>grow</b></span><span class="betaChip">Beta</span></div>
+      <div class="brand"><img class="logo" src="brand/allegrow-icon.svg" alt=""><span class="wm">Alle<b>Grow</b></span><span class="betaChip">Beta</span></div>
       <button class="ghost" id="parentBtn"><svg class="ic sm"><use href="#i-lock"/></svg>Parents</button>
     </header>
     <div class="intro">
@@ -542,8 +542,8 @@
       <svg class="ic lg muted"><use href="#i-users"/></svg>
       <p class="muted">No players yet. A parent or teacher can add them in Settings.</p>
       <button class="secondary" id="setupBtn">Add players</button>
-      <a class="ghost small" id="bringOver" href="https://sergcast07.github.io/practice-timer/app.html?export" hidden>Used Allegrow at its old address (sergcast07.github.io)? Bring your players over</a>
-      <button class="ghost" id="homeRestore"><svg class="ic sm"><use href="#i-user"/></svg>Used Allegrow before? Sign in to get your family back</button>
+      <a class="ghost small" id="bringOver" href="https://sergcast07.github.io/practice-timer/app.html?export" hidden>Used AlleGrow at its old address (sergcast07.github.io)? Bring your players over</a>
+      <button class="ghost" id="homeRestore"><svg class="ic sm"><use href="#i-user"/></svg>Used AlleGrow before? Sign in to get your family back</button>
     </div>
     <button class="secondary block" id="historyBtn"><svg class="ic"><use href="#i-chart"/></svg>Practice history</button>
     <button class="ghost" id="syncStatus" type="button"></button>
@@ -727,7 +727,7 @@
         </div>
       </div>
       <div class="syncBlock" id="joinBlock">
-        <b id="joinTitle">Already using Allegrow on another device?</b>
+        <b id="joinTitle">Already using AlleGrow on another device?</b>
         <p class="muted small" id="joinHelp">Scan its QR code with this device’s camera, or enter its family code here.</p>
         <div class="addRow" style="margin-top:8px">
           <input type="text" id="joinCode" placeholder="Family code, e.g. abcde-fghjk-…" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Family code">
@@ -776,7 +776,7 @@
 
     <div class="sectionLabel">Help us improve</div>
     <div class="card rowBetween">
-      <div class="label"><svg class="ic"><use href="#i-heart"/></svg>Allegrow is in beta</div>
+      <div class="label"><svg class="ic"><use href="#i-heart"/></svg>AlleGrow is in beta</div>
       <button class="secondary" id="feedbackBtn">Send feedback</button>
     </div>
 
@@ -785,7 +785,7 @@
       <div class="label"><svg class="ic"><use href="#i-lock"/></svg>Settings PIN</div>
       <button class="secondary" id="changePinBtn">Change PIN</button>
     </div>
-    <p class="muted small" style="text-align:center"><a href="./?about">About Allegrow</a> · <a href="privacy">Privacy policy</a> · <a href="terms">Terms</a></p>
+    <p class="muted small" style="text-align:center"><a href="./?about">About AlleGrow</a> · <a href="privacy">Privacy policy</a> · <a href="terms">Terms</a></p>
   </section>
 
 </main>
@@ -999,7 +999,7 @@ async function addParentAccount() {
     const other = await F.getDoc(F.doc(db, 'families', rec.family)).catch(() => null);
     if (other?.exists()) {
       const names = (other.data().kids || []).map(k => k.name).join(', ') || 'no players yet';
-      if (confirm(`${u.email} already belongs to another family on Allegrow (${names}).\n\nOK: switch this device to that family.\nCancel: keep this device's family and move your account to it.`))
+      if (confirm(`${u.email} already belongs to another family on AlleGrow (${names}).\n\nOK: switch this device to that family.\nCancel: keep this device's family and move your account to it.`))
         return joinFamily(rec.family).then(renderParent);
     }
   }
@@ -1078,7 +1078,7 @@ function setSync(state) {
   }[state];
   const html = text ? `${icon(ic, 'sm')}<span>${text}</span>` : '';
   // On the home screen this line doubles as the way into Devices & sync
-  $('syncStatus').innerHTML = state === 'local' ? `${icon('cloud', 'sm')}<span>Use Allegrow on more than one device?</span>`
+  $('syncStatus').innerHTML = state === 'local' ? `${icon('cloud', 'sm')}<span>Use AlleGrow on more than one device?</span>`
     : state === 'synced' ? `${html}<span class="muted">·</span><span style="text-decoration:underline">Add a device</span>` : html;
   $('syncState').innerHTML = html;
 }
@@ -1172,7 +1172,7 @@ function renderMove() {
   const card = $('moveCard'), NEW = 'https://allegrowmusic.com/app';
   if (window.ALLEGROW_OLD_HOME) {             // the home-screen app installed from the old address
     card.hidden = false;
-    card.innerHTML = `<b>Allegrow has a new home: allegrowmusic.com</b>
+    card.innerHTML = `<b>AlleGrow has a new home: allegrowmusic.com</b>
       <p class="small muted">This app keeps working, but it won’t get updates. Moving takes a minute:</p>
       <ol class="small">${family ? `<li>Your family code is <b class="code" style="display:inline;padding:1px 6px">${esc(family)}</b> <button class="ghost small" id="mvCopy">Copy</button></li>`
         : `<li>First turn on sync (Parents → Settings → Devices &amp; sync) so your players and history can come along.</li>`}
@@ -1186,8 +1186,8 @@ function renderMove() {
   const inAt = store.get('pt-moved-in', null);
   if (inAt && !store.get('pt-moved-seen', false)) {   // just arrived from the old address
     card.hidden = false;
-    card.innerHTML = `<div class="rowBetween"><b>Welcome to Allegrow’s new home</b><button class="ghost icon" id="mvOk" aria-label="Dismiss">${icon('x')}</button></div>
-      <p class="small muted">Your players and practice history came with you. Allegrow now lives at <b>allegrowmusic.com</b>.
+    card.innerHTML = `<div class="rowBetween"><b>Welcome to AlleGrow’s new home</b><button class="ghost icon" id="mvOk" aria-label="Dismiss">${icon('x')}</button></div>
+      <p class="small muted">Your players and practice history came with you. AlleGrow now lives at <b>allegrowmusic.com</b>.
       If it was on your home screen, add it again from here (Share → Add to Home Screen) and delete the old icon.</p>`;
     $('mvOk').onclick = () => { store.set('pt-moved-seen', true); card.hidden = true; };
     return;
@@ -1427,7 +1427,7 @@ async function pickPhoto(k) {
   k.photo = photo; saveKids(); pushTeacher(k); renderParent();
 }
 
-// Feedback from parents goes to the Allegrow team (read only by admins – see firestore.rules)
+// Feedback from parents goes to the AlleGrow team (read only by admins – see firestore.rules)
 $('feedbackBtn').onclick = () => {
   const card = $('linkCard');
   card.innerHTML = `<div class="medal" style="--kid:var(--leaf)">${icon('heart')}</div>
@@ -1776,8 +1776,8 @@ function renderParent() {
   $('syncOn').hidden = !family;
   $('leaveBtn').hidden = !family;
   renderAccount();
-  $('joinTitle').textContent = family ? 'Bring in a different family account' : 'Already using Allegrow on another device?';
-  $('joinHelp').textContent = family ? 'Has your family already set up Allegrow somewhere else? Enter that family code to switch this device over to it.'
+  $('joinTitle').textContent = family ? 'Bring in a different family account' : 'Already using AlleGrow on another device?';
+  $('joinHelp').textContent = family ? 'Has your family already set up AlleGrow somewhere else? Enter that family code to switch this device over to it.'
     : 'Scan its QR code with this device’s camera, or enter its family code here.';
   $('familyCode').textContent = family || '';
   $('musicOnly').checked = settings.musicOnly;
@@ -1810,7 +1810,7 @@ const joinUrl = () => location.origin + location.pathname + '#join=' + family;
 $('shareBtn').onclick = async () => {
   const url = joinUrl();
   try {
-    if (navigator.share) return await navigator.share({ title: 'Allegrow', text: 'Open this to connect this device to our family’s Allegrow:', url });
+    if (navigator.share) return await navigator.share({ title: 'AlleGrow', text: 'Open this to connect this device to our family’s AlleGrow:', url });
     await navigator.clipboard.writeText(url);
     $('shareBtn').innerHTML = `${icon('check', 'sm')}Link copied`;
   } catch {}
@@ -2375,7 +2375,7 @@ const icsTime = d => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate(
 const icsFold = line => { const out = []; while (line.length > 74) { out.push(line.slice(0, 74)); line = ' ' + line.slice(74); } out.push(line); return out.join('\r\n'); };
 function buildIcs(calName, evs) {
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
-  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Allegrow//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:' + icsEsc(calName)];
+  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//AlleGrow//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:' + icsEsc(calName)];
   for (const e of evs) {
     L.push('BEGIN:VEVENT', 'UID:' + e.uid, 'DTSTAMP:' + stamp, 'DTSTART:' + icsTime(e.start),
            'DTEND:' + icsTime(new Date(e.start.getTime() + e.minutes * 60000)), 'SUMMARY:' + icsEsc(e.title));
@@ -2905,7 +2905,7 @@ function renderInstall() {
   if (standalone() || store.get('pt-install-hide', false) || !(installEvent || isIOS())) { el.hidden = true; return; }
   el.hidden = false;
   el.innerHTML = `<img src="brand/allegrow-icon.svg" alt="">
-    <div class="grow"><b>Put Allegrow on your home screen</b>
+    <div class="grow"><b>Put AlleGrow on your home screen</b>
       <span>${installEvent ? 'Opens like an app, full screen, even without internet.' : 'Tap the Share button, then “Add to Home Screen”.'}</span>
       ${installEvent ? '<div><button class="secondary" id="installGo" style="margin-top:10px">Install</button></div>' : ''}</div>
     <button class="ghost icon" id="installX" aria-label="Not now" style="align-self:flex-start">${icon('x')}</button>`;

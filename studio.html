@@ -6,15 +6,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#f6f3ee" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#14171f" media="(prefers-color-scheme: dark)">
-<title>Allegrow Studio</title>
-<meta name="description" content="Allegrow for music teachers: see students' practice, plan lessons, set assignments, award badges and print reports.">
+<title>AlleGrow Studio</title>
+<meta name="description" content="AlleGrow for music teachers: see students' practice, plan lessons, set assignments, award badges and print reports.">
 <link rel="icon" href="brand/allegrow-icon.svg" type="image/svg+xml">
 <link rel="icon" href="brand/png/allegrow-icon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="brand/png/apple-touch-icon.png">
 <link rel="manifest" href="manifest-studio.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Allegrow Studio">
+<meta name="apple-mobile-web-app-title" content="AlleGrow Studio">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Noto+Music&display=swap" rel="stylesheet">
@@ -457,7 +457,7 @@
 <div class="gate" id="signin" hidden>
   <div class="card">
     <img class="logo" src="brand/allegrow-icon.svg" alt="">
-    <div><h1><span class="wm">Alle<b>grow</b></span> Studio</h1>
+    <div><h1><span class="wm">Alle<b>Grow</b></span> Studio</h1>
       <p class="muted" style="margin-top:8px">Everything for your music students, in one place.</p></div>
     <div class="features">
       <div><svg class="ic"><use href="#i-users"/></svg>See every student’s practice time, focus, tuning and rhythm</div>
@@ -468,7 +468,7 @@
     <div id="signinOptions" style="width:100%;max-width:340px;margin:0 auto"></div>
     <div class="gateErr" id="signinErr"></div>
     <p class="small muted">Just looking? <a href="?demo">Explore a demo studio</a> with sample students.</p>
-    <p class="small muted"><span class="betaChip">Beta</span> Free while in beta · <a href="./">About Allegrow</a> · <a href="privacy">Privacy</a> · <a href="terms">Terms</a></p>
+    <p class="small muted"><span class="betaChip">Beta</span> Free while in beta · <a href="./">About AlleGrow</a> · <a href="privacy">Privacy</a> · <a href="terms">Terms</a></p>
   </div>
 </div>
 
@@ -488,7 +488,7 @@
 <!-- App -->
 <div id="shell" hidden>
   <aside>
-    <div class="brand"><img class="logo" src="brand/allegrow-icon.svg" alt=""><div><span id="studioName"></span><small class="wm small">Alle<b>grow</b> Studio <span class="betaChip">Beta</span></small></div></div>
+    <div class="brand"><img class="logo" src="brand/allegrow-icon.svg" alt=""><div><span id="studioName"></span><small class="wm small">Alle<b>Grow</b> Studio <span class="betaChip">Beta</span></small></div></div>
     <nav id="nav">
       <button data-go="overview"><svg class="ic"><use href="#i-home"/></svg>Overview</button>
       <button data-go="students"><svg class="ic"><use href="#i-users"/></svg>Students</button>
@@ -500,7 +500,7 @@
     <div class="planBox" id="planBox"></div>
     <div class="account">
       <div class="who"><b id="meName"></b><span id="meEmail"></span></div>
-      <button class="ghost icon" id="installBtn" title="Install Allegrow Studio" aria-label="Install Allegrow Studio" hidden><svg class="ic"><use href="#i-share"/></svg></button>
+      <button class="ghost icon" id="installBtn" title="Install AlleGrow Studio" aria-label="Install AlleGrow Studio" hidden><svg class="ic"><use href="#i-share"/></svg></button>
       <button class="ghost icon" id="feedbackBtn" title="Send feedback" aria-label="Send feedback"><svg class="ic"><use href="#i-heart"/></svg></button>
       <button class="ghost icon" id="studioBtn" title="Studio settings" aria-label="Studio settings"><svg class="ic"><use href="#i-settings"/></svg></button>
       <button class="ghost icon" id="signOutBtn" title="Sign out" aria-label="Sign out"><svg class="ic"><use href="#i-logout"/></svg></button>
@@ -517,7 +517,7 @@
 <script src="signin.js?v=1"></script>
 <script>
 // ============================================================================================
-// Allegrow Studio (teacher side of Allegrow)
+// AlleGrow Studio (teacher side of AlleGrow)
 // Data lives in Firebase (same project as the family app):
 //   studios/{uid}                    studio name + teacher name (only this teacher)
 //   studios/{uid}/lessons/{sid_date} lesson status, notes, ratings (private)
@@ -773,7 +773,7 @@ function renderPlan() {
 function betaCodeModal(reason) {
   openModal(`${mhead('Become a beta partner')}
     ${reason ? `<p><b>${reason}</b></p>` : ''}
-    <p>Allegrow is in beta. Studios who try it with their students and share feedback get <b>unlimited students, free</b>.</p>
+    <p>AlleGrow is in beta. Studios who try it with their students and share feedback get <b>unlimited students, free</b>.</p>
     <label class="field">Beta code <input type="text" id="bcCode" placeholder="GROW-XXXX-XXXX" autocapitalize="characters" autocomplete="off" spellcheck="false" style="text-transform:uppercase;letter-spacing:.05em"></label>
     <div class="gateErr" id="bcErr"></div>
     <p class="small muted">No code yet? <a href="./#beta" target="_blank" rel="noopener">Request one</a> – it takes a minute.</p>
@@ -792,8 +792,8 @@ function betaCodeModal(reason) {
 function feedbackModal() {
   let rating = 0;
   openModal(`${mhead('Send feedback')}
-    <p class="muted" style="margin-top:-6px">What’s working, what’s confusing, what you wish it did – it all helps shape Allegrow.</p>
-    <div class="field">How is Allegrow working for you? <div class="rate"><span></span><div class="dots">${[1, 2, 3, 4, 5].map(n => `<button type="button" data-r="${n}">${n}</button>`).join('')}</div></div></div>
+    <p class="muted" style="margin-top:-6px">What’s working, what’s confusing, what you wish it did – it all helps shape AlleGrow.</p>
+    <div class="field">How is AlleGrow working for you? <div class="rate"><span></span><div class="dots">${[1, 2, 3, 4, 5].map(n => `<button type="button" data-r="${n}">${n}</button>`).join('')}</div></div></div>
     <label class="field">Your feedback <textarea id="fbMsg" maxlength="4000" style="min-height:140px" placeholder="e.g. My students love the badges, but I wish I could…"></textarea></label>
     <label class="participant" style="grid-template-columns:auto 1fr;border:0;padding:0"><input type="checkbox" id="fbContact" checked><span class="small">It’s OK to email me about this (${esc(me?.email || '')})</span></label>
     <div class="gateErr" id="fbErr"></div>
@@ -820,7 +820,7 @@ async function loadAdmin() {
   if (route.view === 'admin') render();
 }
 function vAdmin() {
-  if (!amAdmin) return `<div class="emptyBig">${icon('alert', 'lg')}<p>This page is only for Allegrow admins.</p></div>`;
+  if (!amAdmin) return `<div class="emptyBig">${icon('alert', 'lg')}<p>This page is only for AlleGrow admins.</p></div>`;
   if (!adminData) { loadAdmin(); return '<div class="emptyBig"><p>Loading…</p></div>'; }
   if (adminData.error) return '<div class="emptyBig"><p>Couldn’t load admin data. Check that the latest database rules are published.</p></div>';
   const by = (a, b) => (b.at || b.created || '').localeCompare(a.at || a.created || '');
@@ -969,12 +969,12 @@ function gettingStarted() {
       `<button class="accent" data-act="import">${icon('report', 'sm')}Import a list</button><button class="secondary" data-act="addStudent">${icon('plus', 'sm')}Add one</button>`],
     [(studio.terms || []).length > 0, 'Set up your terms <span class="muted small">(optional)</span>', 'Name your semesters once, so lesson times start and stop on the right dates.',
       `<button class="secondary" data-act="terms">${icon('calendar', 'sm')}Set up terms</button>`],
-    [!!studio.invitesSent || all.some(s => s.linkedAt), 'Invite families', 'Each student has an invite link that connects their family’s Allegrow app to your studio.',
+    [!!studio.invitesSent || all.some(s => s.linkedAt), 'Invite families', 'Each student has an invite link that connects their family’s AlleGrow app to your studio.',
       `<button class="secondary" data-act="invites" ${all.length ? '' : 'disabled'}>${icon('link', 'sm')}Invite families</button>`]
   ];
   const done = steps.filter(x => x[0]).length;
   if (done === steps.length) return '';
-  return `<section class="card welcome"><h2>Welcome to Allegrow Studio <button class="ghost icon" data-act="dismissWelcome" aria-label="Dismiss" title="Hide this">${icon('x')}</button></h2>
+  return `<section class="card welcome"><h2>Welcome to AlleGrow Studio <button class="ghost icon" data-act="dismissWelcome" aria-label="Dismiss" title="Hide this">${icon('x')}</button></h2>
     <p class="muted" style="margin-top:-6px">Three quick steps to get your studio going · ${done} of 3 done</p>
     <div class="steps">${steps.map(([ok, title, text, btns], i) => `<div class="step ${ok ? 'done' : ''}"><div class="num">${ok ? icon('check') : i + 1}</div>
       <div class="grow"><b>${title}</b><p class="small muted">${text}</p>${ok && i !== 0 ? '' : `<div class="btns">${ok ? btns.replace('class="accent"', 'class="secondary"') : btns}</div>`}</div></div>`).join('')}</div></section>`;
@@ -1073,7 +1073,7 @@ function vStudent() {
       </div>
     </div>
     ${s.archived ? `<div class="banner">${icon('alert')}<div class="grow">This student is archived.</div><button class="secondary" data-act="unarchive">Restore</button></div>` : ''}
-    ${leftAt(s) && !s.archived ? `<div class="banner">${icon('link')}<div class="grow"><b>${leftText(s)}.</b> ${esc(firstName(s.name))}’s family disconnected Allegrow from your studio${s.consent.removedData ? ' and removed the practice history they’d shared' : ' – practice they shared before stays here'}. They no longer see your assignments or lesson times.</div>
+    ${leftAt(s) && !s.archived ? `<div class="banner">${icon('link')}<div class="grow"><b>${leftText(s)}.</b> ${esc(firstName(s.name))}’s family disconnected AlleGrow from your studio${s.consent.removedData ? ' and removed the practice history they’d shared' : ' – practice they shared before stays here'}. They no longer see your assignments or lesson times.</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="secondary" data-act="archiveLeft">Archive student</button><button class="secondary" data-act="invite">New invite</button></div></div>` : ''}
     ${!s.linkedAt && !leftAt(s) && !s.archived ? `<div class="banner">${icon('link')}<div class="grow"><b>Not connected yet.</b> Send the family the invite link so ${esc(firstName(s.name))}’s practice shows up here and your assignments appear in their app.</div><button class="accent" data-act="invite">Send invite</button></div>` : ''}
     <div class="tabs noprint">${tabs.map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
@@ -1102,7 +1102,7 @@ function tProgress(s) {
       ${(() => { const eds = Object.entries(s.practiceEdits || {}).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 10); return eds.length ? `<div class="editList"><div class="small" style="font-weight:600;margin-bottom:4px">Days you edited</div>${eds.map(([k, e]) => `<div class="assign"><div class="grow"><div class="t">${fmtDate(parseDay(k))} · ${mins(pDay(s, k))}</div>
         <div class="d">Was ${mins(e.was)} · changed ${fmtDate(dayKey(new Date(e.at)), { month: 'short', day: 'numeric' })}${e.note ? ` · ${esc(e.note)}` : ''}</div></div><button class="ghost small" data-pedit="${k}">Change</button></div>`).join('')}</div>` : ''; })()}
     </div>
-    <p class="small muted">Last practiced: ${lastPracticedText(lastPracticed(s))}. Practice data comes from ${esc(s.kidName || firstName(s.name))}’s Allegrow app.</p>
+    <p class="small muted">Last practiced: ${lastPracticedText(lastPracticed(s))}. Practice data comes from ${esc(s.kidName || firstName(s.name))}’s AlleGrow app.</p>
   </div>`;
 }
 
@@ -1478,7 +1478,7 @@ function vReports() {
       <div class="chart" style="height:110px">${wVals.map((v, i) => `<div class="col" title="Week of ${fmtDate(weeks[i][0])}: ${mins(v)}"><div class="b met" style="height:${v / wTop * 100}%"></div></div>`).join('')}
         <div class="goal" style="bottom:${weekTarget / wTop * 100}%"></div></div>
       <div class="axis"><span>Minutes per week</span><span>dashed line = weekly plan (${planText(planOfStudent(s))})</span></div>`
-      : '<p class="muted">Not connected to the Allegrow app, so no practice data.</p>'}
+      : '<p class="muted">Not connected to the AlleGrow app, so no practice data.</p>'}
     </section>
     <section><h3>Lessons</h3>
       <div class="stats"><div class="stat"><b>${doneL.length}</b><span>attended</span></div><div class="stat"><b>${cancelled.length}</b><span>canceled</span></div><div class="stat"><b>${noshow.length}</b><span>missed</span></div></div>
@@ -1697,7 +1697,7 @@ function inviteLink(sid) { return location.origin + location.pathname.replace(/[
 function inviteModal(sid) {
   const s = students[sid], link = inviteLink(sid);
   openModal(`${mhead('Invite ' + esc(firstName(s.name)) + '’s family')}
-    <p>Send this link to the family. They open it on the phone or tablet ${esc(firstName(s.name))} practices with, and the Allegrow app connects to your studio.</p>
+    <p>Send this link to the family. They open it on the phone or tablet ${esc(firstName(s.name))} practices with, and the AlleGrow app connects to your studio.</p>
     <div class="codeBox">${esc(link)}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       ${navigator.share ? `<button class="accent" id="iShare">${icon('share', 'sm')}Share link</button>` : ''}
@@ -1708,11 +1708,11 @@ function inviteModal(sid) {
       Anyone with the link can see ${esc(firstName(s.name))}’s assignments and lesson times, so send it only to the family.</p>
     ${s.linkedAt ? `<div class="banner" style="margin:0">${icon('check')}<div class="grow">Connected${s.kidName && s.kidName !== s.name ? ` as “${esc(s.kidName)}”` : ''}.</div></div>` : ''}
     <footer><div class="right"><button class="primary" data-close>Done</button></div></footer>`, m => {
-    const msg = `Hi! ${studio.teacherName} here. Please open this link on the device ${firstName(s.name)} practices with to connect the Allegrow app to my studio: ${link}`;
+    const msg = `Hi! ${studio.teacherName} here. Please open this link on the device ${firstName(s.name)} practices with to connect the AlleGrow app to my studio: ${link}`;
     const copy = async (t, what) => { try { await navigator.clipboard.writeText(t); toast(what + ' copied'); } catch { prompt('Copy this:', t); } };
     m.querySelector('#iCopy').onclick = () => copy(link, 'Link');
     m.querySelector('#iMsg').onclick = () => copy(msg, 'Message');
-    const sh = m.querySelector('#iShare'); if (sh) sh.onclick = () => navigator.share({ title: 'Allegrow', text: msg.replace(link, '').trim(), url: link }).catch(() => {});
+    const sh = m.querySelector('#iShare'); if (sh) sh.onclick = () => navigator.share({ title: 'AlleGrow', text: msg.replace(link, '').trim(), url: link }).catch(() => {});
   });
 }
 
@@ -1887,7 +1887,7 @@ function insightData(s, k) {
 function insightInfoModal(focusOn, sid) {
   const s = sid && students[sid];
   openModal(`${mhead('How practice scores work')}
-    <p class="muted" style="margin-top:-6px">Allegrow works these out on the family’s device while the practice timer listens. Nothing is recorded or sent except the numbers.</p>
+    <p class="muted" style="margin-top:-6px">AlleGrow works these out on the family’s device while the practice timer listens. Nothing is recorded or sent except the numbers.</p>
     ${INSIGHT_ORDER.map(k => { const mode = s ? insMode(s, k) : insightMode(studio.insights, k); return `<div class="insRow">
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>${INSIGHTS[k].label}</b>
         <span class="chip ${mode === 'off' || mode === 'na' ? '' : 'info'}">${mode === 'na' ? 'Not measured' : INSIGHT_MODES[mode]}${s ? '' : ' · studio'}</span></div>
@@ -2344,7 +2344,7 @@ function planForImport(r) { const p = Array(7).fill(0); (DAY_PATTERNS[r.days] ||
 function invitesModal(ids, title) {
   const list = (ids ? ids.map(id => students[id]).filter(Boolean) : active().filter(s => !s.linkedAt)).sort((a, b) => a.name.localeCompare(b.name));
   if (!list.length) return toast(ids ? 'Nothing to invite' : 'Every student is already connected');
-  const message = s => `Hi! ${studio.teacherName} here. Please open this link on the device ${firstName(s.name)} practices with, to connect the Allegrow app to my studio: ${inviteLink(s.id)}`;
+  const message = s => `Hi! ${studio.teacherName} here. Please open this link on the device ${firstName(s.name)} practices with, to connect the AlleGrow app to my studio: ${inviteLink(s.id)}`;
   const markSent = () => { if (!studio.invitesSent) { studio.invitesSent = true; api.updateStudio({ invitesSent: true }); render(); } };
   openModal(`${mhead(title ? `${title} – now invite their families` : 'Invite families')}
     <p class="muted" style="margin-top:-6px">Each family opens their link on the device their child practices with. ${ids ? '' : 'These students aren’t connected yet.'}</p>
@@ -2354,7 +2354,7 @@ function invitesModal(ids, title) {
       ${list.map(s => `<tr><td><b>${esc(s.name)}</b>${importEmails[s.id] ? `<div class="muted small">${esc(importEmails[s.id])}</div>` : ''}</td>
         <td><button class="ghost small" data-ivcopy="${s.id}">${icon('copy', 'sm')}Copy link</button></td>
         <td><a class="ghost small" style="display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border-radius:10px;text-decoration:none;font-weight:600;color:var(--ink-2)"
-          data-ivmail="${s.id}" href="mailto:${encodeURIComponent(importEmails[s.id] || '')}?subject=${encodeURIComponent(`Connect ${firstName(s.name)} to ${studio.studioName} on Allegrow`)}&body=${encodeURIComponent(message(s))}">${icon('share', 'sm')}Email</a></td></tr>`).join('')}
+          data-ivmail="${s.id}" href="mailto:${encodeURIComponent(importEmails[s.id] || '')}?subject=${encodeURIComponent(`Connect ${firstName(s.name)} to ${studio.studioName} on AlleGrow`)}&body=${encodeURIComponent(message(s))}">${icon('share', 'sm')}Email</a></td></tr>`).join('')}
     </tbody></table></div>
     <p class="small muted">Tip: you can also send links one at a time later from each student’s page (Invite link).</p>
     <footer><div class="right"><button class="primary" data-close>Done</button></div></footer>`, m => {
@@ -2398,7 +2398,7 @@ function studioIcs() {
   for (const e of Object.values(events)) if (e.date >= from)
     ev.push([`event-${e.id}`, e.date, e.time || '12:00', 120, e.title, '', [], e.location || '',
              Object.entries(e.participants || {}).map(([sid, p]) => `${students[sid]?.name || ''}${p.piece ? ': ' + p.piece : ''}`).join('\n')]);
-  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Allegrow//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:' + icsEsc(studio.studioName + ' – lessons')];
+  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//AlleGrow//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:' + icsEsc(studio.studioName + ' – lessons')];
   for (const [uid, key, time, len, title, rrule, ex, loc, desc] of ev) {
     L.push('BEGIN:VEVENT', `UID:${uid}@practice-timer`, 'DTSTAMP:' + stamp, 'DTSTART:' + icsLocal(key, time), 'DTEND:' + plusMin(key, time, len), 'SUMMARY:' + icsEsc(title));
     if (rrule) L.push('RRULE:' + rrule);
@@ -2466,7 +2466,7 @@ async function calendarEmailModal() {
       <label class="participant" style="grid-template-columns:auto 1fr;border:0;padding:0"><input type="checkbox" id="cDigest" ${feed.digest ? 'checked' : ''}>
         <span><b style="color:var(--ink)">Sunday studio digest</b><br><span class="small muted">Sunday at 6 pm: the week’s wins, who could use a nudge, and what’s coming up.</span></span></label>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="secondary" data-test="brief">Send a test brief</button><button class="secondary" data-test="digest">Send a test digest</button></div>
-      <p class="small muted" id="cMsg">Emails come from Allegrow. While it uses the free test sender, they can only go to the email address the service was set up with.</p>
+      <p class="small muted" id="cMsg">Emails come from AlleGrow. While it uses the free test sender, they can only go to the email address the service was set up with.</p>
     </section>` : ''}
     <footer><div class="right"><button class="${feed ? 'secondary' : 'primary'}" data-close>${feed ? 'Cancel' : 'Done'}</button>${feed ? '<button class="primary" id="cSave">Save</button>' : ''}</div></footer>`, m => {
     m.querySelector('#cDownload').onclick = downloadIcs;

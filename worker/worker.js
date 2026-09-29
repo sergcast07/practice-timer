@@ -1,4 +1,4 @@
-// Allegrow – calendar feeds and teacher emails (runs free on Cloudflare Workers)
+// AlleGrow – calendar feeds and teacher emails (runs free on Cloudflare Workers)
 //
 // It reads the same Firestore documents the apps use (readable only with their long random codes):
 //   feeds/{token}      a teacher's calendar/email settings + list of student codes (written by studio.html)
@@ -67,7 +67,7 @@ export default {
         const mail = await buildEmail(env, feed, m[2], { test: url.searchParams.has('test') });
         return new Response(`<!-- ${mail.subject} -->` + mail.html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
       }
-      if (path === '/') return new Response('Allegrow calendar & email service', { headers: CORS });
+      if (path === '/') return new Response('AlleGrow calendar & email service', { headers: CORS });
       return new Response('Not found', { status: 404 });
     } catch (e) {
       console.error(e);
@@ -150,7 +150,7 @@ const icsEnd = (key, time, minutes) => { const t = toMin(time) + minutes, k = ad
 function calendarText(name, tz, events) {
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
   const at = (prop, key, time) => tz ? `${prop};TZID=${tz}:${icsLocal(key, time)}` : `${prop}:${icsLocal(key, time)}`;
-  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Allegrow//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//AlleGrow//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
              'X-WR-CALNAME:' + icsEsc(name), 'X-PUBLISHED-TTL:PT1H', 'REFRESH-INTERVAL;VALUE=DURATION:PT1H', ...(tz ? ['X-WR-TIMEZONE:' + tz] : [])];
   for (const e of events) {
     L.push('BEGIN:VEVENT', 'UID:' + e.uid, 'DTSTAMP:' + stamp, at('DTSTART', e.date, e.time),
@@ -359,7 +359,7 @@ function digestEmail(env, feed, students, now, test) {
   body += section('Coming up', [
     `<p style="margin:8px 0;font-size:15px">${lessonsNext} ${lessonsNext === 1 ? 'lesson' : 'lessons'} next week.</p>`,
     ...upcoming.map(e => `<p style="margin:8px 0;font-size:15px"><b>${esc(e.title)}</b> · ${fmtDay(e.date)}${e.time ? ' at ' + fmtTime(e.time) : ''}</p>`),
-    ...left.map(s => `<p style="margin:8px 0;font-size:14px;color:#c0612b">${esc(s.name)}’s family disconnected from your studio on ${fmtDay(s.consent.withdrawnAt.slice(0, 10))}${s.consent.removedData ? ' and removed the practice they’d shared' : ''}. You can archive ${esc(first(s.name))} in Allegrow Studio.</p>`),
+    ...left.map(s => `<p style="margin:8px 0;font-size:14px;color:#c0612b">${esc(s.name)}’s family disconnected from your studio on ${fmtDay(s.consent.withdrawnAt.slice(0, 10))}${s.consent.removedData ? ' and removed the practice they’d shared' : ''}. You can archive ${esc(first(s.name))} in AlleGrow Studio.</p>`),
     unlinked ? `<p style="margin:8px 0;font-size:14px;color:#6e7385">${unlinked} ${unlinked === 1 ? 'student hasn’t' : 'students haven’t'} connected the app yet – their invite link is on their page.</p>` : ''
   ].join(''));
   const change = prevTotal ? (total >= prevTotal ? ` (up from ${minsText(prevTotal)})` : '') : '';
@@ -453,7 +453,7 @@ const getJSON = async (env, key) => JSON.parse(await env.KV.get(key) || 'null');
 const validTz = tz => { try { new Intl.DateTimeFormat('en-US', { timeZone: tz }); return true; } catch { return false; } };
 // Resend's shared test sender only delivers to the Resend account's own address
 const sendError = e => TEST_SENDER.test(String(e?.message)) || /only send testing emails/i.test(String(e?.message))
-  ? 'Allegrow can’t email this address yet (the email service is still in test mode). Please try again later.' : 'Couldn’t send the email. Please try again.';
+  ? 'AlleGrow can’t email this address yet (the email service is still in test mode). Please try again later.' : 'Couldn’t send the email. Please try again.';
 
 async function parentsApi(req, env, url) {
   const path = url.pathname;
@@ -463,7 +463,7 @@ async function parentsApi(req, env, url) {
     if (rec && sig === await hmac(env, 'unsub:' + uid)) await env.KV.put(`parent:${uid}`, JSON.stringify({ ...rec, weekly: false }));
     return new Response(`<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><body style="font-family:-apple-system,Segoe UI,sans-serif;background:#f6f3ee;color:#1e2a44;display:grid;place-items:center;min-height:90vh;margin:0">
       <div style="background:#fff;border-radius:18px;padding:28px;max-width:420px;text-align:center"><h1 style="font-family:Georgia,serif;font-weight:600">You’re unsubscribed</h1>
-      <p>You won’t get the weekly Allegrow family summary any more. You can turn it back on in the app: Parents → Settings → Devices &amp; sync.</p></div></body>`,
+      <p>You won’t get the weekly AlleGrow family summary any more. You can turn it back on in the app: Parents → Settings → Devices &amp; sync.</p></div></body>`,
       { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
   }
   // Local testing only (DRY_RUN): see a parent's weekly summary as HTML
@@ -545,21 +545,21 @@ function parentLayout(env, heading, intro, body, footer) {
   return `<!doctype html><html><body style="margin:0;background:#f6f3ee;padding:24px 12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1e2a44">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center">
   <table role="presentation" width="100%" style="max-width:560px;background:#ffffff;border-radius:18px;padding:28px 26px" cellspacing="0" cellpadding="0"><tr><td>
-    <div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#23865f">Allegrow</div>
+    <div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#23865f">AlleGrow</div>
     <h1 style="font-family:Georgia,'Times New Roman',serif;font-size:26px;line-height:1.2;margin:6px 0 6px;font-weight:600">${heading}</h1>
     <p style="margin:0 0 18px;color:#3d4760;font-size:15px;line-height:1.5">${intro}</p>
     ${body}
-    <p style="margin:24px 0 0"><a href="${app}" style="display:inline-block;background:#1e2a44;color:#f6f3ee;text-decoration:none;font-weight:600;padding:11px 18px;border-radius:12px;font-size:15px">Open Allegrow</a></p>
+    <p style="margin:24px 0 0"><a href="${app}" style="display:inline-block;background:#1e2a44;color:#f6f3ee;text-decoration:none;font-weight:600;padding:11px 18px;border-radius:12px;font-size:15px">Open AlleGrow</a></p>
   </td></tr></table>
   <p style="max-width:560px;font-size:12px;color:#8a8f9e;line-height:1.5;margin:14px auto 0">${footer}</p>
   </td></tr></table></body></html>`;
 }
 function pinEmail(env, code) {
-  return { subject: `Your Allegrow PIN reset code: ${code}`,
-    html: parentLayout(env, 'Reset your parent PIN', 'Someone asked to reset the parent PIN in Allegrow. Enter this code in the app to choose a new PIN:',
+  return { subject: `Your AlleGrow PIN reset code: ${code}`,
+    html: parentLayout(env, 'Reset your parent PIN', 'Someone asked to reset the parent PIN in AlleGrow. Enter this code in the app to choose a new PIN:',
       `<div style="font-size:34px;font-weight:700;letter-spacing:.3em;background:#f6f3ee;border-radius:14px;padding:16px;text-align:center;font-variant-numeric:tabular-nums">${code}</div>
        <p style="font-size:14px;color:#3d4760;margin:14px 0 0">It works for 15 minutes. If this wasn’t you, you can ignore this email – the PIN stays the same.</p>`,
-      'You got this because your Google account is a parent account on an Allegrow family.') };
+      'You got this because your Google account is a parent account on an AlleGrow family.') };
 }
 
 // The family's week: time and days for each child, plus what their teacher sent (numbers only; no scores)
@@ -597,7 +597,7 @@ async function familyEmail(env, parent, { test } = {}) {
   return {
     subject: `${test ? '[Test] ' : ''}Your family’s week in music: ${minsText(total)} of practice`,
     html: parentLayout(env, 'Your week in music', total ? `Together your family practiced <b>${minsText(total)}</b> this week${prevTotal && total > prevTotal ? ` – up from ${minsText(prevTotal)}` : ''}.` : 'A quiet week – a fresh one starts tomorrow. Even 10 minutes a day adds up.',
-      rows.join(''), `You get this on Sunday evenings because you turned on the weekly summary in Allegrow. <a href="${unsub}" style="color:#8a8f9e">Unsubscribe</a>`)
+      rows.join(''), `You get this on Sunday evenings because you turned on the weekly summary in AlleGrow. <a href="${unsub}" style="color:#8a8f9e">Unsubscribe</a>`)
   };
 }
 async function runParents(env) {

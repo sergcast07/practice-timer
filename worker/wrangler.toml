@@ -13,7 +13,7 @@ APP_URL = "https://allegrowmusic.com/"
 WORKER_URL = "https://practice-timer.sergcast07.workers.dev"   # for unsubscribe links in emails
 # allegrowmusic.com is verified in Resend (records added in Cloudflare DNS). Replies go to hello@, which
 # Cloudflare Email Routing forwards to the owner's inbox.
-FROM_EMAIL = "Allegrow <hello@allegrowmusic.com>"
+FROM_EMAIL = "AlleGrow <hello@allegrowmusic.com>"
 REPLY_TO = "hello@allegrowmusic.com"
 
 # KV stores which studios to email and which emails were already sent. Filled in by `wrangler kv namespace create`.

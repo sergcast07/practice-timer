@@ -1,4 +1,4 @@
-// Allegrow – sign-in options, shared by the family app (index.html) and the studio (teacher.html).
+// AlleGrow – sign-in options, shared by the family app (index.html) and the studio (teacher.html).
 // Only Firebase's free methods: Google, Microsoft, Yahoo and email + password.
 // (Phone codes need the paid plan; email sign-in links are capped at 5 a day; Apple needs a paid developer account.)
 //

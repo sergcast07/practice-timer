@@ -1,4 +1,4 @@
-// Allegrow – badges (shared by the family app and the teacher studio)
+// AlleGrow – badges (shared by the family app and the teacher studio)
 //
 // Badges are earned automatically from practice data. Each badge measures one thing (its metric) and has
 // levels (tiers); the child always sees the next level, so there's always something within reach.
@@ -341,7 +341,7 @@ const INSIGHTS = {
   focus: {
     label: 'Focus', unit: 'focus',
     what: 'How much of the practice session was spent playing.',
-    how: ['While the practice timer runs, Allegrow listens. Minutes where it hears music count as playing; pauses, talking and quiet count as breaks.',
+    how: ['While the practice timer runs, AlleGrow listens. Minutes where it hears music count as playing; pauses, talking and quiet count as breaks.',
           'Focus = minutes playing ÷ minutes the timer was listening. The app also notes the longest stretch without stopping and how many breaks there were.',
           'Some pauses are part of good practice – fixing a spot, listening back, reading ahead – so a score below 100% is normal.'],
     limits: 'A noisy room or long silent rests in the music can make it read lower than it should.'
