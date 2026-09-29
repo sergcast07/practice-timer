@@ -10,10 +10,52 @@ service cloud.firestore {
       allow list, write: if false;
     }
 
-    // A family's players and practice history. The long random family code is the key.
+    // A family's players and practice history.
+    // Signed-in families: only members can reach it – parent accounts and paired practice devices, listed in
+    // `members` ({uid: {role: 'parent' | 'device', …}}). A device joins with a short-lived pairing code (see pairs/)
+    // and can only add or remove itself; parents manage everyone. Removing a device ends its access at once.
+    // Older families without `members` still work with their long random code until a parent signs in and moves them.
+    function members() { return resource.data.get('members', {}); }
+    function isMember() { return request.auth != null && request.auth.uid in members(); }
+    function isParent() { return isMember() && members()[request.auth.uid].role == 'parent'; }
+    function legacy() { return !('members' in resource.data); }
+    function isPerson() { return request.auth != null && request.auth.token.firebase.sign_in_provider != 'anonymous'; }
+    function pairOk(family, m) {
+      let p = get(/databases/$(db)/documents/pairs/$(m.pair)).data;
+      return p.family == family && p.expires > request.time && m.role == p.role && (m.role == 'device' || isPerson());
+    }
     match /families/{family} {
-      allow get, create, update: if family.size() >= 20;
+      allow get: if isMember() || (legacy() && family.size() >= 20);
+      allow create: if family.size() >= 20 && (!('members' in request.resource.data)
+        || (isPerson() && request.resource.data.members.keys().hasOnly([request.auth.uid])
+            && request.resource.data.members[request.auth.uid].role == 'parent'));
+      allow update: if
+        // a parent: anything
+        isParent()
+        // a device: anything but the member list – except taking itself off it
+        || (isMember() && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['members'])
+            || request.resource.data.members.keys().toSet() == members().keys().toSet().difference([request.auth.uid].toSet())))
+        // joining with a pairing code: adds only itself, with the role the code was made for
+        || (request.auth != null && !isMember() && !legacy()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members'])
+            && request.resource.data.members.diff(members()).affectedKeys().hasOnly([request.auth.uid])
+            && pairOk(family, request.resource.data.members[request.auth.uid]))
+        // an older family: the code still works, and a parent signing in moves it to members
+        || (legacy() && family.size() >= 20 && (!('members' in request.resource.data)
+            || (isPerson() && request.resource.data.members.keys().hasOnly([request.auth.uid])
+                && request.resource.data.members[request.auth.uid].role == 'parent')));
       allow list, delete: if false;
+    }
+    // Pairing codes: a parent makes one (valid 15 minutes) to add a practice device or another parent;
+    // the device that uses it deletes it. 8 random characters, so they can't be guessed in that time.
+    match /pairs/{code} {
+      allow get: if request.auth != null && code.size() >= 8;
+      allow create: if request.auth != null && code.size() >= 8 && request.resource.data.by == request.auth.uid
+        && request.resource.data.role in ['device', 'parent']
+        && request.resource.data.expires < request.time + duration.value(16, 'm')
+        && get(/databases/$(db)/documents/families/$(request.resource.data.family)).data.get('members', {})[request.auth.uid].role == 'parent';
+      allow delete: if request.auth != null;
+      allow list, update: if false;
     }
 
     // A parent's own sign-in record (optional Google sign-in in the family app): which family they belong to.

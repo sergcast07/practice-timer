@@ -119,7 +119,7 @@
   .btnRow { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
   .btnRow button { flex: 1 1 auto; padding: 10px 12px; font-size: 14.5px; }
   .qrBox { display: grid; justify-items: center; gap: 6px; margin: 8px 0 4px; }
-  .qrBox #qr { width: 200px; background: #fff; border-radius: 12px; padding: 6px; }
+  .qrBox #qr, .qrBox svg { max-width: 200px; } .qrBox #qr { width: 200px; background: #fff; border-radius: 12px; padding: 6px; }
   .qrBox svg { display: block; width: 100%; height: auto; }
 
   /* Tablets: more room – two columns while practicing, wider lists */
@@ -308,6 +308,10 @@
   .welcomeList label span { flex: 1; }
   #parentBtn.linked { position: relative; }
   #parentBtn.linked::after { content: ''; position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--good); }
+  .devicesBlock { display: grid; gap: 10px; }
+  .deviceList { display: grid; gap: 4px; margin: 6px 0 10px; }
+  .pairCode { font-size: 34px; font-weight: 800; letter-spacing: .12em; text-align: center; font-variant-numeric: tabular-nums; margin: 6px 0; }
+  .famNotice { display: flex; gap: 10px; align-items: center; border: 1.5px solid color-mix(in srgb, var(--warn) 40%, transparent); }
   .accountBlock { display: grid; gap: 8px; padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--line); }
   .parentList .opt { font-size: 14.5px; }
   .forgotBox { display: grid; gap: 8px; text-align: left; background: var(--card); border-radius: 14px; padding: 14px; box-shadow: var(--shadow); }
@@ -516,6 +520,7 @@
   <symbol id="i-share" viewBox="0 0 24 24"><path d="M4.5 12.5V19a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-6.5"/><path d="m16 6.5-4-4-4 4M12 2.5V15"/></symbol>
   <symbol id="i-qr" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="6" height="6" rx="1"/><rect x="14.5" y="3.5" width="6" height="6" rx="1"/><rect x="3.5" y="14.5" width="6" height="6" rx="1"/><path d="M14.5 14.5h2.5v2.5h-2.5zM18.5 18.5h2v2h-2zM14.5 19.5h1M20.5 14.5v1.5"/></symbol>
   <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="12" height="12" rx="2"/><path d="M15.5 8.5V5.5a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3"/></symbol>
+  <symbol id="i-tablet" viewBox="0 0 24 24"><rect x="4.5" y="2.5" width="15" height="19" rx="2.5"/><path d="M11 18.5h2"/></symbol>
   <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></symbol>
   <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M18.5 11a6.5 6.5 0 0 1-13 0M12 17.5V21"/></symbol>
   <symbol id="i-metronome" viewBox="0 0 24 24"><path d="M9.2 3h5.6l4 17.5H5.2z"/><path d="M5.8 17.5h12.4M12 15 16.5 6.5"/></symbol>
@@ -558,6 +563,7 @@
       <p>Tap your name to start.</p>
     </div>
     <div class="card moveCard" id="moveCard" hidden></div>
+    <div class="card famNotice" id="famNotice" hidden></div>
     <div class="card recap" id="recap" hidden></div>
     <div class="card installCard" id="installCard" hidden></div>
     <div class="kids" id="kidList"></div>
@@ -566,7 +572,8 @@
       <p class="muted">No players yet. A parent or teacher can add them in Settings.</p>
       <button class="secondary" id="setupBtn">Add players</button>
       <a class="ghost small" id="bringOver" href="https://sergcast07.github.io/practice-timer/app.html?export" hidden>Used AlleGrow at its old address (sergcast07.github.io)? Bring your players over</a>
-      <button class="ghost" id="homeRestore"><svg class="ic sm"><use href="#i-user"/></svg>Used AlleGrow before? Sign in to get your family back</button>
+      <button class="ghost" id="homeJoin"><svg class="ic sm"><use href="#i-tablet"/></svg>Have a code from a parent? Add this device</button>
+      <button class="ghost" id="homeRestore"><svg class="ic sm"><use href="#i-user"/></svg>Parent? Sign in to bring your family back</button>
     </div>
     <button class="secondary block" id="historyBtn"><svg class="ic"><use href="#i-chart"/></svg>Practice history</button>
     <button class="ghost" id="syncStatus" type="button"></button>
@@ -725,41 +732,12 @@
       <button class="ghost back" data-home><svg class="ic"><use href="#i-back"/></svg>Done</button>
     </header>
     <div class="intro"><h1>Settings</h1><p>For parents and teachers.</p></div>
-    <div class="jump"><a href="#syncCard">Devices &amp; sync</a><a href="#playersCard">Players</a><a href="#micCard">Microphone</a></div>
+    <div class="jump"><a href="#syncCard">Family &amp; devices</a><a href="#playersCard">Players</a><a href="#micCard">Microphone</a></div>
 
-    <div class="sectionLabel" id="syncCard">Devices &amp; sync</div>
+    <div class="sectionLabel" id="syncCard">Family &amp; devices</div>
     <div class="card">
       <div id="accountBlock" class="accountBlock"></div>
-      <div id="syncOff">
-        <p class="muted small">Everything is saved on this device only. Turn on sync to share players and practice history across all your phones and tablets.</p>
-        <button class="secondary block" id="createFamilyBtn" style="margin-top:14px"><svg class="ic"><use href="#i-cloud"/></svg>Turn on sync</button>
-      </div>
-      <div id="syncOn">
-        <div id="syncState"></div>
-        <div class="syncBlock">
-          <b>Add another device</b>
-          <p class="muted small">On the other phone or tablet, scan this code with the camera, or open the link you send it.</p>
-          <div class="qrBox" id="qrBox" hidden><div id="qr"></div><div class="small muted">Scan with the other device’s camera</div></div>
-          <div class="btnRow">
-            <button class="secondary" id="qrBtn"><svg class="ic sm"><use href="#i-qr"/></svg>Show QR code</button>
-            <button class="secondary" id="shareBtn"><svg class="ic sm"><use href="#i-share"/></svg>Send link</button>
-            <button class="secondary" id="copyCodeBtn"><svg class="ic sm"><use href="#i-copy"/></svg>Copy code</button>
-          </div>
-          <div class="help" style="margin-top:8px">Family code</div><div id="familyCode" class="code"></div>
-          <div class="help">Anyone with this code can see and change your practice data, so share it only with family.</div>
-        </div>
-      </div>
-      <div class="syncBlock" id="joinBlock">
-        <b id="joinTitle">Already using AlleGrow on another device?</b>
-        <p class="muted small" id="joinHelp">Scan its QR code with this device’s camera, or enter its family code here.</p>
-        <div class="addRow" style="margin-top:8px">
-          <input type="text" id="joinCode" placeholder="Family code, e.g. abcde-fghjk-…" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Family code">
-          <button class="secondary" id="joinBtn">Connect</button>
-        </div>
-        <div id="joinError" class="small" style="color:var(--danger);margin-top:6px"></div>
-        <button class="ghost" id="restoreBtn" type="button" style="justify-self:start;margin-left:-10px"><svg class="ic sm"><use href="#i-user"/></svg>Or sign in with your parent account</button>
-      </div>
-      <button class="danger" id="leaveBtn" style="margin-top:10px;margin-left:-10px">Stop syncing on this device</button>
+      <div id="devicesBlock" class="devicesBlock"></div>
     </div>
 
     <div class="sectionLabel" id="playersCard">Players</div>
@@ -913,8 +891,11 @@ async function connect() {
   setSync('connecting');
   try { await loadFirebase(); } catch (e) { console.error(e); return setSync('error'); }
   unsubscribe?.();
+  if (deviceRole) { try { await loadAuth(); } catch (e) { console.error(e); } }
+  if (deviceRole && !auth?.currentUser) return accessLost(deviceRole === 'device' ? 'removed' : 'signed-out');
   ref = F.doc(db, 'families', family);
-  unsubscribe = F.onSnapshot(ref, { includeMetadataChanges: true }, onRemote, e => { console.error(e); setSync('error'); });
+  unsubscribe = F.onSnapshot(ref, { includeMetadataChanges: true }, onRemote,
+    e => { console.error(e); if (e.code === 'permission-denied') accessLost('removed'); else setSync('error'); });
   flushPractice(); flushFields();
 }
 
@@ -925,6 +906,10 @@ function onRemote(snap) {
   if (!pendingFields.kids) kids = d.kids || [];
   if (!pendingFields.settings) settings = Object.assign(settings, d.settings || {});
   familyParents = d.parents || {}; markParentBtn();
+  const had = members; members = d.members || null;
+  if (members && deviceRole && !members[myUid()] && !snap.metadata.hasPendingWrites) return accessLost('removed');
+  if (pairDialog.waiting && members) { const m = Object.values(members).find(x => x.pair === pairDialog.waiting); if (m) pairDone(m); }
+  if (!had !== !members && screen === 'parent') renderParent();
   upgradePin();
   log = d.log || {};
   stats = d.stats || {};
@@ -1049,33 +1034,219 @@ function parentWelcome(u) {
     renderParent();
   };
 }
-// From Settings: add a parent account to this family (turning on sync first if needed)
-async function addParentAccount() {
-  const u = await parentSignIn('So you can reset the parent PIN if you forget it, and get your family back on a new device.');
-  if (!u) return;
-  const rec = await parentRecord(u.uid).catch(() => null);
-  if (rec && rec.family !== family) {
-    const other = await F.getDoc(F.doc(db, 'families', rec.family)).catch(() => null);
-    if (other?.exists()) {
-      const names = (other.data().kids || []).map(k => k.name).join(', ') || 'no players yet';
-      if (confirm(`${u.email} already belongs to another family on AlleGrow (${names}).\n\nOK: switch this device to that family.\nCancel: keep this device's family and move your account to it.`))
-        return joinFamily(rec.family).then(renderParent);
-    }
-  }
-  try {
-    if (!family) await createFamily();
-    await linkParent(u);
-  } catch (e) { console.error(e); alert('Couldn’t link your account right now. Check the internet connection and try again.'); return renderParent(); }
-  renderParent(); parentWelcome(u);
+// ---------- Family access: parent sign-in + paired practice devices ----------
+// A family (families/{id}) belongs to its members: parent accounts (Google or email) and practice devices. A parent signs in
+// once (that creates the family, or brings it back on a new device). A child's tablet doesn't sign in: a parent makes a
+// short pairing code (pairs/{code}, 15 minutes) and the device joins with it as an anonymous "practice device". Parents see
+// every device and can remove one; a removed device loses access right away and clears itself. Without a family, the app
+// works on its own on one device. Older families that still use the long family code keep working until a parent signs in.
+let deviceRole = store.get('pt-role', null);      // 'parent' | 'device' | null (no family, or an older code-only family)
+let members = null;                               // the family's member list (null for older code-only families)
+const PAIR_ABC = 'abcdefghjkmnpqrstuvwxyz23456789';
+const pairCode = () => [...crypto.getRandomValues(new Uint8Array(8))].map(x => PAIR_ABC[x % PAIR_ABC.length]).join('');
+const showCode = c => c.toUpperCase().replace(/^(.{4})(.{4})$/, '$1-$2');
+const myUid = () => auth?.currentUser?.uid || null;
+const myMember = () => members && myUid() ? members[myUid()] : null;
+// The players this device shows: a practice device can be limited to some of the family's children
+const visibleKids = () => { const m = myMember(); return deviceRole === 'device' && Array.isArray(m?.kids) && m.kids.length ? kids.filter(k => m.kids.includes(k.id)) : kids; };
+function deviceLabel() {
+  const ua = navigator.userAgent;
+  return /iPad|Macintosh.*Mobile|Macintosh(?=.*Safari)(?!.*Chrome).*Touch/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ? 'iPad'
+    : /iPhone/.test(ua) ? 'iPhone' : /Android/.test(ua) ? (/Mobile/.test(ua) ? 'Android phone' : 'Android tablet')
+    : /CrOS/.test(ua) ? 'Chromebook' : /Mac/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows computer' : 'Device';
 }
-// From a new device: sign in and bring the family back
-async function restoreWithAccount() {
-  const u = await parentSignIn('Use the same sign-in as on your other device.');
-  if (!u) return;
+async function useFamily(id, role) {
+  if (family) { flushPractice(); flushFields(); }
+  unsubscribe?.(); unsubscribe = ref = null;
+  family = id; store.set('pt-family', family);
+  deviceRole = role; store.set('pt-role', role);
+  pend = {}; store.set('pt-pend', pend);
+  pendStats = {}; store.set('pt-pendstats', pendStats);
+  await connect();
+}
+// A new family, made by a parent who just signed in: this device's players and history go into it
+async function createFamily(u) {
+  setSync('connecting');
+  await loadFirebase();
+  const id = familyCode(), me = { role: 'parent', name: u.email || u.displayName || '', at: new Date().toISOString() };
+  await F.setDoc(F.doc(db, 'families', id), { kids, log, stats, manual, settings, theory, created: F.serverTimestamp(), members: { [u.uid]: me } });
+  await useFamily(id, 'parent');
+}
+// "Sign in as a parent": create the family, bring it back on this device, or move an older family to sign-in
+async function parentSignInFlow(intro) {
+  await loadAuth();
+  const before = auth.currentUser?.isAnonymous ? auth.currentUser.uid : null;   // a practice device's own identity
+  if (deviceRole === 'device' && !confirm('This is a practice device. Sign in only with an account that’s already a parent in this family – otherwise this device will need to be added again with a code.')) return false;
+  const u = await parentSignIn(intro || 'Connect a teacher, use AlleGrow on more than one device, and reset the parent PIN by email.');
+  if (!u) return false;
   const rec = await parentRecord(u.uid).catch(() => null);
-  if (!rec) return alert(`No family is linked to ${u.email} yet.\n\nOn a device that already has your players, open Parents → Settings → Devices & sync and add a parent account there first.`);
-  await joinFamily(rec.family);
-  if (family === rec.family) show('home');
+  try {
+    if (family && !members && (!rec?.family || rec.family === family)) {            // an older code-only family: move it to sign-in
+      await F.updateDoc(ref, { [`members.${u.uid}`]: { role: 'parent', name: u.email || '', at: new Date().toISOString() } });
+      deviceRole = 'parent'; store.set('pt-role', 'parent');
+      await linkParent(u); await connect();
+    } else if (rec?.family && rec.family !== family) {                               // this account already has a family
+      if (family && deviceRole === 'parent' && !confirm('Switch this device to the family on this account? Your other family stays safe on its own account.')) return false;
+      if (!family && kids.length && !confirm('Your family’s players and practice history will replace the ones on this device. Continue?')) return false;
+      await useFamily(rec.family, 'parent');
+    } else if (rec?.family === family) {                                             // already in this family (maybe as this device)
+      deviceRole = 'parent'; store.set('pt-role', 'parent');
+      await connect();
+      if (before && before !== u.uid && members?.[before]) F.updateDoc(ref, { [`members.${before}`]: F.deleteField() }).catch(() => {});
+      if (!members?.[u.uid]) F.updateDoc(ref, { [`members.${u.uid}`]: { role: 'parent', name: u.email || '', at: new Date().toISOString() } }).catch(console.error);
+    } else if (!family) {                                                            // first time: a new family
+      await createFamily(u); await linkParent(u);
+    } else {
+      alert(`${u.email || 'This account'} isn’t a parent in this family yet. Ask a parent here to add you: Parent settings → Add another parent.`);
+      return false;
+    }
+  } catch (e) { console.error(e); alert('Couldn’t finish signing in. Check the internet connection and try again.'); return false; }
+  renderParent(); if (screen === 'parent' || $('linkDlg').hidden) parentWelcome(u);
+  return true;
+}
+// Something (a teacher's invite) needs a parent: sign in first, then carry on
+function requireParent(why, then) {
+  const card = $('linkCard');
+  card.style.setProperty('--kid', 'var(--accent)');
+  card.innerHTML = `<div class="medal">${icon('user')}</div><h2 style="text-align:center">A parent signs in first</h2>
+    <p class="muted" style="text-align:center">${why} It takes a minute: sign in with Google or an email address. Children never need an account.</p>
+    <div class="pickList"><button class="primary" id="rpGo" style="--kid:var(--brand);color:var(--bg);justify-content:center">${icon('user')}Sign in as a parent</button>
+      <button class="ghost block" id="rpNo" style="justify-content:center">Not now</button></div>`;
+  $('linkDlg').hidden = false;
+  $('rpNo').onclick = () => { $('linkDlg').hidden = true; };
+  $('rpGo').onclick = async () => { $('linkDlg').hidden = true; if (await parentSignInFlow()) then(); };
+}
+// Parent side: make a pairing code for a practice device (or another parent) and wait for it to be used
+async function pairDialog(role = 'device') {
+  const card = $('linkCard'), sel = new Set(kids.map(k => k.id));
+  card.style.setProperty('--kid', 'var(--accent)');
+  const pick = () => {
+    card.innerHTML = `<div class="medal">${icon(role === 'device' ? 'tablet' : 'user')}</div>
+      <h2 style="text-align:center">${role === 'device' ? 'Add a practice device' : 'Add another parent'}</h2>
+      <p class="muted" style="text-align:center">${role === 'device' ? 'A phone or tablet your child practices on. It doesn’t need an account, and you can remove it any time.'
+        : 'They’ll sign in with their own Google or email account and can manage everything you can.'}</p>
+      ${role === 'device' && kids.length > 1 ? `<div class="pickList" style="margin-top:4px"><div class="small" style="font-weight:700">Who practices on it?</div>
+        ${kids.map(k => `<label class="opt" style="--kid:${kidColor(k)}"><span>${esc(k.name)}</span><input type="checkbox" class="toggle" data-pk="${k.id}" checked></label>`).join('')}</div>` : ''}
+      ${role === 'device' ? `<label class="fieldRow">Name (optional)<input type="text" id="pName" maxlength="30" placeholder="e.g. Mia’s iPad"></label>` : ''}
+      <p class="small" id="pErr" style="color:var(--danger);min-height:1.2em;text-align:center"></p>
+      <div class="pickList"><button class="primary" id="pGo" style="--kid:var(--brand);color:var(--bg);justify-content:center">Get a code</button>
+        <button class="ghost block" id="pNo" style="justify-content:center">Cancel</button></div>`;
+    card.querySelectorAll('[data-pk]').forEach(c => c.onchange = () => c.checked ? sel.add(c.dataset.pk) : sel.delete(c.dataset.pk));
+    $('pNo').onclick = () => { $('linkDlg').hidden = true; };
+    $('pGo').onclick = make;
+  };
+  async function make() {
+    if (role === 'device' && kids.length > 1 && !sel.size) return ($('pErr').textContent = 'Pick at least one player.');
+    const code = pairCode(), name = role === 'device' ? ($('pName')?.value.trim() || '') : '';
+    try {
+      await F.setDoc(F.doc(db, 'pairs', code), { family, role, by: myUid(), name, kids: role === 'device' && sel.size < kids.length ? [...sel] : null,
+        expires: F.Timestamp.fromMillis(Date.now() + 15 * 60000) });
+    } catch (e) { console.error(e); return ($('pErr').textContent = 'Couldn’t make a code. Check the internet connection.'); }
+    const url = `${location.origin}${location.pathname}#pair=${code}`;
+    card.innerHTML = `<h2 style="text-align:center">${role === 'device' ? 'On the practice device' : 'For the other parent'}</h2>
+      <p class="muted" style="text-align:center">${role === 'device' ? 'Open <b>allegrowmusic.com/app</b>, tap “Add this device with a code” and enter:' : 'Send them this link, or have them open allegrowmusic.com/app, tap “Add this device with a code” and sign in:'}</p>
+      <div class="pairCode">${showCode(code)}</div>
+      <div class="qrBox" id="pQr"></div>
+      <p class="small muted" style="text-align:center" id="pWait">Or scan the QR code with its camera. Works for 15 minutes, once.</p>
+      <div class="pickList"><button class="secondary block" id="pShare" style="justify-content:center">${icon('share', 'sm')}Send the link</button>
+        <button class="ghost block" id="pNo" style="justify-content:center">Cancel</button></div>`;
+    pairDialog.waiting = code;
+    $('pNo').onclick = () => { pairDialog.waiting = null; F.deleteDoc(F.doc(db, 'pairs', code)).catch(() => {}); $('linkDlg').hidden = true; };
+    $('pShare').onclick = async () => { try { if (navigator.share) return await navigator.share({ title: 'AlleGrow', url }); await navigator.clipboard.writeText(url); $('pShare').innerHTML = `${icon('check', 'sm')}Link copied`; } catch {} };
+    try {
+      if (!window.qrcode) await new Promise((ok, bad) => { const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js'; sc.onload = ok; sc.onerror = bad; document.head.append(sc); });
+      const qr = qrcode(0, 'M'); qr.addData(url); qr.make(); $('pQr').innerHTML = qr.createSvgTag({ cellSize: 5, margin: 2, scalable: true });
+    } catch { $('pQr').remove(); }
+  }
+  $('linkDlg').hidden = false;
+  pick();
+}
+// …and when it's used, the member list changes: say so
+function pairDone(m) {
+  pairDialog.waiting = null;
+  if ($('linkDlg').hidden) return;
+  const card = $('linkCard');
+  card.innerHTML = `<div class="medal" style="--kid:var(--good)">${icon('check')}</div><h2 style="text-align:center">${esc(m.name || (m.role === 'parent' ? 'Parent' : 'Device'))} added</h2>
+    <p class="muted" style="text-align:center">${m.role === 'device' ? 'It’s ready to practice on. You can remove it any time in Parent settings.' : 'They can now manage your family’s AlleGrow.'}</p>
+    <button class="primary" id="pOk" style="margin-top:14px;--kid:var(--brand);color:var(--bg)">Done</button>`;
+  $('pOk').onclick = () => { $('linkDlg').hidden = true; renderParent(); };
+}
+// Device side: join a family with a code (as a practice device, or – for a parent code – after signing in)
+async function joinWithCode(raw) {
+  const code = String(raw || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (code.length !== 8) return alert('Enter the 8-character code, like ABCD-EF23.');
+  try {
+    await loadAuth();
+    if (!auth.currentUser) await A.signInAnonymously(auth);
+    let p = await F.getDoc(F.doc(db, 'pairs', code)).then(s => s.exists() ? s.data() : null);
+    if (!p || p.expires.toMillis() < Date.now()) return alert('That code has expired or was already used. Ask a parent for a new one.');
+    if (p.role === 'parent') {
+      if (auth.currentUser.isAnonymous) { const u = await parentSignIn('Sign in with your own account to join your family.'); if (!u) return; }
+      p = await F.getDoc(F.doc(db, 'pairs', code)).then(s => s.data());
+    }
+    if (family === p.family) return alert('This device is already in that family.');
+    if (kids.length && !confirm('Your family’s players and practice history will replace the ones on this device. Continue?')) return;
+    const u = auth.currentUser;
+    await F.updateDoc(F.doc(db, 'families', p.family), { [`members.${u.uid}`]: { role: p.role, pair: code, at: new Date().toISOString(),
+      name: p.role === 'parent' ? (u.email || u.displayName || 'Parent') : (p.name || deviceLabel()), ...(p.kids ? { kids: p.kids } : {}) } });
+    F.deleteDoc(F.doc(db, 'pairs', code)).catch(() => {});
+    if (p.role === 'parent') await linkParent(u);
+    await useFamily(p.family, p.role);
+    show('home');
+  } catch (e) { console.error(e); alert('Couldn’t add this device. Check the code and the internet connection, then try again.'); }
+}
+function askJoinCode() {
+  const v = prompt('Enter the code from a parent’s AlleGrow (Parent settings → Add a practice device):');
+  if (v) joinWithCode(v);
+}
+// Parent: remove a device or parent. Device: remove itself.
+async function removeMember(uid) {
+  const m = members?.[uid]; if (!m) return;
+  if (!confirm(uid === myUid() ? 'Remove this device from your family? Its players and practice history will be cleared from it (they stay safe on your other devices).'
+      : `Remove ${m.name || 'this device'}? It stops syncing right away and clears itself the next time it’s opened.`)) return;
+  try { await F.updateDoc(ref, { [`members.${uid}`]: F.deleteField() }); } catch (e) { console.error(e); return alert('Couldn’t remove it. Check the internet connection.'); }
+  if (uid === myUid()) accessLost('removed-self'); else renderParent();
+}
+// This device can't reach the family any more: it was removed, or the family moved to sign-in without it
+function accessLost(why) {
+  unsubscribe?.(); unsubscribe = ref = null;
+  const wasDevice = deviceRole === 'device';
+  family = null; store.set('pt-family', null); deviceRole = null; store.set('pt-role', null); members = null;
+  if (wasDevice || why === 'removed-self') {                        // a practice device keeps nothing of the family
+    kids = []; log = {}; stats = {}; manual = {}; theory = {}; pend = {}; pendStats = {};
+    for (const k of ['pt-kids', 'pt-log', 'pt-stats', 'pt-manual', 'pt-theory', 'pt-pend', 'pt-pendstats']) store.set(k, k === 'pt-kids' ? [] : {});
+    kid = null;
+  }
+  store.set('pt-notice', why === 'removed-self' ? 'This device was removed from your family.' : wasDevice ? 'A parent removed this device from the family. They can add it again with a new code.'
+    : 'Your family now uses parent sign-in. Ask a parent to add this device (Parent settings → Add a practice device), or sign in as a parent.');
+  setSync('local'); show('home');
+}
+function renderDevices() {
+  const box = $('devicesBlock'); if (!box) return;
+  const day = iso => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const who = m => Array.isArray(m.kids) && m.kids.length ? m.kids.map(id => kids.find(k => k.id === id)?.name).filter(Boolean).join(', ') : 'Everyone';
+  if (!family) box.innerHTML = `<div class="syncBlock"><b>Joining your family on this device?</b>
+      <p class="muted small">If a parent already uses AlleGrow, they can add this phone or tablet as a practice device: Parent settings → Add a practice device. Then enter the code here.</p>
+      <button class="secondary" id="dvJoin">${icon('tablet', 'sm')}Add this device with a code</button></div>`;
+  else if (!members) box.innerHTML = `<div id="syncState"></div><div class="syncBlock"><b>Switch to parent sign-in</b>
+      <p class="muted small">Your family still shares practice with an older family code. Sign in as a parent above to switch: then you can see every device, add new ones with a one-time code, and remove any of them.</p>
+      <button class="danger" id="dvLeave" style="justify-self:start;margin-left:-10px">Stop syncing on this device</button></div>`;
+  else if (deviceRole === 'device') { const m = myMember() || {};
+    box.innerHTML = `<div id="syncState"></div><div class="syncBlock"><b>This is a practice device</b>
+      <p class="muted small">${esc(m.name || deviceLabel())} · for ${esc(who(m))} · added ${m.at ? day(m.at) : ''}. Parents manage it from their own AlleGrow.</p>
+      <button class="danger" id="dvSelf" style="justify-self:start;margin-left:-10px">Remove this device</button></div>`; }
+  else { const devs = Object.entries(members).filter(([, m]) => m.role === 'device').sort((a, b) => (a[1].at || '').localeCompare(b[1].at || ''));
+    box.innerHTML = `<div id="syncState"></div><div class="syncBlock"><b>Practice devices</b>
+      ${devs.length ? `<div class="deviceList">${devs.map(([uid, m]) => `<div class="opt"><span>${icon('tablet', 'sm')} ${esc(m.name || 'Device')}<br><small class="muted">For ${esc(who(m))} · added ${m.at ? day(m.at) : ''}</small></span>
+        <button class="ghost small dangerText" data-rmdev="${uid}">Remove</button></div>`).join('')}</div>`
+        : '<p class="muted small">None yet. Add your child’s tablet or phone – it doesn’t need an account.</p>'}
+      <button class="secondary" id="dvAdd" style="justify-self:start">${icon('plus', 'sm')}Add a practice device</button></div>`; }
+  box.querySelector('#dvJoin')?.addEventListener('click', askJoinCode);
+  box.querySelector('#dvLeave')?.addEventListener('click', leaveFamily);
+  box.querySelector('#dvSelf')?.addEventListener('click', () => removeMember(myUid()));
+  box.querySelector('#dvAdd')?.addEventListener('click', () => pairDialog('device'));
+  box.querySelectorAll('[data-rmdev]').forEach(b => b.onclick = () => removeMember(b.dataset.rmdev));
+  setSync(syncState);
 }
 async function removeParentAccount(uid) {
   if (!confirm('Remove this parent account from the family? You can add it again any time.')) return;
@@ -1090,20 +1261,9 @@ function familyCode() {
   const abc = 'abcdefghjkmnpqrstuvwxyz23456789', r = crypto.getRandomValues(new Uint8Array(25));
   return [...r].map(x => abc[x % abc.length]).join('').match(/.{5}/g).join('-');
 }
-async function createFamily() {
-  setSync('connecting');
-  try { await loadFirebase(); } catch (e) { console.error(e); return setSync('error'); }
-  family = familyCode();
-  const saved = F.setDoc(F.doc(db, 'families', family), { kids, log, stats, manual, settings, theory, created: F.serverTimestamp() })
-    .catch(e => { console.error(e); setSync('error'); });
-  store.set('pt-family', family);
-  await connect(); renderParent();
-  return saved;                                  // resolves once the server has it (someone linking an account waits for this)
-}
 async function joinFamily(code) {
   code = code.trim().toLowerCase().replace(/\s+/g, '');
-  const fail = msg => screen === 'parent' ? ($('joinError').textContent = msg) : alert(msg);
-  $('joinError').textContent = '';
+  const fail = msg => alert(msg);                  // an older "join" link (family code); new devices use pairing codes
   if (code.length < 20) return fail('That code is too short. Check it and try again.');
   try {
     await loadFirebase();
@@ -1114,17 +1274,14 @@ async function joinFamily(code) {
   if (family ? !confirm('Switch this device to the other family account? It will show that account’s players and history instead. Your current account stays safe on your other devices, and you can switch back with its code.')
       : kids.length && !confirm('Replace the players and history on this device with your family’s shared ones?')) return;
   if (family) { flushPractice(); flushFields(); }
-  family = code; store.set('pt-family', family);
-  pend = {}; store.set('pt-pend', pend);
-  pendStats = {}; store.set('pt-pendstats', pendStats);
-  await connect();
+  await useFamily(code, null);
   if (screen === 'parent') renderParent();
 }
 function leaveFamily() {
   if (!confirm('Stop syncing on this device? It keeps a copy of the current players and history, but won’t see new practice from other devices.')) return;
   flushPractice(); flushFields();
   unsubscribe?.(); unsubscribe = ref = null;
-  family = null; store.set('pt-family', null);
+  family = null; store.set('pt-family', null); deviceRole = null; store.set('pt-role', null); members = null;
   setSync('local'); renderParent();
 }
 
@@ -1138,8 +1295,8 @@ function setSync(state) {
   const html = text ? `${icon(ic, 'sm')}<span>${text}</span>` : '';
   // On the home screen this line doubles as the way into Devices & sync
   $('syncStatus').innerHTML = state === 'local' ? `${icon('cloud', 'sm')}<span>Use AlleGrow on more than one device?</span>`
-    : state === 'synced' ? `${html}<span class="muted">·</span><span style="text-decoration:underline">Add a device</span>` : html;
-  $('syncState').innerHTML = html;
+    : state === 'synced' && deviceRole === 'parent' ? `${html}<span class="muted">·</span><span style="text-decoration:underline">Add a device</span>` : html;
+  if ($('syncState')) $('syncState').innerHTML = html;
 }
 
 // ---------- Dates & formatting ----------
@@ -1234,9 +1391,9 @@ function renderMove() {
     card.innerHTML = `<b>AlleGrow has a new home: allegrowmusic.com</b>
       <p class="small muted">This app keeps working, but it won’t get updates. Moving takes a minute:</p>
       <ol class="small">${family ? `<li>Your family code is <b class="code" style="display:inline;padding:1px 6px">${esc(family)}</b> <button class="ghost small" id="mvCopy">Copy</button></li>`
-        : `<li>First turn on sync (Parents → Settings → Devices &amp; sync) so your players and history can come along.</li>`}
+        : `<li>First turn on sync (Parents → Settings → Family &amp; devices) so your players and history can come along.</li>`}
         <li>Open <b>allegrowmusic.com/app</b> in your browser and add it to your home screen (Share → Add to Home Screen).</li>
-        <li>In the new app, go to Parents → Settings → Devices &amp; sync and enter your family code${Object.keys(familyParents).length ? ' (or sign in as a parent)' : ''}.</li>
+        <li>In the new app, go to Parents → Settings → Family &amp; devices and enter your family code${Object.keys(familyParents).length ? ' (or sign in as a parent)' : ''}.</li>
         <li>Then delete this old icon.</li></ol>
       <a class="secondary block" href="${NEW}" target="_blank" rel="noopener" style="text-decoration:none;display:flex;justify-content:center;padding:11px;border-radius:14px;border:1.5px solid var(--line);font-weight:600;color:var(--ink)">Open allegrowmusic.com</a>`;
     $('mvCopy')?.addEventListener('click', async e => { try { await navigator.clipboard.writeText(family); e.target.textContent = 'Copied'; } catch {} });
@@ -1261,7 +1418,10 @@ function renderHome() {
   renderInstall();
   $('noKids').hidden = kids.length > 0;
   $('historyBtn').hidden = kids.length === 0;
-  $('kidList').innerHTML = kids.map(k => {
+  const notice = store.get('pt-notice', '');
+  $('famNotice').hidden = !notice; $('famNotice').innerHTML = notice ? `${icon('alert', 'sm')}<span class="grow">${esc(notice)}</span><button class="ghost small" id="famNoticeX">OK</button>` : '';
+  $('famNoticeX')?.addEventListener('click', () => { store.set('pt-notice', ''); renderHome(); });
+  $('kidList').innerHTML = visibleKids().map(k => {
     const today = msOn(k), g = goalOf(k) * 60000, frac = g ? Math.min(today / g, 1) : (today ? 1 : 0), st = streak(k);
     return `<button class="tile" data-kid="${k.id}" style="--kid:${kidColor(k)}">
       <div class="avatar">${face(k)}</div>
@@ -1282,6 +1442,8 @@ function renderHome() {
   document.querySelectorAll('[data-kid]').forEach(b => b.onclick = () => { kid = kids.find(k => k.id === b.dataset.kid); sessionMs = 0; session = newSession(); show('practice'); });
 }
 $('parentBtn').onclick = $('setupBtn').onclick = () => askPin();
+$('homeJoin').onclick = askJoinCode;
+$('homeRestore').onclick = () => parentSignInFlow('Sign in with the account you use for AlleGrow to bring your family’s players and practice back on this device.').then(ok => ok && show('home'));
 $('historyBtn').onclick = () => show('history');
 
 // ---------- Practice ----------
@@ -1682,7 +1844,7 @@ $('pinForgot').onclick = () => {
       <button class="secondary block" id="fgEmail">Email me a reset code</button>
       <div class="addRow" id="fgCodeRow" hidden><input type="text" id="fgCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code" aria-label="Code from the email"><button class="secondary" id="fgVerify">Continue</button></div>
       <p class="small" id="fgErr" style="color:var(--danger)"></p>
-      <button class="ghost small" id="fgSignIn">Or sign in with the parent account</button>`;
+      ${deviceRole === 'device' ? '' : '<button class="ghost small" id="fgSignIn">Or sign in with the parent account</button>'}`;
     $('fgEmail').onclick = async () => {
       $('fgEmail').disabled = true; $('fgErr').textContent = '';
       try {
@@ -1701,11 +1863,11 @@ $('pinForgot').onclick = () => {
       } catch { $('fgErr').textContent = 'Couldn’t check the code. Check the internet connection.'; }
     };
     $('fgCode').onkeydown = e => { if (e.key === 'Enter') $('fgVerify').click(); };
-    $('fgSignIn').onclick = async () => {
+    if ($('fgSignIn')) $('fgSignIn').onclick = async () => {
       try {
         const u = await parentSignIn('Sign in with the parent account linked to this family.');
         if (!u) return;
-        if (!familyParents[u.uid]) return ($('fgErr').textContent = `${u.email} isn’t a parent account for this family.`);
+        if (!familyParents[u.uid] && members?.[u.uid]?.role !== 'parent') return ($('fgErr').textContent = `${u.email} isn’t a parent account for this family.`);
         pinReset = u.email; askPin(true);
       } catch (e) { if (e?.code !== 'auth/popup-closed-by-user') $('fgErr').textContent = 'Sign-in didn’t work. Please try again.'; }
     };
@@ -1715,7 +1877,7 @@ $('pinForgot').onclick = () => {
   box.innerHTML = `<p class="small">For grown-ups: what is <b>${NUM_WORDS[a]} times ${NUM_WORDS[b]}</b>?</p>
     <div class="addRow"><input type="text" id="fgAns" inputmode="numeric" maxlength="3" aria-label="Answer"><button class="secondary" id="fgOk">Reset PIN</button></div>
     <p class="small" id="fgErr" style="color:var(--danger)"></p>
-    <p class="muted small">Players and practice history aren’t affected. Tip: add a parent account in Settings → Devices &amp; sync, so next time you can reset it by signing in.</p>`;
+    <p class="muted small">Players and practice history aren’t affected. Tip: add a parent account in Settings → Family &amp; devices, so next time you can reset it by signing in.</p>`;
   $('fgAns').focus();
   $('fgOk').onclick = () => {
     if (+$('fgAns').value.trim() !== a * b) { $('pinForgot').onclick(); $('fgErr').textContent = 'That’s not it – here’s a new one.'; return; }
@@ -1771,7 +1933,7 @@ function renderAccount() {
     ${mine && auth.currentUser && !auth.currentUser.emailVerified ? `<p class="small" style="color:var(--warn)">Check your inbox to confirm ${esc(auth.currentUser.email)} – PIN codes and summaries can only be emailed once it’s confirmed.
       <button class="ghost small" id="resendVerify" style="padding:2px 4px">Send the link again</button></p>` : ''}
     ${settings.pinResetAt ? `<p class="muted small">The PIN was last reset ${new Date(settings.pinResetAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} by ${esc(settings.pinResetBy || 'a parent')}.</p>` : ''}`;
-  $('addParent').onclick = addParentAccount;
+  $('addParent').onclick = () => mine || deviceRole === 'parent' ? pairDialog('parent') : parentSignInFlow();
   $('resendVerify')?.addEventListener('click', async e => { try { await A.sendEmailVerification(auth.currentUser); e.target.textContent = 'Sent – check your inbox'; } catch { e.target.textContent = 'Couldn’t send – try again later'; } });
   const msg = t => { const el = $('summaryMsg'); if (el) el.textContent = t; };
   $('weeklyToggle')?.addEventListener('change', async e => {
@@ -1856,14 +2018,8 @@ function renderParent() {
     if (ref) F.updateDoc(ref, { ['log.' + k.id]: F.deleteField(), ['stats.' + k.id]: F.deleteField(), ['manual.' + k.id]: F.deleteField() }).catch(console.error);
     renderParent();
   });
-  $('syncOff').hidden = !!family;
-  $('syncOn').hidden = !family;
-  $('leaveBtn').hidden = !family;
   renderAccount();
-  $('joinTitle').textContent = family ? 'Bring in a different family account' : 'Already using AlleGrow on another device?';
-  $('joinHelp').textContent = family ? 'Has your family already set up AlleGrow somewhere else? Enter that family code to switch this device over to it.'
-    : 'Scan its QR code with this device’s camera, or enter its family code here.';
-  $('familyCode').textContent = family || '';
+  renderDevices();
   $('musicOnly').checked = settings.musicOnly;
   $('sens').value = settings.sens;
   $('grace').value = settings.grace;
@@ -1875,7 +2031,7 @@ function renderParent() {
 }
 function newKid(name, instrument = '') {
   const used = kids.map(kidColor);
-  const k = { id: Date.now().toString(36), name, goal: 20, bpm: 80, instrument, chime: true,
+  const k = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name, goal: 20, bpm: 80, instrument, chime: true,
               color: COLORS.find(c => !used.includes(c)) || COLORS[kids.length % COLORS.length] };
   kids.push(k); saveKids();
   return k;
@@ -1884,33 +2040,6 @@ $('addBtn').onclick = () => {
   const name = $('newName').value.trim();
   if (!name) return;
   newKid(name); $('newName').value = ''; renderParent();
-};
-$('createFamilyBtn').onclick = createFamily;
-$('joinBtn').onclick = () => joinFamily($('joinCode').value);
-$('restoreBtn').onclick = $('homeRestore').onclick = restoreWithAccount;
-$('joinCode').onkeydown = e => { if (e.key === 'Enter') $('joinBtn').click(); };
-$('leaveBtn').onclick = leaveFamily;
-const joinUrl = () => location.origin + location.pathname + '#join=' + family;
-$('shareBtn').onclick = async () => {
-  const url = joinUrl();
-  try {
-    if (navigator.share) return await navigator.share({ title: 'AlleGrow', text: 'Open this to connect this device to our family’s AlleGrow:', url });
-    await navigator.clipboard.writeText(url);
-    $('shareBtn').innerHTML = `${icon('check', 'sm')}Link copied`;
-  } catch {}
-};
-$('copyCodeBtn').onclick = async () => {
-  try { await navigator.clipboard.writeText(family); $('copyCodeBtn').innerHTML = `${icon('check', 'sm')}Code copied`; } catch { prompt('Family code:', family); }
-};
-// QR code of the join link (a small free library, loaded only when asked for)
-$('qrBtn').onclick = async () => {
-  if (!$('qrBox').hidden) { $('qrBox').hidden = true; $('qrBtn').innerHTML = `${icon('qr', 'sm')}Show QR code`; return; }
-  try {
-    if (!window.qrcode) await new Promise((ok, bad) => { const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js'; sc.onload = ok; sc.onerror = bad; document.head.append(sc); });
-    const qr = qrcode(0, 'M'); qr.addData(joinUrl()); qr.make();
-    $('qr').innerHTML = qr.createSvgTag({ cellSize: 6, margin: 3, scalable: true });
-    $('qrBox').hidden = false; $('qrBtn').innerHTML = `${icon('qr', 'sm')}Hide QR code`;
-  } catch (e) { console.error(e); alert('Couldn’t make the QR code – check the internet connection, or use Send link instead.'); }
 };
 // Home screen sync line → straight to Devices & sync (after the parent PIN)
 let afterPin = null;
@@ -2319,6 +2448,7 @@ function pushTeacher(k) {
 
 async function startLink(code, forKid) {
   code = code.trim().toLowerCase().replace(/\s+/g, '');
+  if (deviceRole !== 'parent') return requireParent('To connect a child to their teacher, a parent agrees and signs in.', () => startLink(code, forKid));
   let t = null;
   try {
     if (code.length >= 20) { await loadFirebase(); const snap = await F.getDoc(F.doc(db, 'students', code)); t = snap.exists() ? snap.data() : null; }
@@ -3265,7 +3395,10 @@ const teacherInvite = location.hash.match(/link=([a-z0-9-]{20,})/);
 if (teacherInvite) { history.replaceState(null, '', location.pathname + location.search); startLink(teacherInvite[1]); }
 if (!family) setSync('local');
 upgradePin();
-// A "Send link to another device" link: #join=<family code>
+// "Add this device" link from a parent: #pair=<code>
+const pairLink = location.hash.match(/pair=([a-z0-9]{8})/i);
+if (pairLink) { history.replaceState(null, '', location.pathname + location.search); joinWithCode(pairLink[1]); }
+// An older "Send link to another device" link: #join=<family code>
 const joinLink = location.hash.match(/join=([a-z0-9-]{20,})/);
 if (joinLink) {
   history.replaceState(null, '', location.pathname);
