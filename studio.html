@@ -512,7 +512,7 @@
 <div class="overlay" id="modal" hidden><div class="card modal" id="modalCard" role="dialog" aria-modal="true"></div></div>
 <div id="toast"></div>
 
-<script src="badges.js?v=8"></script>
+<script src="badges.js?v=9"></script>
 <script src="theory.js?v=3"></script>
 <script src="signin.js?v=1"></script>
 <script>
@@ -1607,14 +1607,9 @@ function studentModal(sid, scrollTo) {
       <div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="fSave">${sid ? 'Save' : 'Add student'}</button></div></footer>`, m => {
     // photo (teacher's own; the family's photo, if any, always wins)
     let tPhoto = s.teacherPhoto || null;
-    m.querySelector('#fPhoto')?.addEventListener('click', () => {
-      const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*';
-      input.onchange = async () => {
-        if (!input.files[0]) return;
-        try { tPhoto = await makePhoto(input.files[0]); m.querySelector('#fPhotoPrev').innerHTML = `<img src="${tPhoto}" alt="">`; m.querySelector('#fPhotoDel').hidden = false; }
-        catch (e) { console.error(e); toast('Couldn’t use that picture'); }
-      };
-      input.click();
+    m.querySelector('#fPhoto')?.addEventListener('click', async () => {
+      const photo = await choosePhoto(); if (!photo) return;           // pick and frame it (badges.js)
+      tPhoto = photo; m.querySelector('#fPhotoPrev').innerHTML = `<img src="${tPhoto}" alt="">`; m.querySelector('#fPhotoDel').hidden = false;
     });
     m.querySelector('#fPhotoDel')?.addEventListener('click', () => { tPhoto = null; m.querySelector('#fPhotoPrev').innerHTML = initial(val('fName') || s.name); m.querySelector('#fPhotoDel').hidden = true; });
     // lesson times editor

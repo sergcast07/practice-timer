@@ -184,19 +184,111 @@ function medalSvg(iconId, color, { locked = false, size = 64 } = {}) {
 }
 
 // ---------- Photos ----------
-// A small square picture (128 × 128 JPEG, about 5–10 KB) kept right on the player/student record, so no file
+// A small square picture (160 × 160 JPEG, about 6–14 KB) kept right on the player/student record, so no file
 // storage is needed. Just enough for a teacher with many students to see who's who.
-async function makePhoto(file, size = 128) {
+// choosePhoto() picks a file, then lets the person drag and zoom to frame it in the circle that's shown in the app.
+
+// Open the file picker; resolves with the file, or null. (The input is kept in the page until it's used:
+// some browsers never report the choice from a detached input.)
+function pickImageFile() {
+  return new Promise(resolve => {
+    const input = Object.assign(document.createElement('input'), { type: 'file', accept: 'image/*' });
+    input.style.cssText = 'position:fixed;left:-9999px;opacity:0';
+    document.body.append(input);
+    const done = f => { input.remove(); resolve(f); };
+    input.onchange = () => done(input.files[0] || null);
+    input.addEventListener('cancel', () => done(null));
+    input.click();
+  });
+}
+async function loadPhoto(file) {
+  if (/heic|heif/i.test(file.type) || /\.(heic|heif)$/i.test(file.name || '')) {
+    try { return await createImageBitmap(file); }                  // Safari can open these; most other browsers can't
+    catch { throw new Error('heic'); }
+  }
+  try { return await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+  catch {
+    const img = new Image(), url = URL.createObjectURL(file);
+    try { img.src = url; await img.decode(); return img; } catch { throw new Error('decode'); } finally { setTimeout(() => URL.revokeObjectURL(url), 1000); }
+  }
+}
+const photoError = e => e?.message === 'heic'
+  ? 'This browser can’t open iPhone HEIC photos. Try it in Safari, or pick a JPEG or PNG (a screenshot of the photo works too).'
+  : 'Couldn’t open that picture. Try a JPEG or PNG.';
+
+// The framing step: returns a JPEG data URL, or null if they cancel
+function framePhoto(src, size = 160) {
+  const W = src.width, H = src.height, S = 280;                    // S = the frame on screen (CSS px)
+  const base = Math.max(S / W, S / H);                             // smallest zoom that still fills the frame
+  let zoom = 1, cx = W / 2, cy = H / 2;                            // image point at the center of the frame
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML = `<div role="dialog" aria-label="Frame the photo" style="background:var(--card,#1d212b);color:var(--ink,#eef0f5);border-radius:20px;padding:18px;width:min(340px,100%);display:grid;gap:12px;justify-items:center;box-shadow:0 20px 60px rgba(0,0,0,.4);font-family:var(--sans,system-ui)">
+      <b style="font-size:17px">Frame the photo</b>
+      <span style="font-size:13px;color:var(--muted,#9aa1b1);text-align:center;margin-top:-6px">Drag to move it. Zoom with the slider, a pinch or the scroll wheel.</span>
+      <canvas style="width:${S}px;height:${S}px;max-width:100%;border-radius:16px;touch-action:none;cursor:grab;background:#000"></canvas>
+      <label style="display:flex;align-items:center;gap:10px;width:100%;font-size:13px;color:var(--muted,#9aa1b1)">Zoom<input type="range" min="1" max="5" step="0.01" value="1" style="flex:1"></label>
+      <div style="display:flex;gap:10px;width:100%"><button type="button" class="secondary" data-x style="flex:1">Cancel</button><button type="button" class="primary" data-ok style="flex:1">Use photo</button></div>
+    </div>`;
+  document.body.append(ov);
+  const cv = ov.querySelector('canvas'), range = ov.querySelector('input'), dpr = Math.min(window.devicePixelRatio || 1, 3), ctx = cv.getContext('2d');
+  cv.width = cv.height = Math.round(S * dpr);
+  const clamp = () => {                                            // keep the frame covered by the picture
+    const half = S / (2 * base * zoom);
+    cx = Math.min(Math.max(cx, half), W - half); cy = Math.min(Math.max(cy, half), H - half);
+  };
+  const paint = (c, px) => {                                       // draw the framed square onto a px × px canvas
+    const k = base * zoom * px / S, g = c.getContext('2d');
+    g.imageSmoothingQuality = 'high'; g.fillStyle = '#fff'; g.fillRect(0, 0, px, px);
+    g.drawImage(src, px / 2 - cx * k, px / 2 - cy * k, W * k, H * k);
+  };
+  const draw = () => {
+    clamp(); paint(cv, cv.width);
+    const r = cv.width / 2;                                        // dim what falls outside the circle the app shows
+    ctx.save(); ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.beginPath(); ctx.rect(0, 0, cv.width, cv.width); ctx.arc(r, r, r - 1, 0, Math.PI * 2, true); ctx.fill('evenodd');
+    ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 2 * dpr; ctx.beginPath(); ctx.arc(r, r, r - dpr, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+  };
+  const setZoom = (z, fx = S / 2, fy = S / 2) => {                 // zoom around a point in the frame
+    z = Math.min(5, Math.max(1, z));
+    const k0 = base * zoom, k1 = base * z;
+    cx += (fx - S / 2) / k0 - (fx - S / 2) / k1; cy += (fy - S / 2) / k0 - (fy - S / 2) / k1;
+    zoom = z; range.value = z; draw();
+  };
+  const pts = new Map(); let pinch = null;
+  const local = e => { const b = cv.getBoundingClientRect(); return [(e.clientX - b.left) * S / b.width, (e.clientY - b.top) * S / b.height]; };
+  cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); pts.set(e.pointerId, local(e)); cv.style.cursor = 'grabbing'; pinch = null; });
+  cv.addEventListener('pointermove', e => {
+    if (!pts.has(e.pointerId)) return;
+    const [x, y] = local(e), [px, py] = pts.get(e.pointerId); pts.set(e.pointerId, [x, y]);
+    if (pts.size === 1) { const k = base * zoom; cx -= (x - px) / k; cy -= (y - py) / k; draw(); return; }
+    const [a, b] = [...pts.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+    if (pinch) setZoom(pinch.z * d / pinch.d, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2); else pinch = { d, z: zoom };
+  });
+  const up = e => { pts.delete(e.pointerId); pinch = null; if (!pts.size) cv.style.cursor = 'grab'; };
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  cv.addEventListener('wheel', e => { e.preventDefault(); const [x, y] = local(e); setZoom(zoom * Math.exp(-e.deltaY / 400), x, y); }, { passive: false });
+  range.oninput = () => setZoom(+range.value);
+  draw();
+  return new Promise(resolve => {
+    const close = v => { ov.remove(); document.removeEventListener('keydown', key, true); resolve(v); };
+    const key = e => { if (e.key === 'Escape') { e.stopPropagation(); close(null); } };
+    document.addEventListener('keydown', key, true);
+    ov.querySelector('[data-x]').onclick = () => close(null);
+    ov.addEventListener('click', e => { if (e.target === ov) close(null); });
+    ov.querySelector('[data-ok]').onclick = () => {
+      const out = document.createElement('canvas'); out.width = out.height = size; paint(out, size);
+      let q = 0.85, url = out.toDataURL('image/jpeg', q);
+      while (url.length > 20000 && q > 0.4) { q -= 0.1; url = out.toDataURL('image/jpeg', q); }
+      close(url);
+    };
+  });
+}
+// Pick a picture and frame it: resolves with the photo (a JPEG data URL) or null. Shows its own error message.
+async function choosePhoto() {
+  const file = await pickImageFile(); if (!file) return null;
   let src;
-  try { src = await createImageBitmap(file); }
-  catch { src = new Image(); src.src = URL.createObjectURL(file); await src.decode(); }
-  const w = src.width, h = src.height, s = Math.min(w, h), c = document.createElement('canvas');
-  c.width = c.height = size;
-  const ctx = c.getContext('2d'); ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(src, (w - s) / 2, (h - s) / 2, s, s, 0, 0, size, size);          // center crop to a square
-  let q = 0.8, url = c.toDataURL('image/jpeg', q);
-  while (url.length > 16000 && q > 0.4) { q -= 0.1; url = c.toDataURL('image/jpeg', q); }
-  return url;
+  try { src = await loadPhoto(file); } catch (e) { console.error(e); alert(photoError(e)); return null; }
+  return framePhoto(src);
 }
 // Only ever display a small JPEG data URL – anything else stored in a photo field is ignored
 const safePhoto = p => typeof p === 'string' && p.length < 40000 && /^data:image\/jpeg;base64,[A-Za-z0-9+/]+=*$/.test(p) ? p : null;

@@ -802,7 +802,7 @@
   </div>
 </div>
 
-<script src="badges.js?v=8"></script>
+<script src="badges.js?v=9"></script>
 <script src="signin.js?v=1"></script>
 <script src="theory.js?v=3"></script>
 <script>
@@ -1421,16 +1421,10 @@ function manualDialog() {
 }
 $('manualBtn').onclick = manualDialog;
 
-// Player photos: shrunk to a 128 px square in the browser before saving (see makePhoto in badges.js)
-function pickPhoto(k) {
-  const input = document.createElement('input');
-  input.type = 'file'; input.accept = 'image/*';
-  input.onchange = async () => {
-    const file = input.files[0]; if (!file) return;
-    try { k.photo = await makePhoto(file); saveKids(); pushTeacher(k); renderParent(); }
-    catch (e) { console.error(e); alert('Couldn’t use that picture. Try a different photo.'); }
-  };
-  input.click();
+// Player photos: picked, framed by the parent, and saved as a small square (choosePhoto in badges.js)
+async function pickPhoto(k) {
+  const photo = await choosePhoto(); if (!photo) return;
+  k.photo = photo; saveKids(); pushTeacher(k); renderParent();
 }
 
 // Feedback from parents goes to the Allegrow team (read only by admins – see firestore.rules)
