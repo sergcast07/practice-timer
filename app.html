@@ -904,6 +904,14 @@ function onRemote(snap) {
   upgradePin();
   log = d.log || {};
   stats = d.stats || {};
+  if (!snap.metadata.fromCache) {                  // a copy uploaded from a device that had the bug (see repairLog)
+    const fixes = repairLog(log, stats);
+    if (fixes.length) {
+      fixes.forEach(f => log[f.id][f.day] = f.ms);
+      F.updateDoc(ref, Object.fromEntries(fixes.map(f => [`log.${f.id}.${f.day}`, f.ms]))).catch(e => console.error(e));
+      kids.filter(k => k.link && fixes.some(f => f.id === k.id)).forEach(k => setTimeout(() => pushTeacher(k), 0));
+    }
+  }
   manual = d.manual || {}; store.set('pt-manual', manual);
   if (!pendingFields.theory && d.theory) { theory = d.theory; store.set('pt-theory', theory); }
   store.set('pt-kids', kids); store.set('pt-log', log); store.set('pt-settings', settings); store.set('pt-stats', stats);
@@ -1474,6 +1482,18 @@ function addPractice(ms) {
     celebrate(kid);
     $('ring').classList.remove('cheer'); void $('ring').offsetWidth; $('ring').classList.add('cheer');
   }
+}
+
+// One-time cleanup for a bug (fixed 28 Sep 2026): on devices without sync, every timer tick also added the day's
+// hand-logged time to the recorded time, so a few seconds of playing could show as hours. Recorded time can never be
+// more than the time the microphone was on ("active"), so on days with hand-logged time we bring it back to that.
+function repairLog(lg, st) {
+  const fixes = [];
+  for (const id in lg) for (const day in lg[id]) {
+    const rec = lg[id][day], active = st?.[id]?.[day]?.active, hand = Object.values(manual[id] || {}).some(e => e.day === day);
+    if (hand && active != null && rec > active + 60000) fixes.push({ id, day, ms: Math.round(active) });
+  }
+  return fixes;
 }
 
 // ---------- End-of-session summary ----------
@@ -3023,6 +3043,11 @@ document.addEventListener('visibilitychange', async () => {
 updateMarks();
 show('home');
 if (musicOnly()) loadClassifier();
+if (!family) {                                     // see repairLog()
+  const fixes = repairLog(log, stats);
+  fixes.forEach(f => log[f.id][f.day] = f.ms);
+  if (fixes.length) { saveLog(); kids.filter(k => k.link && fixes.some(f => f.id === k.id)).forEach(k => pushTeacher(k)); }
+}
 if (family) connect();
 watchTeachers().then(() => kids.forEach(pushTeacher));
 // A teacher's invite link: #link=<student code>
