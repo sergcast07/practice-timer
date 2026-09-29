@@ -100,18 +100,18 @@ function decode(v) {
 // Family records are readable only by the family's own members, so the weekly family summary reads them as the service
 // itself: a Google service account (secret FIREBASE_SA = the key's JSON) signs a short-lived token. Everything else is
 // readable by its long random code. (The local emulator accepts "owner".)
-const b64url = b => btoa(typeof b === 'string' ? b : String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const toB64url = b => btoa(typeof b === 'string' ? b : String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 let saCache = null;
 async function serviceToken(env) {
   if (env.FIRESTORE) return 'owner';
   if (!env.FIREBASE_SA) return null;
   if (saCache && saCache.exp > Date.now() + 120000) return saCache.token;
   const sa = JSON.parse(env.FIREBASE_SA), now = Math.floor(Date.now() / 1000);
-  const body = `${b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))}.${b64url(JSON.stringify({ iss: sa.client_email, scope: 'https://www.googleapis.com/auth/datastore',
+  const body = `${toB64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))}.${toB64url(JSON.stringify({ iss: sa.client_email, scope: 'https://www.googleapis.com/auth/datastore',
     aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 }))}`;
   const der = Uint8Array.from(atob(sa.private_key.replace(/-----[^-]+-----|\s/g, '')), c => c.charCodeAt(0));
   const key = await crypto.subtle.importKey('pkcs8', der, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
-  const jwt = `${body}.${b64url(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(body)))}`;
+  const jwt = `${body}.${toB64url(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(body)))}`;
   const r = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: `grant_type=${encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer')}&assertion=${jwt}` });
   const j = await r.json();
