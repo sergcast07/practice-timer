@@ -72,18 +72,75 @@ service cloud.firestore {
     // Only the signed-in teacher who owns it can read or write.
     // The studio's plan (Free, or Beta partner) can only be changed by redeeming an unused beta code in the
     // same write, or by an admin.
+    // Music schools: schools/{id} = { name, owner (the admin's user ID), teachers: {uid: {name, email, status, billing, invite}} }.
+    // A teacher's studio says which school it belongs to (studios/{uid}.school); the admin can open that studio (not its
+    // private notes) and, when the school handles a teacher's billing, change it. Students of a school carry schoolId.
+    function schoolDoc(s) { return get(/databases/$(db)/documents/schools/$(s)).data; }
+    function schoolAdmin(s) { return request.auth != null && s is string && s != '' && schoolDoc(s).owner == request.auth.uid; }
+    function schoolTeacher(s) { return request.auth != null && s is string && s != '' && schoolDoc(s).teachers.get(request.auth.uid, {}).get('status', '') == 'active'; }
+    function studioSchool(uid) { return get(/databases/$(db)/documents/studios/$(uid)).data.get('school', ''); }
+    // the school runs this teacher's billing (the admin changes it; the teacher only sees it)
+    function schoolBills(s, uid) { return s != '' && schoolDoc(s).owner != uid && schoolDoc(s).teachers.get(uid, {}).get('billing', 'teacher') == 'school'; }
+
     match /studios/{uid} {
-      allow read: if (request.auth != null && request.auth.uid == uid) || isAdmin();
-      allow create: if request.auth != null && request.auth.uid == uid && !('plan' in request.resource.data);
-      allow update: if isAdmin() || (request.auth != null && request.auth.uid == uid && (
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['plan'])
-        || (request.resource.data.plan.tier == 'beta'
-            && getAfter(/databases/$(db)/documents/betaCodes/$(request.resource.data.plan.code)).data.usedBy == request.auth.uid)));
+      allow read: if (request.auth != null && request.auth.uid == uid) || isAdmin() || schoolAdmin(resource.data.get('school', ''));
+      allow create: if request.auth != null && request.auth.uid == uid && !('plan' in request.resource.data) && !('school' in request.resource.data);
+      allow update: if isAdmin()
+        || (request.auth != null && request.auth.uid == uid
+            && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['plan'])
+                || (request.resource.data.plan.tier == 'beta'
+                    && getAfter(/databases/$(db)/documents/betaCodes/$(request.resource.data.plan.code)).data.usedBy == request.auth.uid))
+            // joining a school: only one the teacher runs, or one that just made them an active teacher
+            && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['school'])
+                || schoolAdmin(request.resource.data.school) || schoolTeacher(request.resource.data.school))
+            && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['billing']) || !schoolBills(resource.data.get('school', ''), uid)))
+        // the school's admin, working in a teacher's studio
+        || (schoolAdmin(resource.data.get('school', ''))
+            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['plan', 'school', 'feedToken'])
+            && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['billing']) || schoolBills(resource.data.school, uid)));
       allow delete: if false;
       // Everything inside the studio (lessons, recitals, notes). "{sub}/" makes sure this only matches documents
       // below the studio – a bare {document=**} would also match the studio record itself and bypass the plan rule.
       match /{sub}/{document=**} {
-        allow read, write: if request.auth != null && request.auth.uid == uid;
+        allow read, write: if request.auth != null && request.auth.uid == uid
+          && !(sub == 'billing' && request.method != 'get' && request.method != 'list' && schoolBills(studioSchool(uid), uid));
+        allow read: if sub != 'notes' && schoolAdmin(studioSchool(uid));
+        allow write: if sub != 'notes' && schoolAdmin(studioSchool(uid)) && (sub != 'billing' || schoolBills(studioSchool(uid), uid));
+      }
+    }
+
+    match /schools/{s} {
+      allow get: if request.auth != null && (resource.data.owner == request.auth.uid
+        || resource.data.teachers.get(request.auth.uid, {}).get('status', '') == 'active');
+      allow create: if request.auth != null && request.resource.data.owner == request.auth.uid && request.resource.data.teachers.size() == 0;
+      allow update: if request.auth != null && request.resource.data.teachers.size() <= 25 && (
+        // the admin: anything but who owns it
+        (resource.data.owner == request.auth.uid && request.resource.data.owner == resource.data.owner)
+        // a teacher accepting an invite: adds only themselves, as an active teacher, with a live invite code
+        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['teachers'])
+            && request.resource.data.teachers.diff(resource.data.teachers).affectedKeys().hasOnly([request.auth.uid])
+            && request.resource.data.teachers[request.auth.uid].status == 'active'
+            && get(/databases/$(db)/documents/schools/$(s)/invites/$(request.resource.data.teachers[request.auth.uid].invite)).data.expires > request.time
+            && request.resource.data.teachers[request.auth.uid].billing
+               == get(/databases/$(db)/documents/schools/$(s)/invites/$(request.resource.data.teachers[request.auth.uid].invite)).data.billing));
+      allow delete: if false;
+      match /invites/{code} {
+        allow get: if request.auth != null && code.size() >= 12;
+        allow create: if schoolAdmin(s) && code.size() >= 12;
+        allow delete: if request.auth != null;                     // used once, then removed (or withdrawn by the admin)
+        allow list: if schoolAdmin(s);
+        allow update: if false;
+      }
+      // school-wide events (recitals with students from several teachers) and tasks the admin gives teachers
+      match /events/{e} {
+        allow read: if schoolAdmin(s) || schoolTeacher(s);
+        allow write: if schoolAdmin(s);
+      }
+      match /tasks/{t} {
+        allow read: if schoolAdmin(s) || (schoolTeacher(s) && resource.data.teacher == request.auth.uid);
+        allow create, delete: if schoolAdmin(s);
+        allow update: if schoolAdmin(s) || (schoolTeacher(s) && resource.data.teacher == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'doneAt', 'reply']));
       }
     }
 
@@ -122,9 +179,12 @@ service cloud.firestore {
     // One student: shared between their teacher and their family.
     // The student code (sent to the family as an invite link) is long and random.
     match /students/{sid} {
-      // Teacher: full control of their own students
-      allow read, update, delete: if request.auth != null && resource.data.studioId == request.auth.uid;
-      allow create: if request.auth != null && request.resource.data.studioId == request.auth.uid && sid.size() >= 20;
+      // Teacher: full control of their own students. A school's admin: all of the school's students.
+      allow read, update, delete: if request.auth != null && (resource.data.studioId == request.auth.uid || schoolAdmin(resource.data.get('schoolId', '')));
+      allow create: if request.auth != null && sid.size() >= 20 && (
+        (request.resource.data.studioId == request.auth.uid
+          && (!('schoolId' in request.resource.data) || studioSchool(request.auth.uid) == request.resource.data.schoolId))
+        || (schoolAdmin(request.resource.data.get('schoolId', '')) && studioSchool(request.resource.data.studioId) == request.resource.data.schoolId));
       // Family (holds the code): can read it, and can only update their child's practice data, assignment ticks,
       // earned badges, which stars they've seen, which challenges they've finished, consent, and the child's photo
       allow get: if sid.size() >= 20;

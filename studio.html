@@ -81,6 +81,12 @@
   .linkBtn:hover { text-decoration: underline; }
   .owe { color: var(--warn); } .credit { color: var(--good); }
   .billTable td { vertical-align: middle; }
+  .viewBar { display: flex; gap: 10px; align-items: center; background: color-mix(in srgb, var(--accent) 14%, var(--card)); border-radius: 12px; padding: 10px 14px; margin-bottom: 18px; font-size: 14px; }
+  .seGroups { display: grid; gap: 10px; max-height: 280px; overflow: auto; padding: 10px; border-radius: 12px; background: var(--soft); }
+  .seGroup { display: grid; gap: 4px; }
+  .assign.off { opacity: .55; }
+  .tickBtn { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--line); background: none; display: grid; place-items: center; color: var(--muted); cursor: pointer; flex: none; }
+  .tickBtn:hover { border-color: var(--good); color: var(--good); }
   .ledgerTable td { vertical-align: middle; } .ledgerTable .rowActs { text-align: right; white-space: nowrap; }
   .ledgerTable .rowActs button { padding: 2px 6px; }
   .lateBox { display: grid; gap: 10px; padding: 12px; border-radius: 14px; background: var(--soft); }
@@ -438,6 +444,7 @@
   <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 6.5 8.5 6.5 8.5-6.5"/></symbol>
   <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3.5"/></symbol>
   <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12.5-7.5z"/></symbol>
+  <symbol id="i-school" viewBox="0 0 24 24"><path d="M3 10.5 12 5l9 5.5M5.5 9.5V19h13V9.5M9.5 19v-5h5v5"/></symbol>
   <symbol id="i-home" viewBox="0 0 24 24"><path d="M3.5 10.5 12 3.5l8.5 7V20a1 1 0 0 1-1 1h-5v-6h-5v6h-5a1 1 0 0 1-1-1z"/></symbol>
   <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.2a6.5 6.5 0 0 1 3 5.8"/></symbol>
   <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="16" rx="2.5"/><path d="M16 3v4M8 3v4M3.5 10h17"/></symbol>
@@ -516,6 +523,7 @@
       <button data-go="events"><svg class="ic"><use href="#i-award"/></svg><span class="navLong">Performances &amp; exams</span><span class="navShort">Events</span></button>
       <button data-go="reports"><svg class="ic"><use href="#i-report"/></svg>Reports</button>
       <button data-go="billing"><svg class="ic"><use href="#i-dollar"/></svg>Billing</button>
+      <button data-go="school" id="schoolNav" hidden><svg class="ic"><use href="#i-school"/></svg>School</button>
       <button data-go="admin" id="adminNav" hidden><svg class="ic"><use href="#i-settings"/></svg>Beta admin</button>
     </nav>
     <div class="planBox" id="planBox"></div>
@@ -659,6 +667,13 @@ function trend(a, b) {
 
 // ---------- State ----------
 let me = null, studio = null, students = {}, lessons = {}, events = {}, notes = {}, billing = {}, clips = {};
+// SU = whose studio is on screen: your own, or – for a music school's admin – one of the school's teachers
+let SU = null;
+const myStudio = () => !me || SU === me.uid;
+// Music school (schools/{id}): the school record, its events and tasks; ownStudio = the signed-in teacher's own studio record
+let school = null, schoolId = null, schoolEvents = {}, schoolTasks = {}, ownStudio = null;
+const isSchoolAdmin = () => !!school && !!me && school.owner === me.uid;
+const teacherEntry = uid => school?.teachers?.[uid] || null;
 const active = () => Object.values(students).filter(s => !s.archived).sort((a, b) => a.name.localeCompare(b.name));
 
 // ---------- Data layer: Firestore, or in-memory for the demo ----------
@@ -678,8 +693,9 @@ async function firebaseApi() {
   const app = initializeApp(FIREBASE), auth = A.getAuth(app), db = F.getFirestore(app);
   if (EMULATOR) { A.connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true }); F.connectFirestoreEmulator(db, '127.0.0.1', 8080); }
   const conv = patch => Object.fromEntries(Object.entries(patch).map(([k, v]) => [k, v === DEL ? F.deleteField() : v]));
-  const unsubs = [];
+  const unsubs = [], schoolSubs = [];
   const fail = e => { console.error(e); toast('Couldn’t save – check your connection'); };
+  const sref = (...p) => F.doc(db, 'schools', schoolId, ...p);
   return {
     auth, A,
     onAuth: cb => A.onAuthStateChanged(auth, cb),
@@ -690,12 +706,13 @@ async function firebaseApi() {
       try { await A.signInWithPopup(auth, p); }
       catch (e) { if (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment') await A.signInWithRedirect(auth, p); else throw e; }
     },
-    signOut: () => { unsubs.splice(0).forEach(u => u()); return A.signOut(auth); },
+    signOut: () => { unsubs.splice(0).forEach(u => u()); schoolSubs.splice(0).forEach(u => u()); return A.signOut(auth); },
+    unwatch: () => { unsubs.splice(0).forEach(u => u()); },
     getStudio: async uid => { const s = await F.getDoc(F.doc(db, 'studios', uid)); return s.exists() ? s.data() : null; },
     createStudio: data => F.setDoc(F.doc(db, 'studios', me.uid), { ...data, email: me.email || '', created: F.serverTimestamp() }),
-    updateStudio: patch => F.updateDoc(F.doc(db, 'studios', me.uid), conv(patch)).catch(fail),
+    updateStudio: patch => F.updateDoc(F.doc(db, 'studios', SU), conv(patch)).catch(fail),
     watch(render) {
-      const uid = me.uid, since = dayKey(addDays(today(), -400));
+      const uid = SU, since = dayKey(addDays(today(), -400));
       unsubs.push(F.onSnapshot(F.query(F.collection(db, 'students'), F.where('studioId', '==', uid)), q => {
         students = {}; q.forEach(d => students[d.id] = { id: d.id, ...d.data() }); render();
       }, fail));
@@ -719,7 +736,7 @@ async function firebaseApi() {
       unsubs.push(F.onSnapshot(F.collection(db, 'studios', uid, 'billing'), q => {
         billing = {}; q.forEach(d => billing[d.id] = d.data()); render();
       }, fail));
-      unsubs.push(F.onSnapshot(F.collection(db, 'studios', uid, 'notes'), q => {
+      if (uid === me.uid) unsubs.push(F.onSnapshot(F.collection(db, 'studios', uid, 'notes'), q => {
         notes = {}; q.forEach(d => notes[d.id] = d.data().text || ''); render();
       }, fail));
     },
@@ -733,16 +750,16 @@ async function firebaseApi() {
     },
     patchStudent: (sid, patch) => F.updateDoc(F.doc(db, 'students', sid), conv(patch)).catch(fail),
     deleteStudent: sid => F.deleteDoc(F.doc(db, 'students', sid)).catch(fail),
-    saveLesson: (id, data) => F.setDoc(F.doc(db, 'studios', me.uid, 'lessons', id), data, { merge: true }).catch(fail),
-    deleteLesson: id => F.deleteDoc(F.doc(db, 'studios', me.uid, 'lessons', id)).catch(fail),
-    saveEvent: (id, data) => F.setDoc(F.doc(db, 'studios', me.uid, 'events', id), data).catch(fail),
-    deleteEvent: id => F.deleteDoc(F.doc(db, 'studios', me.uid, 'events', id)).catch(fail),
-    saveNote: (sid, text) => F.setDoc(F.doc(db, 'studios', me.uid, 'notes', sid), { text }).catch(fail),
+    saveLesson: (id, data) => F.setDoc(F.doc(db, 'studios', SU, 'lessons', id), data, { merge: true }).catch(fail),
+    deleteLesson: id => F.deleteDoc(F.doc(db, 'studios', SU, 'lessons', id)).catch(fail),
+    saveEvent: (id, data) => F.setDoc(F.doc(db, 'studios', SU, 'events', id), data).catch(fail),
+    deleteEvent: id => F.deleteDoc(F.doc(db, 'studios', SU, 'events', id)).catch(fail),
+    saveNote: (sid, text) => F.setDoc(F.doc(db, 'studios', SU, 'notes', sid), { text }).catch(fail),
     // a student's billing record: created empty if needed, then patched (dotted paths, DEL removes)
     clipAudio: async (sid, id) => (await F.getDoc(F.doc(db, 'students', sid, 'clipData', id))).data(),
     patchClip: (sid, id, patch) => F.updateDoc(F.doc(db, 'students', sid, 'clips', id), patch).catch(fail),
     deleteClip: (sid, id) => Promise.all([F.deleteDoc(F.doc(db, 'students', sid, 'clipData', id)), F.deleteDoc(F.doc(db, 'students', sid, 'clips', id))]).catch(fail),
-    saveBilling: async (sid, patch) => { const ref = F.doc(db, 'studios', me.uid, 'billing', sid); await F.setDoc(ref, {}, { merge: true }); return F.updateDoc(ref, conv(patch)).catch(fail); },
+    saveBilling: async (sid, patch) => { const ref = F.doc(db, 'studios', SU, 'billing', sid); await F.setDoc(ref, {}, { merge: true }); return F.updateDoc(ref, conv(patch)).catch(fail); },
     getFeed: async token => { const s = await F.getDoc(F.doc(db, 'feeds', token)); return s.exists() ? s.data() : null; },
     saveFeed: (token, data) => F.setDoc(F.doc(db, 'feeds', token), data, { merge: true }),
     // Beta: plan, codes, feedback
@@ -758,6 +775,64 @@ async function firebaseApi() {
       return plan;
     },
     sendFeedback: data => F.addDoc(F.collection(db, 'feedback'), { ...data, at: new Date().toISOString(), studioId: me.uid }),
+    // ---- music school ----
+    schoolCreate: async name => {
+      const id = randomCode();
+      await F.setDoc(F.doc(db, 'schools', id), { name, owner: me.uid, teachers: {}, created: new Date().toISOString() });
+      await F.updateDoc(F.doc(db, 'studios', me.uid), { school: id });
+      return id;
+    },
+    schoolWatch(id, cb) {
+      schoolSubs.splice(0).forEach(u => u());
+      let started = false;
+      schoolSubs.push(F.onSnapshot(F.doc(db, 'schools', id), d => {
+        school = d.exists() ? { id, ...d.data() } : null;
+        if (school && !started) {                     // the admin sees every task; a teacher only their own
+          started = true;
+          const owner = school.owner === me.uid;
+          schoolSubs.push(F.onSnapshot(F.collection(db, 'schools', id, 'events'), q => { schoolEvents = {}; q.forEach(x => schoolEvents[x.id] = { id: x.id, ...x.data() }); cb(); }, e => console.error(e)));
+          schoolSubs.push(F.onSnapshot(owner ? F.collection(db, 'schools', id, 'tasks') : F.query(F.collection(db, 'schools', id, 'tasks'), F.where('teacher', '==', me.uid)),
+            q => { schoolTasks = {}; q.forEach(x => schoolTasks[x.id] = { id: x.id, ...x.data() }); cb(); }, e => console.error(e)));
+        }
+        cb();
+      }, e => { console.error(e); school = null; cb(); }));
+    },
+    schoolUpdate: patch => F.updateDoc(sref(), conv(patch)).catch(fail),
+    schoolInvite: (code, { expiresMs, ...data }) => F.setDoc(sref('invites', code), { ...data, expires: F.Timestamp.fromMillis(expiresMs) }),
+    schoolInvites: async () => (await F.getDocs(F.collection(db, 'schools', schoolId, 'invites'))).docs.map(d => ({ id: d.id, ...d.data() })),
+    schoolDropInvite: code => F.deleteDoc(sref('invites', code)).catch(fail),
+    schoolGetInvite: async (id, code) => { const x = await F.getDoc(F.doc(db, 'schools', id, 'invites', code)); return x.exists() ? x.data() : null; },
+    schoolJoin: async (id, code, entry) => {
+      await F.updateDoc(F.doc(db, 'schools', id), { [`teachers.${me.uid}`]: { ...entry, invite: code } });
+      await F.updateDoc(F.doc(db, 'studios', me.uid), { school: id });
+      F.deleteDoc(F.doc(db, 'schools', id, 'invites', code)).catch(() => {});
+    },
+    // everything the admin's roll-up needs, for each teacher: their studio record, students, recent lessons and billing
+    schoolLoad: async (uids, since) => {
+      const out = {}, studs = await F.getDocs(F.query(F.collection(db, 'students'), F.where('schoolId', '==', schoolId)));
+      await Promise.all(uids.map(async uid => {
+        const [st, ls, bl] = await Promise.all([F.getDoc(F.doc(db, 'studios', uid)),
+          F.getDocs(F.query(F.collection(db, 'studios', uid, 'lessons'), F.where('date', '>=', since))), F.getDocs(F.collection(db, 'studios', uid, 'billing'))]);
+        out[uid] = { studio: st.exists() ? st.data() : {}, students: {}, lessons: {}, billing: {} };
+        ls.forEach(d => out[uid].lessons[d.id] = { id: d.id, ...d.data() }); bl.forEach(d => out[uid].billing[d.id] = d.data());
+      }));
+      studs.forEach(d => { const x = { id: d.id, ...d.data() }; (out[x.studioId] ??= { studio: {}, students: {}, lessons: {}, billing: {} }).students[d.id] = x; });
+      return out;
+    },
+    schoolSaveEvent: (id, data) => F.setDoc(sref('events', id), data).catch(fail),
+    schoolDeleteEvent: id => F.deleteDoc(sref('events', id)).catch(fail),
+    teacherEvent: async (uid, id, data) => {
+      const r = F.doc(db, 'studios', uid, 'events', id);
+      if (data === DEL) return F.deleteDoc(r).catch(fail);
+      const old = await F.getDoc(r).then(x => x.exists() ? x.data() : null).catch(() => null);
+      for (const [sid, p] of Object.entries(data.participants)) if (old?.participants?.[sid]) data.participants[sid] = { ...p, piece: old.participants[sid].piece || '', result: old.participants[sid].result || '' };
+      return F.setDoc(r, data).catch(fail);
+    },
+    schoolSaveTask: (id, data) => F.setDoc(sref('tasks', id), data).catch(fail),
+    schoolPatchTask: (id, patch) => F.updateDoc(sref('tasks', id), patch).catch(fail),
+    schoolDeleteTask: id => F.deleteDoc(sref('tasks', id)).catch(fail),
+    moveStudents: async (ids, to, names = {}) => { for (let i = 0; i < ids.length; i += 400) { const b = F.writeBatch(db); ids.slice(i, i + 400).forEach(id => b.update(F.doc(db, 'students', id), { studioId: to, ...names })); await b.commit(); } },
+    tagStudents: async (ids, id) => { for (let i = 0; i < ids.length; i += 400) { const b = F.writeBatch(db); ids.slice(i, i + 400).forEach(x => b.update(F.doc(db, 'students', x), { schoolId: id })); await b.commit(); } },
     admin: {
       codes: async () => (await F.getDocs(F.collection(db, 'betaCodes'))).docs.map(d => ({ id: d.id, ...d.data() })),
       createCode: (code, label) => F.setDoc(F.doc(db, 'betaCodes', code), { label, created: new Date().toISOString(), usedBy: null, revoked: false }),
@@ -776,13 +851,19 @@ function demoApi() {
   return {
     onAuth: cb => cb({ uid: 'demo', displayName: 'Ms. Alvarez', email: 'demo studio' }),
     signOut: () => { location.href = location.pathname; },
-    getStudio: async () => studio || { studioName: 'Riverside Strings & Keys', teacherName: 'Ms. Alvarez' },
+    getStudio: async uid => !uid || uid === 'demo' ? (demoStudios.demo?.studio || studio || { studioName: 'Riverside Strings & Keys', teacherName: 'Ms. Alvarez' }) : demoStudios[uid]?.studio || null,
     createStudio: async d => { studio = d; },
     updateStudio: async p => { applyPatch(studio, p); later(); },
-    watch(render) { rerender = render; seedDemo(); render(); },
+    watch(render) {
+      rerender = render;
+      if (SU === 'demo' && !demoStudios.demo) seedDemo();
+      else { const d = demoStudios[SU]; ({ studio, students, lessons, events, billing, clips, notes } = { ...d, notes: d.notes || {} }); }
+      render();
+    },
+    unwatch: () => {},
     createStudent: async (sid, data) => { students[sid] = { id: sid, ...structuredClone(data) }; later(); },
     createStudents: async list => { for (const [sid, data] of list) students[sid] = { id: sid, ...structuredClone(data) }; later(); },
-    patchStudent: async (sid, p) => { applyPatch(students[sid], p); later(); },
+    patchStudent: async (sid, p) => { const x = students[sid] || Object.values(demoStudios).map(d => d.students?.[sid]).find(Boolean); if (x) applyPatch(x, p); later(); },
     deleteStudent: async sid => { delete students[sid]; later(); },
     saveLesson: async (id, d) => { lessons[id] = { id, ...(lessons[id] || {}), ...structuredClone(d) }; later(); },
     deleteLesson: async id => { delete lessons[id]; later(); },
@@ -791,6 +872,28 @@ function demoApi() {
     saveNote: async (sid, t) => { notes[sid] = t; },
     saveBilling: async (sid, p) => { applyPatch(billing[sid] ??= {}, p); later(); },
     clipAudio: async () => demoClipAudio(),
+    schoolUpdate: async p => { applyPatch(school, p); later(); },
+    schoolInvite: async (code, d) => { (demoStudios.invites ??= {})[code] = { ...d, id: code }; },
+    schoolInvites: async () => Object.values(demoStudios.invites || {}),
+    schoolDropInvite: async code => { delete demoStudios.invites?.[code]; },
+    schoolLoad: async uids => Object.fromEntries(uids.map(u => [u, u === SU ? { studio, students, lessons, billing } : demoStudios[u]]).filter(([, d]) => d)),
+    schoolSaveEvent: async (id, d) => { schoolEvents[id] = { id, ...structuredClone(d) }; later(); },
+    schoolDeleteEvent: async id => { delete schoolEvents[id]; later(); },
+    teacherEvent: async (uid, id, d) => { const box = uid === SU ? events : (demoStudios[uid] ??= { events: {} }).events; if (d === DEL) delete box[id]; else box[id] = { id, ...structuredClone(d) }; later(); },
+    schoolSaveTask: async (id, d) => { schoolTasks[id] = { id, ...d }; later(); },
+    schoolPatchTask: async (id, p) => { Object.assign(schoolTasks[id], p); later(); },
+    schoolDeleteTask: async id => { delete schoolTasks[id]; later(); },
+    tagStudents: async () => {},
+    moveStudents: async (ids, to, names = {}) => {
+      for (const id of ids) {
+        const from = students[id] ? null : Object.keys(demoStudios).find(u => demoStudios[u].students?.[id]);
+        const x = from ? demoStudios[from].students[id] : students[id]; if (!x) continue;
+        from ? delete demoStudios[from].students[id] : delete students[id];
+        Object.assign(x, { studioId: to }, names);
+        (to === SU ? students : (demoStudios[to] ??= { students: {} }).students)[id] = x;
+      }
+      later();
+    },
     patchClip: async (sid, id, p) => { Object.assign(clips[id], p); later(); },
     deleteClip: async (sid, id) => { delete clips[id]; later(); },
     getFeed: async () => null,
@@ -807,7 +910,7 @@ function demoApi() {
 const FREE_STUDENTS = 3;
 let amAdmin = false;
 const isPartner = () => DEMO || amAdmin || studio?.plan?.tier === 'beta';
-const canAddStudent = () => isPartner() || active().length < FREE_STUDENTS;
+const canAddStudent = () => isPartner() || !!studio?.school || active().length < FREE_STUDENTS;
 function renderPlan() {
   $('planBox').innerHTML = !studio || DEMO ? '' : isPartner()
     ? `<div><b>Beta partner</b><br>Unlimited students, free${studio.plan?.since ? ` · since ${fmtDate(studio.plan.since, { month: 'short', year: 'numeric' })}` : ''}. Thank you for your feedback!</div>`
@@ -942,14 +1045,15 @@ function render() {
   if (!studio) return;
   $('studioName').textContent = studio.studioName;
   document.querySelectorAll('[data-go]').forEach(b => b.classList.toggle('on', b.dataset.go === (route.view === 'student' ? 'students' : route.view)));
-  const v = { overview: vOverview, students: vStudents, student: vStudent, schedule: vSchedule, events: vEvents, reports: vReports, billing: vBilling, admin: vAdmin }[route.view] || vOverview;
+  if ($('schoolNav')) $('schoolNav').hidden = !isSchoolAdmin();
+  const v = { overview: vOverview, students: vStudents, student: vStudent, schedule: vSchedule, events: vEvents, reports: vReports, billing: vBilling, school: vSchool, admin: vAdmin }[route.view] || vOverview;
   renderPlan();
   // Don't redraw under someone who is typing
   const ae = document.activeElement;
   if (ae && $('view').contains(ae) && ['TEXTAREA', 'INPUT'].includes(ae.tagName) && ae.dataset.keep) return;
   // …or under a recording that's playing: redraw once it stops
   if ([...$('view').querySelectorAll('audio')].some(a => !a.paused && !a.ended)) { renderAfterAudio = true; return; }
-  $('view').innerHTML = (DEMO ? `<div class="demoBar noprint"><span><b>Demo studio.</b> Sample data – changes aren’t saved.</span><a href="${location.pathname}">Sign in to create your studio</a></div>` : '') + v();
+  $('view').innerHTML = (DEMO ? `<div class="demoBar noprint"><span><b>Demo studio.</b> Sample data – changes aren’t saved.</span><a href="${location.pathname}">Sign in to create your studio</a></div>` : '') + viewBar() + v();
   bindView();
 }
 
@@ -979,13 +1083,14 @@ function vOverview() {
 
   return `
   <div class="pageHead">
-    <div><div class="eyebrow">${fmtDate(t, { weekday: 'long', day: 'numeric', month: 'long' })}</div><h1>${greeting()}, ${esc(studio.teacherName)}</h1></div>
+    <div><div class="eyebrow">${fmtDate(t, { weekday: 'long', day: 'numeric', month: 'long' })}</div><h1>${myStudio() ? `${greeting()}, ${esc(studio.teacherName)}` : `${esc(studio.teacherName)}’s studio`}</h1></div>
     <div class="actions"><button class="secondary" data-act="addStudent">${icon('plus', 'sm')}Add student</button>
       <button class="secondary mobileOnly" data-act="settings">${icon('settings', 'sm')}Settings</button>
       <button class="secondary mobileOnly" data-act="feedback">${icon('heart', 'sm')}Feedback</button></div>
   </div>
   <div class="stack">
     ${gettingStarted()}
+    ${schoolTasksCard()}
     <div class="kpis">
       <div class="kpi"><div class="l">Students</div><div class="v">${all.length}</div><div class="s">${linked.length} connected to the app</div></div>
       <div class="kpi"><div class="l">Practice this week</div><div class="v">${mins(weekTotal)}</div><div class="s">across connected students</div></div>
@@ -1106,7 +1211,7 @@ function vStudent() {
   const s = students[route.id];
   if (!s) return `<div class="emptyBig">${icon('users', 'lg')}<p>This student isn’t in your studio.</p><button class="secondary" data-go2="students">Back to students</button></div>`;
   const tab = sub.tab || 'progress';
-  const tabs = [['progress', 'Progress'], ['assignments', newClips(s.id).length ? `Assignments <span class="dotNew" title="New recordings"></span>` : 'Assignments'], ['rewards', 'Badges & stars'], ['lessons', 'Lessons'], ['events', 'Performances'], ['theory', 'Theory'], ['notes', 'Notes']];
+  const tabs = [['progress', 'Progress'], ['assignments', newClips(s.id).length ? `Assignments <span class="dotNew" title="New recordings"></span>` : 'Assignments'], ['rewards', 'Badges & stars'], ['lessons', 'Lessons'], ['events', 'Performances'], ['theory', 'Theory'], ...(myStudio() ? [['notes', 'Notes']] : [])];
   return `<div style="--kid:${s.color}">
     <button class="ghost" data-go2="students" style="margin-left:-10px;margin-bottom:10px">${icon('back', 'sm')}Students</button>
     <div class="studentHead">
@@ -1694,6 +1799,7 @@ function ledger(sid) {
   return { entries: live, balance: run, waived };
 }
 function vBilling() {
+  if (billLocked()) return vBillingLocked();
   const B = studio?.billing;
   if (!B?.since) return `<div class="pageHead"><div><div class="eyebrow">Lessons owed</div><h1>Billing</h1></div></div>
     <div class="card" style="max-width:640px"><h2>Know who’s paid</h2>
@@ -1996,6 +2102,339 @@ function billingCsv() {
 }
 
 // ============================================================================================
+// Music school: an admin (who can also teach) runs up to 25 teachers. Each teacher has their own studio as usual;
+// the school record lists them, whether the school or the teacher handles their billing, and who was revoked.
+// The admin can open any teacher's studio (everything but their private notes), sees the school rolled up by teacher,
+// plans school-wide events with students from several teachers, and gives teachers tasks.
+// ============================================================================================
+const SCHOOL_MAX = 25;
+const activeTeachers = () => Object.entries(school?.teachers || {}).filter(([, t]) => t.status === 'active');
+const teacherName = uid => uid === school?.owner ? (ownStudio?.teacherName || 'You') : teacherEntry(uid)?.name || 'Teacher';
+function startSchool() {
+  if (DEMO) seedDemoSchool();
+  else if (ownStudio?.school) { schoolId = ownStudio.school; api.schoolWatch(schoolId, () => { $('schoolNav').hidden = !isSchoolAdmin(); render(); }); }
+  $('schoolNav').hidden = !isSchoolAdmin();
+  const p = pendingInvite(); if (p) setTimeout(() => joinSchoolModal(p.school, p.invite), 400);
+}
+// A teacher opened an invite link (studio?school=…&invite=…): kept through sign-in and studio setup
+function pendingInvite() {
+  const q = new URLSearchParams(location.search), sch = q.get('school'), inv = q.get('invite');
+  if (sch && inv) { sessionStorage.setItem('pt-invite', JSON.stringify({ school: sch, invite: inv })); history.replaceState(null, '', location.pathname + location.hash); }
+  try { return JSON.parse(sessionStorage.getItem('pt-invite') || 'null'); } catch { return null; }
+}
+async function joinSchoolModal(id, code) {
+  sessionStorage.removeItem('pt-invite');
+  if (DEMO) return toast('Sign in to join a school – this is the demo.');
+  const inv = await api.schoolGetInvite(id, code).catch(() => null);
+  if (!inv || inv.expires?.toMillis?.() < Date.now()) return openModal(`${mhead('Invite expired')}<p>This invite has expired or was already used. Ask the school for a new one.</p><footer><div class="right"><button class="primary" data-close>OK</button></div></footer>`);
+  if (ownStudio.school && ownStudio.school !== id) return openModal(`${mhead('Already in a school')}<p>Your studio already belongs to another music school.</p><footer><div class="right"><button class="primary" data-close>OK</button></div></footer>`);
+  openModal(`${mhead('Join ' + esc(inv.schoolName || 'a music school'))}
+    <div class="fields"><p style="margin:0">${esc(inv.schoolName || 'The school')} invited you to teach with them in AlleGrow.</p>
+      <ul class="small" style="margin:0;padding-left:18px;line-height:1.6">
+        <li>Your studio, students and schedule stay yours to run, as now.</li>
+        <li>The school’s admin can see your studio (not your private notes), plan school events with your students and send you tasks.</li>
+        <li>${inv.billing === 'school' ? 'The school handles billing for your students – you’ll see it but not change it.' : 'You handle billing for your own students.'}</li>
+        <li>If the school removes you, your students stay with the school.</li></ul>
+      <div class="gateErr" id="jErr"></div></div>
+    <footer><div class="right"><button class="secondary" data-close>Not now</button><button class="primary" id="jGo">Join the school</button></div></footer>`, m => {
+    m.querySelector('#jGo').onclick = async () => {
+      m.querySelector('#jGo').disabled = true;
+      try {
+        await api.schoolJoin(id, code, { name: ownStudio.teacherName, email: me.email || '', status: 'active', billing: inv.billing || 'teacher', joined: new Date().toISOString() });
+        ownStudio.school = id; if (myStudio()) studio.school = id;
+        await api.tagStudents(Object.values(students).map(x => x.id), id);
+        closeModal(); startSchool(); toast(`You’ve joined ${inv.schoolName || 'the school'}`);
+      } catch (e) { console.error(e); m.querySelector('#jErr').textContent = 'Couldn’t join. The invite may have expired – ask for a new one.'; m.querySelector('#jGo').disabled = false; }
+    };
+  });
+}
+function createSchoolModal() {
+  openModal(`${mhead('Start a music school')}
+    <div class="fields"><p style="margin:0">Add up to ${SCHOOL_MAX} teachers. Each keeps their own studio; you see the whole school, plan school events and give teachers tasks. You keep teaching in your own studio too.</p>
+      <label class="field">School name <input type="text" id="scName" maxlength="60" value="${esc(ownStudio.studioName)}"></label><div class="gateErr" id="scErr"></div></div>
+    <footer><div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="scGo">Create the school</button></div></footer>`, m => {
+    m.querySelector('#scGo').onclick = async () => {
+      const name = val('scName'); if (!name) return (m.querySelector('#scErr').textContent = 'Give the school a name.');
+      if (DEMO) { closeModal(); return toast('This is the demo – it already has a school.'); }
+      try {
+        const id = await api.schoolCreate(name);
+        ownStudio.school = id; studio.school = id;
+        await api.tagStudents(Object.values(students).map(x => x.id), id);
+        closeModal(); startSchool(); sub = {}; go('school'); toast('School created');
+      } catch (e) { console.error(e); m.querySelector('#scErr').textContent = 'Couldn’t create the school. Please try again.'; }
+    };
+  });
+}
+// ---- the admin opening a teacher's studio ----
+async function switchStudio(uid) {
+  if (uid === SU) { go('overview'); return; }
+  if (DEMO) demoStash();
+  api.unwatch();
+  students = {}; lessons = {}; events = {}; notes = {}; billing = {}; clips = {};
+  const target = uid === me.uid ? ownStudio : await api.getStudio(uid).catch(() => null);
+  if (!target) return toast('Couldn’t open that studio');
+  SU = uid; studio = target;
+  let t; api.watch(() => { render(); clearTimeout(t); t = setTimeout(() => { syncFeed(); publishBilling(); }, 1500); });
+  sub = {}; location.hash = '#/overview'; render();
+}
+function viewBar() {
+  if (myStudio()) return '';
+  return `<div class="viewBar noprint">${icon('users', 'sm')}<span class="grow">Viewing <b>${esc(studio.teacherName)}</b>’s studio${school ? ` · ${esc(school.name)}` : ''}</span>
+    <button class="secondary small" data-mystudio>Back to my studio</button></div>`;
+}
+// Billing that this viewer can look at but not change
+function billLocked() {
+  if (!studio?.school || !school || SU === school.owner) return false;
+  const mode = teacherEntry(SU)?.billing || 'teacher';
+  return myStudio() ? mode === 'school' : mode !== 'school';
+}
+function vBillingLocked() {
+  const B = studio.billing, list = active();
+  const rows = B?.since ? list.map(s => ({ s, L: ledger(s.id) })) : [];
+  return `<div class="pageHead"><div><div class="eyebrow">Lessons owed</div><h1>Billing</h1></div></div>
+    <div class="stack"><div class="banner">${icon('alert')}<div class="grow">${myStudio() ? `Billing for your students is handled by <b>${esc(school.name)}</b>. You can see balances here; the school makes changes.`
+      : `<b>${esc(studio.teacherName)}</b> handles their own billing. You can see it; changes are theirs to make.`}</div></div>
+    <div class="card"><h2>Balances</h2>${!B?.since ? '<div class="empty">Billing isn’t set up for this studio yet.</div>'
+      : `<div class="tableWrap"><table class="impTable billTable"><thead><tr><th>Student</th><th>Balance</th><th class="wide">Price</th></tr></thead><tbody>
+        ${rows.map(({ s, L }) => `<tr><td>${esc(s.name)}</td><td><b class="${L.balance > 0.004 ? 'owe' : ''}">${L.balance < -0.004 ? money(-L.balance) + ' credit' : money(L.balance)}</b></td><td class="wide">${money(billRate(s.id).rate)} / ${billRate(s.id).per}</td></tr>`).join('')}
+      </tbody></table></div>`}</div></div>`;
+}
+// ---- roll-up: every teacher's numbers, worked out with the same code the studio uses ----
+let schoolData = null, schoolDataAt = 0, schoolLoading = false;
+async function loadSchoolData(force) {
+  if (schoolLoading || (!force && schoolData && Date.now() - schoolDataAt < 5 * 60000)) return;
+  schoolLoading = true; render();
+  try { schoolData = await api.schoolLoad([school.owner, ...activeTeachers().map(([uid]) => uid)], dayKey(addDays(today(), -400))); schoolDataAt = Date.now(); }
+  catch (e) { console.error(e); toast('Couldn’t load the school’s numbers'); }
+  schoolLoading = false; render();
+}
+function withStudio(d, fn) {
+  const saved = [students, lessons, billing, studio];
+  students = d.students || {}; lessons = d.lessons || {}; billing = d.billing || {}; studio = { ...(d.studio || {}) };
+  try { return fn(); } finally { [students, lessons, billing, studio] = saved; }
+}
+function teacherStats(uid) {
+  const d = schoolData?.[uid]; if (!d) return null;
+  return withStudio(d, () => {
+    const list = active(), linked = list.filter(s => s.linkedAt), wk = lastDays(7), m0 = new Date(today().getFullYear(), today().getMonth(), 1);
+    const sums = linked.map(s => practiceSummary(s, wk));
+    const ls = lessonsBetween(m0, today()).filter(l => lessonPast(l));
+    const out = { students: list.length, linked: linked.length, practice: sums.reduce((a, x) => a + x.total, 0), five: sums.filter(x => x.days >= 5).length,
+      taught: ls.filter(l => countsAsLesson(l) && l.status !== 'noshow').length, cancelled: ls.filter(l => l.status === 'cancelled').length, noshow: ls.filter(l => l.status === 'noshow').length,
+      billed: null, owed: null, currency: studio.billing?.currency || 'USD',
+      theory: list.reduce((a, s) => a + Object.values(s.practice?.theory?.levels || {}).reduce((x, y) => x + y, 0), 0) };
+    if (studio.billing?.since) {
+      const monthKey = dayKey(m0), led = list.map(s => ledger(s.id));
+      out.billed = led.reduce((a, L) => a + L.entries.filter(e => e.amount > 0 && e.date >= monthKey).reduce((x, e) => x + e.amount, 0), 0);
+      out.owed = led.reduce((a, L) => a + Math.max(0, L.balance), 0);
+    }
+    return out;
+  });
+}
+function vSchool() {
+  if (!isSchoolAdmin()) return `<div class="pageHead"><h1>School</h1></div><div class="card empty">Only the school’s admin sees this page.</div>`;
+  const tab = sub.stab || 'overview';
+  const tabs = [['overview', 'Overview'], ['teachers', `Teachers (${activeTeachers().length + 1})`], ['events', 'Events'], ['tasks', 'Tasks']];
+  if (tab === 'overview' || tab === 'events' || tab === 'teachers') loadSchoolData();
+  return `<div class="pageHead"><div><div class="eyebrow">Music school</div><h1>${esc(school.name)}</h1></div>
+      <div class="actions"><button class="secondary" data-act="schoolRefresh">${icon('refresh', 'sm')}Refresh</button><button class="accent" data-act="schoolInvite" ${activeTeachers().length >= SCHOOL_MAX ? 'disabled' : ''}>${icon('plus', 'sm')}Invite a teacher</button></div></div>
+    <div class="tabs noprint">${tabs.map(([k, l]) => `<button data-schooltab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    ${{ overview: schoolOverview, teachers: schoolTeachers, events: schoolEventsView, tasks: schoolTasksView }[tab]()}`;
+}
+function schoolOverview() {
+  if (!schoolData) return `<div class="card empty">${schoolLoading ? 'Loading the school’s numbers…' : 'No numbers yet.'}</div>`;
+  const uids = [school.owner, ...activeTeachers().map(([u]) => u)], rows = uids.map(u => ({ u, st: teacherStats(u) })).filter(r => r.st);
+  const tot = k => rows.reduce((a, r) => a + (r.st[k] || 0), 0), cur = rows.find(r => r.st.billed != null)?.st.currency || 'USD';
+  const m = (n, c) => n == null ? '<span class="muted">–</span>' : money(n, c);
+  return `<div class="stack">
+    <div class="kpis">
+      <div class="kpi"><div class="l">Teachers</div><div class="v">${uids.length}</div><div class="s">you + ${uids.length - 1} of ${SCHOOL_MAX} teachers</div></div>
+      <div class="kpi"><div class="l">Students</div><div class="v">${tot('students')}</div><div class="s">${tot('linked')} connected to the app</div></div>
+      <div class="kpi"><div class="l">Practice this week</div><div class="v">${mins(tot('practice'))}</div><div class="s">${tot('linked') ? Math.round(100 * tot('five') / tot('linked')) : 0}% practiced 5+ days</div></div>
+      <div class="kpi"><div class="l">Lessons this month</div><div class="v">${tot('taught')}</div><div class="s">${tot('cancelled')} canceled · ${tot('noshow')} no-shows</div></div>
+      <div class="kpi"><div class="l">Owed to the school</div><div class="v">${m(rows.some(r => r.st.owed != null) ? tot('owed') : null, cur)}</div><div class="s">${m(rows.some(r => r.st.billed != null) ? tot('billed') : null, cur)} billed this month</div></div>
+    </div>
+    <div class="card"><h2>By teacher <span class="small muted">updated ${new Date(schoolDataAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</span></h2>
+      <div class="tableWrap"><table class="impTable billTable"><thead><tr><th>Teacher</th><th>Students</th><th>Practice (7 days)</th><th class="wide">5+ days</th><th>Lessons this month</th><th class="wide">Billed this month</th><th>Owed</th><th></th></tr></thead><tbody>
+        ${rows.map(({ u, st }) => `<tr><td><b>${esc(teacherName(u))}</b>${u === school.owner ? ' <span class="chip">Admin</span>' : teacherEntry(u)?.billing === 'school' ? ' <span class="chip info">School billing</span>' : ''}</td>
+          <td>${st.students}<span class="muted small"> · ${st.linked} connected</span></td><td>${mins(st.practice)}</td><td class="wide">${st.five} of ${st.linked}</td>
+          <td>${st.taught}<span class="muted small">${st.cancelled || st.noshow ? ` · ${st.cancelled} canceled, ${st.noshow} no-show` : ''}</span></td>
+          <td class="wide">${m(st.billed, st.currency)}</td><td>${m(st.owed, st.currency)}</td>
+          <td style="text-align:right"><button class="ghost small" data-openstudio="${u}">Open studio</button></td></tr>`).join('')}
+      </tbody></table></div></div></div>`;
+}
+function schoolTeachers() {
+  const list = Object.entries(school.teachers || {}).sort((a, b) => (a[1].status === 'active' ? 0 : 1) - (b[1].status === 'active' ? 0 : 1) || (a[1].name || '').localeCompare(b[1].name || ''));
+  return `<div class="stack"><div class="card"><h2>Teachers</h2><div class="list">
+    <div class="assign"><div class="grow"><div class="t">${esc(ownStudio.teacherName)} <span class="chip">Admin</span></div><div class="d">${esc(me.email || '')} · your own studio</div></div>
+      <button class="ghost small" data-openstudio="${school.owner}">Open studio</button></div>
+    ${list.map(([uid, t]) => `<div class="assign ${t.status === 'active' ? '' : 'off'}"><div class="grow"><div class="t">${esc(t.name || 'Teacher')} ${t.status === 'active' ? '' : '<span class="chip bad">Removed</span>'}</div>
+        <div class="d">${esc(t.email || '')}${t.joined ? ` · joined ${fmtDate(t.joined.slice(0, 10), { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}${schoolData?.[uid] ? ` · ${Object.values(schoolData[uid].students).filter(x => !x.archived).length} students` : ''}</div></div>
+      ${t.status === 'active' ? `<label class="small">Billing <select data-tbill="${uid}"><option value="teacher" ${t.billing !== 'school' ? 'selected' : ''}>Teacher handles it</option><option value="school" ${t.billing === 'school' ? 'selected' : ''}>School handles it</option></select></label>
+        <button class="ghost small" data-openstudio="${uid}">Open studio</button><button class="ghost small dangerText" data-revoke="${uid}">Remove</button>` : ''}</div>`).join('')}
+    </div><p class="small muted" style="margin-top:10px">${activeTeachers().length} of ${SCHOOL_MAX} teachers. “School handles it”: you set prices, record payments and send reminders for that teacher’s students; they can see it but not change it.</p></div>
+    <div class="card"><h2>Invites waiting</h2><div id="invList" class="list"><div class="empty">Loading…</div></div></div></div>`;
+}
+function teacherInviteModal() {
+  if (activeTeachers().length >= SCHOOL_MAX) return toast(`A school can have up to ${SCHOOL_MAX} teachers.`);
+  openModal(`${mhead('Invite a teacher')}
+    <div class="fields"><div class="fields two"><label class="field">Name <input type="text" id="ivName" maxlength="60" placeholder="e.g. Ms. Lee"></label>
+      <label class="field">Email <input type="email" id="ivEmail" maxlength="120" placeholder="teacher@example.com"></label></div>
+      <label class="field">Billing for their students <select id="ivBill"><option value="teacher">They handle it</option><option value="school">The school handles it</option></select></label>
+      <div class="gateErr" id="ivErr"></div></div>
+    <footer><div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="ivGo">Create invite</button></div></footer>`, m => {
+    m.querySelector('#ivGo').onclick = async () => {
+      if (!val('ivName')) return (m.querySelector('#ivErr').textContent = 'Add their name.');
+      const code = randomCode(), url = `${location.origin}${location.pathname}?school=${schoolId}&invite=${code}`;
+      try { await api.schoolInvite(code, { name: val('ivName'), email: val('ivEmail'), billing: val('ivBill'), schoolName: school.name, by: me.uid, created: new Date().toISOString(), expiresMs: Date.now() + 14 * 864e5 }); }
+      catch (e) { console.error(e); return (m.querySelector('#ivErr').textContent = 'Couldn’t create the invite.'); }
+      const body = `Hi ${val('ivName')},\n\nI’d like you to join ${school.name} on AlleGrow, where we track students’ practice, lessons and billing. Open this link to set up your studio (it works for 14 days):\n\n${url}\n\n${ownStudio.teacherName}`;
+      openModal(`${mhead('Invite ready')}<div class="fields"><p style="margin:0">Send ${esc(val('ivName'))} this link. It works once, for 14 days.</p><div class="codeBox" style="font-size:13px">${esc(url)}</div></div>
+        <footer><div class="right"><a class="secondary" style="display:inline-flex;gap:7px;align-items:center;padding:9px 14px;border-radius:12px;text-decoration:none;font-weight:600" href="mailto:${encodeURIComponent(val('ivEmail'))}?subject=${encodeURIComponent('Join ' + school.name + ' on AlleGrow')}&body=${encodeURIComponent(body)}">${icon('mail', 'sm')}Email it</a>
+          <button class="primary" id="ivCopy">${icon('copy', 'sm')}Copy link</button></div></footer>`, m2 => {
+        m2.querySelector('#ivCopy').onclick = async () => { try { await navigator.clipboard.writeText(url); toast('Link copied'); } catch { prompt('Copy this link:', url); } };
+      });
+      render();
+    };
+  });
+}
+function revokeModal(uid) {
+  const t = teacherEntry(uid), mine = Object.values(schoolData?.[uid]?.students || {});
+  const others = [[school.owner, ownStudio.teacherName + ' (you)'], ...activeTeachers().filter(([u]) => u !== uid).map(([u, x]) => [u, x.name])];
+  openModal(`${mhead('Remove ' + esc(t.name))}
+    <div class="fields"><p style="margin:0">${esc(t.name)} loses access to the school’s students right away. Their ${mine.length} ${mine.length === 1 ? 'student stays' : 'students stay'} with the school – choose who takes them:</p>
+      <label class="field">Move students to <select id="rvTo">${others.map(([u, n]) => `<option value="${u}">${esc(n)}</option>`).join('')}</select></label>
+      <p class="small muted" style="margin:0">Practice history, assignments and billing come along. Past lesson notes stay in ${esc(t.name)}’s studio, where you can still open them.</p>
+      <div class="gateErr" id="rvErr"></div></div>
+    <footer><div class="right"><button class="secondary" data-close>Cancel</button><button class="danger" id="rvGo">Remove teacher</button></div></footer>`, m => {
+    m.querySelector('#rvGo').onclick = async () => {
+      m.querySelector('#rvGo').disabled = true;
+      try {
+        const to = val('rvTo'), toStudio = to === school.owner ? ownStudio : schoolData?.[to]?.studio || {};
+        await api.moveStudents(mine.map(x => x.id), to, { teacherName: toStudio.teacherName || '', studioName: toStudio.studioName || school.name });
+        await api.schoolUpdate({ [`teachers.${uid}.status`]: 'revoked', [`teachers.${uid}.revokedAt`]: new Date().toISOString() });
+        closeModal(); toast(`${t.name} removed`); loadSchoolData(true);
+      } catch (e) { console.error(e); m.querySelector('#rvErr').textContent = 'Couldn’t finish. Please try again.'; m.querySelector('#rvGo').disabled = false; }
+    };
+  });
+}
+// ---- school events: recitals and concerts with students from several teachers ----
+function schoolEventsView() {
+  const all = Object.values(schoolEvents), t = dayKey();
+  const up = all.filter(e => e.date >= t).sort((a, b) => a.date.localeCompare(b.date)), past = all.filter(e => e.date < t).sort((a, b) => b.date.localeCompare(a.date));
+  const row = e => { const by = {}; for (const p of Object.values(e.participants || {})) by[p.teacher] = (by[p.teacher] || 0) + 1;
+    return `<button class="rowLink" data-sevent="${e.id}"><div class="grow"><div class="t">${esc(e.title)} ${eventChip(e)}</div>
+      <div class="d">${fmtDate(e.date, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}${e.time ? ' · ' + e.time : ''}${e.location ? ' · ' + esc(e.location) : ''}</div>
+      <div class="d">${Object.keys(e.participants || {}).length} students · ${Object.entries(by).map(([u, n]) => `${esc(teacherName(u))} ${n}`).join(', ') || 'no students yet'}</div></div></button>`; };
+  return `<div class="stack"><div class="card"><h2>Upcoming <button class="accent" data-act="schoolEvent">${icon('plus', 'sm')}New school event</button></h2>
+      <div class="list">${up.length ? up.map(row).join('') : '<div class="empty">No school events planned. Add a recital or concert and pick students from any teacher – it appears in each teacher’s Performances and each family’s app.</div>'}</div></div>
+    ${past.length ? `<div class="card"><h2>Past</h2><div class="list">${past.map(row).join('')}</div></div>` : ''}</div>`;
+}
+function schoolEventModal(eid) {
+  if (!schoolData) { loadSchoolData(); return toast('Loading teachers’ students – try again in a moment'); }
+  const e = eid ? schoolEvents[eid] : { type: 'recital', title: '', date: dayKey(addDays(today(), 30)), time: '', location: '', participants: {} };
+  const groups = [school.owner, ...activeTeachers().map(([u]) => u)].map(u => ({ u, list: Object.values(schoolData[u]?.students || {}).filter(x => !x.archived).sort((a, b) => a.name.localeCompare(b.name)) })).filter(g => g.list.length);
+  openModal(`${mhead(eid ? 'Edit school event' : 'New school event')}
+    <div class="fields"><div class="fields two">
+        <label class="field">Type <select id="seType">${Object.entries(EVENT_TYPES).filter(([k]) => k !== 'other').map(([k, v]) => `<option value="${k}" ${e.type === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+        <label class="field">Title <input type="text" id="seTitle" maxlength="80" value="${esc(e.title)}" placeholder="e.g. Spring Recital"></label></div>
+      <div class="fields three"><label class="field">Date <input type="date" id="seDate" value="${e.date}"></label><label class="field">Time <input type="time" id="seTime" value="${e.time || ''}"></label>
+        <label class="field">Where <input type="text" id="seLoc" maxlength="80" value="${esc(e.location || '')}"></label></div>
+      <div class="field">Students</div>
+      <div class="seGroups">${groups.map(g => `<div class="seGroup"><label class="small" style="font-weight:700;display:flex;gap:8px;align-items:center"><input type="checkbox" data-segall="${g.u}" style="width:auto"> ${esc(teacherName(g.u))}</label>
+        ${g.list.map(x => `<label class="small" style="display:flex;gap:8px;align-items:center;padding-left:22px"><input type="checkbox" data-sestud="${x.id}" data-seteacher="${g.u}" style="width:auto" ${e.participants?.[x.id] ? 'checked' : ''}> ${esc(x.name)}</label>`).join('')}</div>`).join('')}</div>
+      <div class="gateErr" id="seErr"></div></div>
+    <footer>${eid ? '<button class="danger" id="seDel">Delete</button>' : ''}<div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="seSave">Save</button></div></footer>`, m => {
+    m.querySelectorAll('[data-segall]').forEach(c => c.onchange = () => m.querySelectorAll(`[data-seteacher="${c.dataset.segall}"]`).forEach(x => x.checked = c.checked));
+    const save = async participants => {
+      const id = eid || newId(), base = { type: val('seType'), title: val('seTitle'), date: val('seDate'), time: val('seTime'), location: val('seLoc') };
+      const before = e.participants || {};
+      await api.schoolSaveEvent(id, { ...base, participants });
+      // each teacher gets a copy in their Performances (school: marks it), each family sees it in their app
+      const teachers = new Set([...Object.values(before), ...Object.values(participants)].map(p => p.teacher));
+      for (const u of teachers) {
+        const mineP = Object.fromEntries(Object.entries(participants).filter(([, p]) => p.teacher === u).map(([sid]) => [sid, { piece: '', result: '' }]));
+        await api.teacherEvent(u, id, Object.keys(mineP).length ? { ...base, school: schoolId, participants: mineP } : DEL);
+      }
+      for (const sid of new Set([...Object.keys(before), ...Object.keys(participants)]))
+        await api.patchStudent(sid, { [`upcoming.${id}`]: participants[sid] ? { ...base, piece: '', result: '' } : DEL });
+    };
+    m.querySelector('#seSave').onclick = async () => {
+      if (!val('seTitle') || !val('seDate')) return (m.querySelector('#seErr').textContent = 'Add a title and a date.');
+      const participants = {}; m.querySelectorAll('[data-sestud]:checked').forEach(c => participants[c.dataset.sestud] = { teacher: c.dataset.seteacher });
+      m.querySelector('#seSave').disabled = true;
+      try { await save(participants); closeModal(); toast('School event saved'); } catch (err) { console.error(err); m.querySelector('#seErr').textContent = 'Couldn’t save. Please try again.'; m.querySelector('#seSave').disabled = false; }
+    };
+    m.querySelector('#seDel')?.addEventListener('click', async () => {
+      if (!confirm('Delete this school event? It’s removed from every teacher and family.')) return;
+      await save({}); await api.schoolDeleteEvent(eid); closeModal(); toast('Deleted');
+    });
+  }, { focus: false });
+}
+// ---- tasks the admin gives teachers ----
+function schoolTasksView() {
+  const all = Object.values(schoolTasks).sort((a, b) => (a.due || '9').localeCompare(b.due || '9') || (b.created || '').localeCompare(a.created || ''));
+  const open = all.filter(x => x.status !== 'done'), done = all.filter(x => x.status === 'done');
+  const row = x => `<div class="assign"><div class="grow"><div class="t">${esc(x.title)} <span class="chip">${esc(teacherName(x.teacher))}</span>${x.status === 'done' ? ' <span class="chip good">Done</span>' : x.due && x.due < dayKey() ? ' <span class="chip bad">Overdue</span>' : ''}</div>
+      <div class="d">${x.due ? `Due ${fmtDate(x.due)}` : 'No due date'}${x.details ? ' · ' + esc(x.details) : ''}${x.reply ? ` · Reply: “${esc(x.reply)}”` : ''}${x.doneAt ? ` · done ${fmtDate(x.doneAt.slice(0, 10), { month: 'short', day: 'numeric' })}` : ''}</div></div>
+    <button class="ghost small dangerText" data-deltask="${x.id}">Delete</button></div>`;
+  return `<div class="stack"><div class="card"><h2>Open tasks <button class="accent" data-act="schoolTask">${icon('plus', 'sm')}New task</button></h2>
+      <div class="list">${open.length ? open.map(row).join('') : '<div class="empty">No open tasks. Give teachers something to do – like “Send recital pieces by Friday” – and see when it’s done.</div>'}</div></div>
+    ${done.length ? `<details class="card"><summary style="cursor:pointer;font-weight:700">Done (${done.length})</summary><div class="list" style="margin-top:8px">${done.map(row).join('')}</div></details>` : ''}</div>`;
+}
+function schoolTaskModal() {
+  const ts = activeTeachers();
+  if (!ts.length) return toast('Invite a teacher first.');
+  openModal(`${mhead('New task for teachers')}
+    <div class="fields"><label class="field">Task <input type="text" id="tkTitle" maxlength="100" placeholder="e.g. Send your students’ recital pieces"></label>
+      <label class="field">Details (optional) <textarea id="tkDet" rows="2" maxlength="500"></textarea></label>
+      <label class="field">Due (optional) <input type="date" id="tkDue"></label>
+      <div class="field">For</div><div class="seGroups">${ts.map(([u, t]) => `<label class="small" style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-tkt="${u}" style="width:auto"> ${esc(t.name)}</label>`).join('')}</div>
+      <div class="gateErr" id="tkErr"></div></div>
+    <footer><div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="tkGo">Send task</button></div></footer>`, m => {
+    m.querySelector('#tkGo').onclick = async () => {
+      const who = [...m.querySelectorAll('[data-tkt]:checked')].map(c => c.dataset.tkt);
+      if (!val('tkTitle') || !who.length) return (m.querySelector('#tkErr').textContent = 'Add the task and pick at least one teacher.');
+      for (const u of who) await api.schoolSaveTask(newId(), { title: val('tkTitle'), details: val('tkDet'), due: val('tkDue') || '', teacher: u, status: 'open', created: new Date().toISOString(), by: me.uid });
+      closeModal(); toast(who.length === 1 ? 'Task sent' : `Sent to ${who.length} teachers`);
+    };
+  });
+}
+// A teacher's tasks from the school, on their Overview
+function schoolTasksCard() {
+  if (!school || isSchoolAdmin() || !myStudio()) return '';
+  const all = Object.values(schoolTasks).filter(x => x.teacher === me.uid), open = all.filter(x => x.status !== 'done').sort((a, b) => (a.due || '9').localeCompare(b.due || '9'));
+  if (!all.length) return '';
+  return `<section class="card"><h2>From ${esc(school.name)}</h2><div class="list">
+    ${open.length ? open.map(x => `<div class="assign"><button class="tickBtn" data-taskdone="${x.id}" aria-label="Mark done">${icon('check', 'sm')}</button>
+      <div class="grow"><div class="t">${esc(x.title)} ${x.due && x.due < dayKey() ? '<span class="chip bad">Overdue</span>' : ''}</div><div class="d">${x.due ? `Due ${fmtDate(x.due)}` : ''}${x.details ? `${x.due ? ' · ' : ''}${esc(x.details)}` : ''}</div></div></div>`).join('')
+      : '<div class="empty">All done. Nice.</div>'}</div></section>`;
+}
+// ---- demo: a small school so the admin side can be tried without other accounts ----
+const demoStudios = {};
+function demoStash() { demoStudios[SU] = { studio, students, lessons, events, billing, clips, notes }; }
+function seedDemoSchool() {
+  if (school) return;
+  schoolId = 'demo-school';
+  school = { id: schoolId, name: 'Riverside Music School', owner: 'demo', teachers: {
+    t2: { name: 'Mr. Okafor', email: 'okafor@example.com', status: 'active', billing: 'school', joined: dayKey(addDays(today(), -120)) },
+    t3: { name: 'Ms. Lindqvist', email: 'lindqvist@example.com', status: 'active', billing: 'teacher', joined: dayKey(addDays(today(), -60)) } } };
+  ownStudio.school = schoolId; studio.school = schoolId;
+  // the other teachers' studios: copies of the demo students with other names and a little less practice
+  const names = { t2: ['Ethan Brooks', 'Lily Nguyen', 'Omar Haddad', 'Chloe Kim'], t3: ['Grace Patel', 'Mateo Silva', 'Ruby Evans'] };
+  for (const [u, list] of Object.entries(names)) {
+    const t = school.teachers[u], sts = {}, src = Object.values(students);
+    list.forEach((n, i) => { const o = structuredClone(src[i % src.length]), id = `demo-${u}-${i}-xxxxxxxxxxxx`;
+      const log = {}; for (const [k, v] of Object.entries(o.practice?.log || {})) if ((k.charCodeAt(9) + i) % 3) log[k] = Math.round(v * (u === 't2' ? .8 : 1.1));
+      sts[id] = { ...o, id, name: n, studioId: u, schoolId, teacherName: t.name, practice: { ...o.practice, log }, assignments: {}, cheers: {} }; });
+    demoStudios[u] = { studio: { studioName: `${t.name}’s studio`, teacherName: t.name, school: schoolId, terms: studio.terms, billing: u === 't2' ? { ...studio.billing, rate: 40 } : null },
+      students: sts, lessons: {}, events: {}, billing: {}, clips: {}, notes: {} };
+  }
+  schoolTasks = { k1: { id: 'k1', title: 'Send your students’ recital pieces', details: 'Title and composer for each student', due: dayKey(addDays(today(), 5)), teacher: 't2', status: 'open', created: new Date().toISOString() },
+                  k2: { id: 'k2', title: 'Update fall lesson times', due: dayKey(addDays(today(), -2)), teacher: 't3', status: 'done', doneAt: new Date().toISOString(), created: new Date().toISOString() } };
+  schoolEvents = {};
+}
+// ============================================================================================
 // Interactions
 // ============================================================================================
 function bindView() {
@@ -2006,6 +2445,25 @@ function bindView() {
   V.querySelectorAll('[data-lesson]').forEach(b => b.onclick = () => lessonModal(b.dataset.lesson));
   V.querySelectorAll('[data-pedit]').forEach(b => b.onclick = () => practiceEditModal(route.id, b.dataset.pedit));
   V.querySelectorAll('[data-bill]').forEach(b => b.onclick = () => billDetailModal(b.dataset.bill));
+  // music school
+  V.querySelectorAll('[data-schooltab]').forEach(b => b.onclick = () => { sub.stab = b.dataset.schooltab; render(); });
+  V.querySelectorAll('[data-openstudio]').forEach(b => b.onclick = () => switchStudio(b.dataset.openstudio));
+  V.querySelectorAll('[data-mystudio]').forEach(b => b.onclick = () => switchStudio(me.uid));
+  V.querySelectorAll('[data-tbill]').forEach(sel => sel.onchange = async () => { await api.schoolUpdate({ [`teachers.${sel.dataset.tbill}.billing`]: sel.value }); toast('Saved'); });
+  V.querySelectorAll('[data-revoke]').forEach(b => b.onclick = async () => { await loadSchoolData(); revokeModal(b.dataset.revoke); });
+  V.querySelectorAll('[data-sevent]').forEach(b => b.onclick = () => schoolEventModal(b.dataset.sevent));
+  V.querySelectorAll('[data-deltask]').forEach(b => b.onclick = () => { if (confirm('Delete this task?')) api.schoolDeleteTask(b.dataset.deltask); });
+  V.querySelectorAll('[data-taskdone]').forEach(b => b.onclick = () => api.schoolPatchTask(b.dataset.taskdone, { status: 'done', doneAt: new Date().toISOString() }).then(() => toast('Marked done')));
+  const inv = V.querySelector('#invList');
+  if (inv) api.schoolInvites().then(list => {
+    const live = list.filter(x => (x.expires?.toMillis?.() ?? x.expiresMs ?? 0) > Date.now());
+    inv.innerHTML = live.length ? live.map(x => { const url = `${location.origin}${location.pathname}?school=${schoolId}&invite=${x.id}`;
+      return `<div class="assign"><div class="grow"><div class="t">${esc(x.name)}</div><div class="d">${esc(x.email || '')} · ${x.billing === 'school' ? 'school billing' : 'own billing'} · sent ${fmtDate(x.created.slice(0, 10), { month: 'short', day: 'numeric' })}</div></div>
+        <button class="ghost small" data-invcopy="${esc(url)}">Copy link</button><button class="ghost small dangerText" data-invdrop="${x.id}">Withdraw</button></div>`; }).join('')
+      : '<div class="empty">None waiting.</div>';
+    inv.querySelectorAll('[data-invcopy]').forEach(b => b.onclick = async () => { try { await navigator.clipboard.writeText(b.dataset.invcopy); toast('Link copied'); } catch { prompt('Copy this link:', b.dataset.invcopy); } });
+    inv.querySelectorAll('[data-invdrop]').forEach(b => b.onclick = async () => { await api.schoolDropInvite(b.dataset.invdrop); render(); });
+  }).catch(() => { inv.innerHTML = '<div class="empty">Couldn’t load invites.</div>'; });
   V.querySelectorAll('[data-pay]').forEach(b => b.onclick = () => paymentModal(b.dataset.pay));
   V.querySelectorAll('[data-thlevel]').forEach(sel => sel.onchange = () => api.patchStudent(route.id, { [`theoryPlan.levels.${sel.dataset.thlevel}`]: { level: +sel.value, at: new Date().toISOString() } }).then(() => toast('Level set')));
   V.querySelectorAll('[data-thdeck]').forEach(c => c.onchange = () => api.patchStudent(route.id, { [`theoryPlan.decks.${c.dataset.thdeck}`]: c.checked }));
@@ -2033,6 +2491,7 @@ function bindView() {
     addLesson: () => extraLessonModal(route.view === 'student' ? route.id : null),
     calendar: () => calendarEmailModal(),
     billSetup: () => billSetupModal(), billExport: () => billingCsv(), billRemind: () => reminderModal(),
+    schoolRefresh: () => loadSchoolData(true), schoolInvite: () => teacherInviteModal(), schoolEvent: () => schoolEventModal(), schoolTask: () => schoolTaskModal(),
     addEvent: () => eventModal(null, route.view === 'student' ? route.id : null),
     unarchive: () => api.patchStudent(route.id, { archived: false }),
     thGoal: () => theoryGoalModal(route.id),
@@ -2193,7 +2652,7 @@ function studentModal(sid, scrollTo) {
 }
 
 function newStudentRecord(data) {
-  return { ...data, insights: insightsFor(studio.insights, data.insightOverride), tz: TZ, studioId: me.uid, studioName: studio.studioName, teacherName: studio.teacherName,
+  return { ...data, insights: insightsFor(studio.insights, data.insightOverride), tz: TZ, studioId: SU || me.uid, ...(studio.school ? { schoolId: studio.school } : {}), studioName: studio.studioName, teacherName: studio.teacherName,
     assignments: {}, upcoming: {}, lessonChanges: {}, cheers: {}, challenges: {}, badgeRules: studio.badgeRules || {}, badgeSet: studio.badgeSet || null,
     created: dayKey(), archived: false };
 }
@@ -2442,6 +2901,8 @@ function studioModal() {
         <button class="secondary" id="sTerms" type="button">${icon('calendar', 'sm')}Terms</button>
         <button class="secondary" id="sBadges" type="button">${icon('award', 'sm')}Studio badges</button>
         <button class="secondary" id="sInsights" type="button">${icon('tune', 'sm')}Practice insights</button></div>
+      ${myStudio() ? `<div class="planBox" style="display:grid;margin-top:0">${school ? `<div><b>${esc(school.name)}</b> · ${isSchoolAdmin() ? `you’re the admin · ${activeTeachers().length} of ${SCHOOL_MAX} teachers` : 'you teach here'}</div>`
+        : `<div><b>Run a music school?</b> Add up to ${SCHOOL_MAX} teachers and see the whole school in one place.</div><button class="secondary" type="button" id="sSchool">${icon('school', 'sm')}Start a music school</button>`}</div>` : ''}
       <div class="planBox" style="display:grid;margin-top:0">${isPartner() ? `<div><b>Beta partner</b> · unlimited students, free.</div>`
         : `<div><b>Free plan</b> · ${active().length} of ${FREE_STUDENTS} students. Beta partners get unlimited students, free.</div><button class="secondary" type="button" id="sCode">Enter a beta code</button>`}</div>
       <p class="small muted">Signed in as ${esc(me.email || me.displayName || '')}. <a href="privacy" target="_blank" rel="noopener">Privacy</a> · <a href="terms" target="_blank" rel="noopener">Terms</a></p>
@@ -2460,6 +2921,8 @@ function studioModal() {
     m.querySelector('#sInsights').onclick = () => insightsModal();
     m.querySelector('#sTerms').onclick = () => termsModal();
     m.querySelector('#sCode')?.addEventListener('click', () => betaCodeModal());
+    m.querySelector('#sSchool')?.addEventListener('click', () => createSchoolModal());
+    if (!myStudio()) m.querySelector('#sCal').hidden = true;
   });
 }
 $('studioBtn').onclick = studioModal;
@@ -2931,7 +3394,7 @@ function feedData(extra = {}) {
 }
 let lastFeedSync = '';
 function syncFeed() {
-  if (!studio?.feedToken || DEMO) return;
+  if (!studio?.feedToken || DEMO || !myStudio()) return;
   const d = feedData(), sig = JSON.stringify(d);
   if (sig === lastFeedSync) return;
   lastFeedSync = sig;
@@ -3009,7 +3472,7 @@ async function start() {
   $('setupSignOut').onclick = () => api.signOut();
   api.onAuth(async user => {
     if (!user) { me = null; studio = null; showOnly('signin'); return; }
-    me = user;
+    me = user; SU = user.uid;
     $('meName').textContent = user.displayName || 'Teacher';
     $('meEmail').textContent = user.email || '';
     studio = await api.getStudio(user.uid);
@@ -3030,8 +3493,11 @@ async function start() {
 }
 function enter() {
   showOnly('shell'); parseRoute();
+  ownStudio = studio;
   api.isAdmin().then(a => { amAdmin = a; $('adminNav').hidden = !a; render(); });
   let t; api.watch(() => { render(); clearTimeout(t); t = setTimeout(() => { syncFeed(); publishBilling(); }, 1500); });
+  if (DEMO) ownStudio = studio;                      // the demo builds its studio as it starts
+  startSchool();
   render();
 }
 
