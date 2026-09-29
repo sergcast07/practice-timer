@@ -81,6 +81,9 @@
   .linkBtn:hover { text-decoration: underline; }
   .owe { color: var(--warn); } .credit { color: var(--good); }
   .billTable td { vertical-align: middle; }
+  .ledgerTable td { vertical-align: middle; } .ledgerTable .rowActs { text-align: right; white-space: nowrap; }
+  .ledgerTable .rowActs button { padding: 2px 6px; }
+  .lateBox { display: grid; gap: 10px; padding: 12px; border-radius: 14px; background: var(--soft); }
   @container (max-width: 600px) { .billTable .wide { display: none; } }
   .clipRow { padding: 10px 0; border-top: 1px solid var(--line); display: grid; gap: 8px; }
   .clipRow:first-of-type { border-top: 0; }
@@ -1618,10 +1621,31 @@ function billRate(sid) {
   const B = studio?.billing || {}, b = billing[sid] || {};
   return { rate: b.rate ?? B.rate ?? 0, per: b.per || B.per || 'lesson' };
 }
+// Automatic late fees (studio.billing.late = { on, amount, type: 'flat' | 'percent', grace }): once per charge, the day
+// after its due date plus the grace days, if payments made before then (settling the oldest charges first) haven't
+// covered it. A teacher can waive one (billing[sid].waived[id]); waived fees are listed so they can be put back.
+function lateFees(entries, b) {
+  const LF = studio?.billing?.late, out = [];
+  if (!LF?.on || !(LF.amount > 0)) return out;
+  const t = dayKey(), ord = (x, y) => x.date.localeCompare(y.date);
+  const charges = entries.filter(e => e.amount > 0 && e.kind !== 'lateAdj').sort(ord), credits = entries.filter(e => e.amount < 0).sort(ord);
+  let before = 0;                                                  // everything owed ahead of this charge
+  for (const c of charges) {
+    const owedThrough = before + c.amount; before = owedThrough;
+    if (c.kind === 'open' || c.kind === 'adj' && c.amount <= 0) continue;
+    const feeDay = dayKey(addDays(parseDay(dueOf(c.date)), (LF.grace || 0) + 1)), id = 'late-' + (c.id || c.date);
+    if (feeDay > t) continue;
+    const paid = -credits.filter(p => p.date < feeDay).reduce((a, p) => a + p.amount, 0), unpaid = Math.min(c.amount, owedThrough - paid);
+    if (unpaid <= 0.004) continue;
+    const amount = Math.round((LF.type === 'percent' ? unpaid * LF.amount / 100 : LF.amount) * 100) / 100;
+    out.push({ date: feeDay, kind: 'late', id, text: `Late fee · ${c.text} (due ${fmtDate(dueOf(c.date), { month: 'short', day: 'numeric' })})`, amount, waived: !!b.waived?.[id] });
+  }
+  return out;
+}
 const dueOf = date => dayKey(addDays(parseDay(date), studio?.billing?.dueDays ?? 7));
 // What's still unpaid, charge by charge: payments and credits settle the oldest charges first
 function openItems(sid) {
-  const L = ledger(sid), charges = L.entries.filter(e => e.amount > 0).map(e => ({ text: e.text, date: e.date, due: dueOf(e.date), amount: e.amount, open: e.amount }));
+  const L = ledger(sid), charges = L.entries.filter(e => e.amount > 0).map(e => ({ text: e.text, date: e.date, due: e.kind === 'late' || e.kind === 'lateAdj' ? e.date : dueOf(e.date), amount: e.amount, open: e.amount }));
   let credit = -L.entries.filter(e => e.amount < 0).reduce((a, e) => a + e.amount, 0);
   for (const c of charges) { const use = Math.min(credit, c.open); c.open = Math.round((c.open - use) * 100) / 100; credit -= use; }
   return { items: charges.filter(c => c.open > 0.004), balance: L.balance };
@@ -1661,11 +1685,13 @@ function ledger(sid) {
     const amount = per === 'hour' ? rate * (l.length || 30) / 60 : rate;
     out.push({ date: l.date, kind: 'lesson', id: l.id, text: `${l.status === 'noshow' ? 'No-show' : 'Lesson'} · ${l.length || 30} min`, amount });
   }
-  for (const [id, a] of Object.entries(b.adjustments || {})) out.push({ date: a.date, kind: 'adj', id, text: a.note || (a.amount < 0 ? 'Credit' : 'Charge'), amount: +a.amount });
+  for (const [id, a] of Object.entries(b.adjustments || {})) out.push({ date: a.date, kind: a.late ? 'lateAdj' : 'adj', id, text: a.note || (a.late ? 'Late fee' : a.amount < 0 ? 'Credit' : 'Charge'), amount: +a.amount });
   for (const [id, p] of Object.entries(b.payments || {})) out.push({ date: p.date, kind: 'pay', id, text: `Payment${p.method ? ' · ' + p.method : ''}${p.note ? ' · ' + p.note : ''}`, amount: -p.amount });
-  out.sort((x, y) => x.date.localeCompare(y.date) || (x.kind === 'pay') - (y.kind === 'pay'));
-  let run = 0; for (const e of out) e.balance = run = Math.round((run + e.amount) * 100) / 100;
-  return { entries: out, balance: run };
+  out.push(...lateFees(out, b));
+  const waived = out.filter(e => e.waived), live = out.filter(e => !e.waived);
+  live.sort((x, y) => x.date.localeCompare(y.date) || (x.kind === 'pay') - (y.kind === 'pay'));
+  let run = 0; for (const e of live) e.balance = run = Math.round((run + e.amount) * 100) / 100;
+  return { entries: live, balance: run, waived };
 }
 function vBilling() {
   const B = studio?.billing;
@@ -1709,6 +1735,13 @@ function billSetupModal() {
       <p class="small muted" id="bPerNote" style="margin:0"></p>
       <label class="small" id="bNoshowRow" style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" id="bNoshow" style="width:auto" ${B.noshow !== false ? 'checked' : ''}><span>Charge for no-shows</span></label>
       <label class="field">Payment is due <select id="bDue">${[[0, 'on the day it’s charged'], [3, '3 days after'], [7, '7 days after'], [14, '14 days after'], [30, '30 days after']].map(([v, l]) => `<option value="${v}" ${(B.dueDays ?? 7) === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+      <div class="lateBox">
+        <label class="small" style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" id="bLateOn" style="width:auto" ${B.late?.on ? 'checked' : ''}><span>Add a late fee automatically</span></label>
+        <div class="fields three" id="bLateFields">
+          <label class="field">Amount <input type="number" id="bLateAmt" min="0" step="0.01" value="${B.late?.amount ?? ''}" placeholder="e.g. 10"></label>
+          <label class="field">As <select id="bLateType"><option value="flat" ${B.late?.type !== 'percent' ? 'selected' : ''}>a flat fee</option><option value="percent" ${B.late?.type === 'percent' ? 'selected' : ''}>% of what’s unpaid</option></select></label>
+          <label class="field">When <select id="bLateGrace">${[[0, 'the day after it’s due'], [3, '3 days after it’s due'], [7, '7 days after it’s due'], [14, '14 days after it’s due']].map(([v, l]) => `<option value="${v}" ${(B.late?.grace ?? 3) === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div>
+        <p class="small muted" style="margin:0">Once per unpaid charge. You can waive any late fee in a student’s details.</p></div>
       <label class="field">Payment link (optional) <input type="text" id="bPay" maxlength="200" value="${esc(B.payLink || '')}" placeholder="e.g. https://venmo.com/u/yourname"></label>
       <label class="field">How to pay (optional) <textarea id="bNote" rows="2" maxlength="400" placeholder="e.g. Zelle to 555-0100, or cash or check at the lesson">${esc(B.payNote || '')}</textarea></label>
       <label class="small" style="display:flex;gap:8px;align-items:flex-start;font-weight:600"><input type="checkbox" id="bShare" style="width:auto;margin-top:2px" ${B.share ? 'checked' : ''}>
@@ -1719,6 +1752,8 @@ function billSetupModal() {
     <footer><div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="bSave">Save</button></div></footer>`, m => {
     const perNote = () => { const p = val('bPer'); m.querySelector('#bPerNote').innerHTML = perHelp(p); m.querySelector('#bNoshowRow').hidden = p === 'month' || p === 'semester'; };
     m.querySelector('#bPer').onchange = perNote; perNote();
+    const lateToggle = () => { m.querySelector('#bLateFields').hidden = !m.querySelector('#bLateOn').checked; };
+    m.querySelector('#bLateOn').onchange = lateToggle; lateToggle();
     m.querySelector('#bPerNote').addEventListener('click', e => { if (e.target.closest('[data-terms]')) termsModal(); });
     m.querySelector('#bSave').onclick = async () => {
       const rate = +val('bRate');
@@ -1726,13 +1761,15 @@ function billSetupModal() {
       if (!(rate >= 0) || val('bRate') === '') return (m.querySelector('#bErr').textContent = 'Enter your lesson price.');
       if (!val('bSince')) return (m.querySelector('#bErr').textContent = 'Choose a start date.');
       studio.billing = { ...studio.billing, rate, per: val('bPer'), currency: val('bCur'), since: val('bSince'), noshow: m.querySelector('#bNoshow').checked, payLink: val('bPay'),
-                         payNote: val('bNote'), dueDays: +val('bDue'), share: m.querySelector('#bShare').checked };
+                         payNote: val('bNote'), dueDays: +val('bDue'), share: m.querySelector('#bShare').checked,
+                         late: { on: m.querySelector('#bLateOn').checked && +val('bLateAmt') > 0, amount: Math.max(0, +val('bLateAmt') || 0), type: val('bLateType'), grace: +val('bLateGrace') } };
+      if (m.querySelector('#bLateOn').checked && !(+val('bLateAmt') > 0)) return (m.querySelector('#bErr').textContent = 'Enter the late fee amount.');
       await api.updateStudio({ billing: studio.billing });
       closeModal(); toast('Billing saved'); render();
     };
   });
 }
-function paymentModal(sid, pid) {
+function paymentModal(sid, pid, back) {
   const s = students[sid], p = pid ? billing[sid]?.payments?.[pid] : null, bal = ledger(sid).balance;
   openModal(`${mhead((p ? 'Edit payment · ' : 'Record payment · ') + esc(firstName(s.name)))}
     <div class="fields">
@@ -1742,14 +1779,15 @@ function paymentModal(sid, pid) {
       <label class="field">Note (optional) <input type="text" id="pNote" maxlength="80" value="${esc(p?.note || '')}" placeholder="e.g. September lessons"></label>
       <div class="gateErr" id="pErr"></div>
     </div>
-    <footer>${p ? '<button class="danger" id="pDel">Delete</button>' : ''}<div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="pSave">Save</button></div></footer>`, m => {
+    <footer>${p ? `<button class="danger" id="pDel">${icon('trash', 'sm')}Delete payment</button>` : ''}<div class="right"><button class="secondary" id="pCancel">Cancel</button><button class="primary" id="pSave">Save</button></div></footer>`, m => {
+    m.querySelector('#pCancel').onclick = () => back ? back() : closeModal();
     m.querySelector('#pSave').onclick = async () => {
       const amount = Math.round(+val('pAmt') * 100) / 100;
       if (!(amount > 0)) return (m.querySelector('#pErr').textContent = 'Enter the amount paid.');
       await api.saveBilling(sid, { [`payments.${pid || newId()}`]: { amount, date: val('pDate') || dayKey(), method: val('pMethod'), note: val('pNote') } });
-      closeModal(); toast('Payment recorded');
+      back ? back() : closeModal(); toast(pid ? 'Payment updated' : 'Payment recorded');
     };
-    m.querySelector('#pDel')?.addEventListener('click', async () => { if (!confirm('Delete this payment?')) return; await api.saveBilling(sid, { [`payments.${pid}`]: DEL }); closeModal(); });
+    m.querySelector('#pDel')?.addEventListener('click', async () => { if (!confirm(`Delete this ${money(p.amount)} payment?`)) return; await api.saveBilling(sid, { [`payments.${pid}`]: DEL }); back ? back() : closeModal(); toast('Payment deleted'); });
   });
 }
 const perOptions = cur => [['lesson', 'lesson'], ['hour', 'hour (by lesson length)'], ['month', 'month'], ['semester', 'semester']]
@@ -1827,6 +1865,29 @@ function reminderModal() {
     };
   });
 }
+function adjustmentModal(sid, aid, preset) {
+  const s = students[sid], a = aid ? billing[sid]?.adjustments?.[aid] : null, late = a ? !!a.late : preset === 'late', LF = studio.billing?.late;
+  const back = () => billDetailModal(sid);
+  openModal(`${mhead((a ? 'Edit ' : 'Add ') + (late ? 'late fee' : 'charge or credit') + ' · ' + esc(firstName(s.name)))}
+    <div class="fields">
+      <div class="fields three"><label class="field">Amount <input type="number" id="aAmt" min="0.01" step="0.01" value="${a ? Math.abs(a.amount) : late && LF?.type !== 'percent' && LF?.amount ? LF.amount : ''}" placeholder="e.g. 20"></label>
+        ${late ? '<input type="hidden" id="aKind" value="1">' : `<label class="field">Type <select id="aKind"><option value="1" ${!a || a.amount > 0 ? 'selected' : ''}>Charge (they owe more)</option><option value="-1" ${a && a.amount < 0 ? 'selected' : ''}>Credit (they owe less)</option></select></label>`}
+        <label class="field">Date <input type="date" id="aDate" value="${a?.date || dayKey()}"></label></div>
+      <label class="field">${late ? 'Note' : 'What for'} <input type="text" id="aNote" maxlength="80" value="${esc(a?.note || (late ? 'Late fee' : ''))}" placeholder="${late ? 'Late fee' : 'e.g. Recital fee · Sheet music · Makeup credit'}"></label>
+      ${late ? '<p class="small muted" style="margin:0">Due right away. Families see it in their app and reminders if you share billing.</p>' : ''}
+      <div class="gateErr" id="aErr"></div>
+    </div>
+    <footer>${a ? `<button class="danger" id="aDel">${icon('trash', 'sm')}Delete</button>` : ''}<div class="right"><button class="secondary" id="aCancel">Cancel</button><button class="primary" id="aSave">${a ? 'Save' : 'Add'}</button></div></footer>`, m => {
+    m.querySelector('#aCancel').onclick = back;
+    m.querySelector('#aSave').onclick = async () => {
+      const amt = Math.round(Math.abs(+val('aAmt')) * 100) / 100;
+      if (!amt) return (m.querySelector('#aErr').textContent = 'Enter an amount.');
+      await api.saveBilling(sid, { [`adjustments.${aid || newId()}`]: { amount: amt * +val('aKind'), date: val('aDate') || dayKey(), note: val('aNote') || (late ? 'Late fee' : ''), ...(late ? { late: true } : {}) } });
+      back(); toast(aid ? 'Saved' : 'Added');
+    };
+    m.querySelector('#aDel')?.addEventListener('click', async () => { if (!confirm(`Delete this ${late ? 'late fee' : a.amount < 0 ? 'credit' : 'charge'}?`)) return; await api.saveBilling(sid, { [`adjustments.${aid}`]: DEL }); back(); toast('Deleted'); });
+  });
+}
 // A plain-text statement a teacher can paste into a message or email to the family
 function statementText(sid, from) {
   const s = students[sid], L = ledger(sid), B = studio.billing || {}, first = firstName(s.name);
@@ -1837,7 +1898,7 @@ function statementText(sid, from) {
   const tuition = inRange.filter(e => e.kind === 'tuition');
   for (const e of tuition) lines.push(`${e.text}: ${money(e.amount)}`);
   if (lessons.length || !tuition.length) lines.push(`${lessons.length} ${lessons.length === 1 ? 'lesson' : 'lessons'} (${lessons.map(e => fmtDate(e.date, { month: 'short', day: 'numeric' })).join(', ') || 'none'}): ${money(charges)}`);
-  for (const e of inRange.filter(e => e.kind === 'adj')) lines.push(`${e.text}: ${money(e.amount)}`);
+  for (const e of inRange.filter(e => ['adj', 'late', 'lateAdj'].includes(e.kind))) lines.push(`${e.text}: ${e.amount < 0 ? '−' + money(-e.amount) : money(e.amount)}`);
   for (const e of inRange.filter(e => e.kind === 'pay')) lines.push(`Paid ${fmtDate(e.date, { month: 'short', day: 'numeric' })}: −${money(-e.amount)}`);
   lines.push('', L.balance > 0.004 ? `Balance due: ${money(L.balance)}` : L.balance < -0.004 ? `Credit: ${money(-L.balance)}` : 'All paid up – thank you!');
   if (L.balance > 0.004 && B.payLink) lines.push(`You can pay here: ${B.payLink}`);
@@ -1852,33 +1913,33 @@ function billDetailModal(sid) {
       <div class="stats"><div class="stat"><b class="${L.balance > 0.004 ? 'owe' : ''}">${L.balance < -0.004 ? money(-L.balance) + ' credit' : money(L.balance)}</b><span>balance</span></div>
         <div class="stat"><b>${money(r.rate)}</b><span>per ${r.per}${b.rate != null ? ' (their own price)' : ''}</span></div></div>
       ${(b.hidden ? '<p class="small muted" style="margin:0">Hidden from the family: no balance in their app, no reminders.</p>' : '') + (billEmails(sid).length ? `<p class="small muted" style="margin:0">Reminders go to ${esc(billEmails(sid).join(', '))}.</p>` : '')}
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="accent small" id="dPay">${icon('plus', 'sm')}Record payment</button><button class="secondary small" id="dAdj">Add a charge or credit</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="accent small" id="dPay">${icon('plus', 'sm')}Record payment</button><button class="secondary small" id="dAdj">Add a charge or credit</button><button class="secondary small" id="dLate">Add a late fee</button>
         <button class="secondary small" id="dStmt">${icon('copy', 'sm')}Statement for the family</button><button class="ghost small" id="dPrice">Price and opening balance</button></div>
       <div class="billPanel" id="dPanel" hidden></div>
-      <div class="tableWrap" style="max-height:340px;overflow:auto"><table class="impTable"><thead><tr><th>Date</th><th>What</th><th style="text-align:right">Amount</th><th style="text-align:right">Balance</th></tr></thead><tbody>
+      <div class="tableWrap" style="max-height:340px;overflow:auto"><table class="impTable ledgerTable"><thead><tr><th>Date</th><th>What</th><th style="text-align:right">Amount</th><th style="text-align:right">Balance</th><th></th></tr></thead><tbody>
         ${L.entries.length ? L.entries.slice().reverse().map(e => `<tr><td style="white-space:nowrap">${fmtDate(e.date, { month: 'short', day: 'numeric', year: e.date.slice(0, 4) === String(today().getFullYear()) ? undefined : 'numeric' })}</td>
-          <td>${e.kind === 'pay' ? `<button class="linkBtn" data-editpay="${e.id}">${esc(e.text)}</button>` : e.kind === 'adj' ? `${esc(e.text)} <button class="ghost small" data-deladj="${e.id}" style="padding:0 4px" aria-label="Remove">${icon('x', 'sm')}</button>` : esc(e.text)}</td>
-          <td style="text-align:right;white-space:nowrap" class="${e.amount < 0 ? 'credit' : ''}">${e.amount < 0 ? '−' + money(-e.amount) : money(e.amount)}</td><td style="text-align:right;white-space:nowrap">${money(e.balance)}</td></tr>`).join('')
-          : '<tr><td colspan="4" class="muted">No lessons or payments yet.</td></tr>'}</tbody></table></div>
+          <td>${esc(e.text)}</td>
+          <td style="text-align:right;white-space:nowrap" class="${e.amount < 0 ? 'credit' : ''}">${e.amount < 0 ? '−' + money(-e.amount) : money(e.amount)}</td><td style="text-align:right;white-space:nowrap">${money(e.balance)}</td>
+          <td class="rowActs">${e.kind === 'pay' ? `<button class="ghost small" data-editpay="${e.id}">${icon('edit', 'sm')}Edit</button>`
+            : e.kind === 'adj' || e.kind === 'lateAdj' ? `<button class="ghost small" data-editadj="${e.id}">${icon('edit', 'sm')}Edit</button>`
+            : e.kind === 'late' ? `<button class="ghost small" data-waive="${e.id}">Waive</button>`
+            : e.kind === 'open' ? `<button class="ghost small" data-editopen>${icon('edit', 'sm')}Edit</button>` : ''}</td></tr>`).join('')
+          : '<tr><td colspan="5" class="muted">No lessons or payments yet.</td></tr>'}</tbody></table></div>
+      ${L.waived?.length ? `<p class="small muted" style="margin:0">Waived: ${L.waived.map(e => `${esc(e.text)} (${money(e.amount)}) <button class="linkBtn" data-unwaive="${e.id}" style="font-weight:600">Put back</button>`).join(' · ')}</p>` : ''}
+      <p class="small muted" style="margin:0">Lessons come from your schedule – to remove one, mark it canceled on the Schedule page.</p>
     </div>
     <footer><div class="right"><button class="secondary" data-close>Done</button></div></footer>`, m => {
     const panel = m.querySelector('#dPanel');
     const showPanel = html => { panel.innerHTML = html; panel.hidden = false; };
-    m.querySelector('#dPay').onclick = () => paymentModal(sid);
-    m.querySelectorAll('[data-editpay]').forEach(x => x.onclick = () => paymentModal(sid, x.dataset.editpay));
-    m.querySelectorAll('[data-deladj]').forEach(x => x.onclick = async () => { if (confirm('Remove this charge or credit?')) { await api.saveBilling(sid, { [`adjustments.${x.dataset.deladj}`]: DEL }); billDetailModal(sid); } });
-    m.querySelector('#dAdj').onclick = () => {
-      showPanel(`<div class="fields three"><label class="field">Amount <input type="number" id="aAmt" step="0.01" placeholder="e.g. 20"></label>
-          <label class="field">Type <select id="aKind"><option value="1">Charge (they owe more)</option><option value="-1">Credit (they owe less)</option></select></label>
-          <label class="field">Date <input type="date" id="aDate" value="${dayKey()}"></label></div>
-        <label class="field">What for <input type="text" id="aNote" maxlength="80" placeholder="e.g. Recital fee · Sheet music · Makeup credit"></label>
-        <div style="display:flex;gap:8px;justify-content:flex-end"><button class="primary small" id="aSave">Add</button></div>`);
-      panel.querySelector('#aSave').onclick = async () => {
-        const amt = Math.round(Math.abs(+val('aAmt')) * 100) / 100; if (!amt) return;
-        await api.saveBilling(sid, { [`adjustments.${newId()}`]: { amount: amt * +val('aKind'), date: val('aDate') || dayKey(), note: val('aNote') } });
-        billDetailModal(sid); toast('Added');
-      };
-    };
+    const back = () => billDetailModal(sid);
+    m.querySelector('#dPay').onclick = () => paymentModal(sid, null, back);
+    m.querySelectorAll('[data-editpay]').forEach(x => x.onclick = () => paymentModal(sid, x.dataset.editpay, back));
+    m.querySelectorAll('[data-editadj]').forEach(x => x.onclick = () => adjustmentModal(sid, x.dataset.editadj));
+    m.querySelector('#dAdj').onclick = () => adjustmentModal(sid);
+    m.querySelector('#dLate').onclick = () => adjustmentModal(sid, null, 'late');
+    m.querySelectorAll('[data-waive]').forEach(x => x.onclick = async () => { await api.saveBilling(sid, { [`waived.${x.dataset.waive}`]: true }); back(); toast('Late fee waived'); });
+    m.querySelectorAll('[data-unwaive]').forEach(x => x.onclick = async () => { await api.saveBilling(sid, { [`waived.${x.dataset.unwaive}`]: DEL }); back(); });
+    m.querySelector('[data-editopen]')?.addEventListener('click', () => m.querySelector('#dPrice').click());
     m.querySelector('#dPrice').onclick = () => {
       showPanel(`<div class="fields three"><label class="field">${esc(firstName(s.name))}’s price <input type="number" id="rRate" min="0" step="0.01" value="${b.rate ?? ''}" placeholder="Studio price: ${B.rate ?? ''}"></label>
           <label class="field">Per <select id="rPer"><option value="">Studio setting (${perWord(B.per)})</option>${perOptions(b.per)}</select></label>
@@ -1910,7 +1971,7 @@ function billingCsv() {
   const q = v => /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v);
   const rows = [['Date', 'Student', 'Type', 'Description', 'Amount', 'Balance', 'Currency']];
   for (const s of active()) for (const e of ledger(s.id).entries)
-    rows.push([e.date, s.name, { open: 'Opening balance', lesson: 'Lesson', tuition: 'Tuition', adj: e.amount < 0 ? 'Credit' : 'Charge', pay: 'Payment' }[e.kind], e.text, e.amount.toFixed(2), e.balance.toFixed(2), studio.billing?.currency || 'USD']);
+    rows.push([e.date, s.name, { open: 'Opening balance', lesson: 'Lesson', tuition: 'Tuition', late: 'Late fee', lateAdj: 'Late fee', adj: e.amount < 0 ? 'Credit' : 'Charge', pay: 'Payment' }[e.kind], e.text, e.amount.toFixed(2), e.balance.toFixed(2), studio.billing?.currency || 'USD']);
   const blob = new Blob([rows.map(r => r.map(q).join(',')).join('\r\n')], { type: 'text/csv' }), a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = `allegrow-billing-${dayKey()}.csv`; document.body.append(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
