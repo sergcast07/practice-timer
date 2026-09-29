@@ -12,8 +12,9 @@
 //   POST /parents/prefs       turn their weekly family summary on/off      POST /parents/test   send one now
 //   POST /parents/unlink      forget a parent                               GET /parents/unsubscribe  (link in emails)
 //   POST /parents/pin-code    email a PIN reset code to a family's parents  POST /parents/pin-verify  check it
+//   POST /bill/test           a sample payment reminder to the teacher      GET /bill/unsubscribe  (link in reminders)
 //   cron (hourly)             teaching-day brief ~1 hour before the first lesson; Sunday 6 pm studio digest;
-//                             Sunday 6 pm family summaries (parent's own time zone)
+//                             Sunday 6 pm family summaries (parent's own time zone); payment reminders ~9 am
 //
 // Parents prove who they are with their Firebase sign-in token: reading their own parents/{uid} record with it succeeds only
 // if the token is genuine and theirs (Firestore checks it). Their email comes from that token, so it's a verified address.
@@ -61,6 +62,7 @@ export default {
         return json({ ok: true, to: feed.email, subject: mail.subject });
       }
       if (path.startsWith('/parents/')) return await parentsApi(req, env, url);
+      if (path.startsWith('/bill/')) return await billApi(req, env, url);
       if (env.DRY_RUN && (m = path.match(/^\/preview\/([a-z0-9-]+)\/(brief|digest)$/))) {
         const feed = await getDoc(env, `feeds/${m[1]}`);
         if (!feed) return new Response('Not found', { status: 404 });
@@ -398,8 +400,9 @@ async function runSchedule(env) {
 async function processFeed(env, token) {
   const feed = await getDoc(env, `feeds/${token}`);
   if (!feed) { await env.KV.delete(`feed:${token}`); return []; }
-  if (!feed.email || (!feed.brief && !feed.digest)) return [];
   const tz = feed.tz || 'UTC', now = localNow(tz), out = [];
+  out.push(...await runBillReminders(env, feed, now));
+  if (!feed.email || (!feed.brief && !feed.digest)) return out;
   if (feed.brief) {
     const key = `sent:brief:${token}:${now.key}`;
     if (!(await env.KV.get(key))) {
@@ -454,6 +457,114 @@ const validTz = tz => { try { new Intl.DateTimeFormat('en-US', { timeZone: tz })
 // Resend's shared test sender only delivers to the Resend account's own address
 const sendError = e => TEST_SENDER.test(String(e?.message)) || /only send testing emails/i.test(String(e?.message))
   ? 'AlleGrow can’t email this address yet (the email service is still in test mode). Please try again later.' : 'Couldn’t send the email. Please try again.';
+
+// ============================================================================================
+// Payment reminders (teacher's billing): around 9 am in the teacher's time zone, for each student with billing emails.
+// The studio keeps students/{sid}.billShare up to date: open charges with due dates ({text, date, due, amount, open}),
+// upcoming flat fees, the balance, the payment link and how to pay. The feed holds the schedule (bill) and addresses (billTo).
+// KV: sent:bill:{sid}:{day} (one reminder per student per day), billoff:{sid}:{email hash} (unsubscribed)
+// ============================================================================================
+const money = (n, cur = 'USD') => new Intl.NumberFormat('en-US', { style: 'currency', currency: cur }).format(Math.round((n || 0) * 100) / 100);
+const dayDiff = (a, b) => Math.round((keyDate(a) - keyDate(b)) / 864e5);
+// What to say today, or null: overdue (every N days after the due date, up to M times), due today, or coming up in N days
+function reminderFor(bs, R, today) {
+  if (!bs) return null;
+  const open = (bs.items || []).filter(i => i.open > 0.004);
+  const overdue = open.filter(i => i.due < today), dueToday = open.filter(i => i.due === today);
+  const soonDay = R.before > 0 ? addKey(today, R.before) : null;
+  const soon = soonDay ? [...open, ...(bs.upcoming || []).map(u => ({ ...u, open: u.amount }))].filter(i => i.due === soonDay) : [];
+  const nudge = R.every > 0 && overdue.some(i => { const d = dayDiff(today, i.due); return d % R.every === 0 && d / R.every <= (R.max || 3); });
+  if (nudge) return { kind: 'overdue', overdue, dueToday, soon };
+  if (R.onDue !== false && dueToday.length) return { kind: 'due', overdue, dueToday, soon };
+  if (soon.length) return { kind: 'soon', overdue, dueToday, soon };
+  return null;
+}
+async function billEmail(env, feed, s, rem, to, { test } = {}) {
+  const bs = s.billShare, cur = bs.currency || 'USD', first = String(s.name || '').split(' ')[0] || 'your child', who = feed.teacherName || feed.studioName || 'your teacher';
+  const sum = list => list.reduce((a, i) => a + (i.open ?? i.amount), 0);
+  const row = (i, note) => `<tr><td style="padding:7px 0;border-bottom:1px solid #eee;font-size:14px">${esc(i.text)}<div style="color:#8a8f9e;font-size:12.5px">${note}</div></td>
+    <td style="padding:7px 0;border-bottom:1px solid #eee;text-align:right;font-size:14px;white-space:nowrap">${money(i.open ?? i.amount, cur)}</td></tr>`;
+  const due = sum(rem.overdue) + sum(rem.dueToday);
+  const subject = test ? `Sample reminder: ${first}’s lessons` : rem.kind === 'overdue' ? `Overdue: ${money(sum(rem.overdue), cur)} for ${first}’s lessons`
+    : rem.kind === 'due' ? `Due today: ${money(due, cur)} for ${first}’s lessons` : `Coming up: ${money(sum(rem.soon), cur)} due ${fmtDay(rem.soon[0].due)} for ${first}’s lessons`;
+  const heading = rem.kind === 'overdue' ? 'A payment is overdue' : rem.kind === 'due' ? 'A payment is due today' : 'A payment is coming up';
+  const rows = [...rem.overdue.map(i => row(i, `Was due ${fmtDay(i.due)}`)), ...rem.dueToday.map(i => row(i, 'Due today')), ...rem.soon.map(i => row(i, `Due ${fmtDay(i.due)}`))].join('');
+  const link = /^https?:\/\//i.test(bs.payLink || '') ? bs.payLink : '';
+  const body = `${feed.bill?.message ? `<p style="margin:0 0 16px;font-size:15px;line-height:1.5;white-space:pre-line">${esc(feed.bill.message)}</p>` : ''}
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0">${rows}</table>
+    <p style="margin:14px 0 0;font-size:15px"><b>${due > 0 ? `Due now: ${money(due, cur)}` : `Balance: ${money(bs.balance, cur)}`}</b></p>
+    ${link ? `<p style="margin:18px 0 0"><a href="${esc(link)}" style="display:inline-block;background:#23865f;color:#fff;text-decoration:none;font-weight:600;padding:11px 18px;border-radius:12px;font-size:15px">Pay ${esc(who)}</a></p>` : ''}
+    ${bs.payNote || (!link && bs.payLink) ? `<p style="margin:14px 0 0;font-size:14px;color:#3d4760;white-space:pre-line"><b>How to pay:</b> ${esc([bs.payNote, link ? '' : bs.payLink].filter(Boolean).join('\n'))}</p>` : ''}
+    <p style="margin:14px 0 0;font-size:12.5px;color:#8a8f9e">Balance as of ${fmtDay(bs.asOf)}. Already paid? Thank you – it may not be recorded yet.</p>`;
+  const off = `${env.WORKER_URL || ''}/bill/unsubscribe?s=${encodeURIComponent(s.id)}&e=${encodeURIComponent(to)}&k=${await hmac(env, `billoff:${s.id}:${to}`)}`;
+  const intro = `From ${esc(who)}${feed.studioName && feed.studioName !== who ? ` (${esc(feed.studioName)})` : ''} about ${esc(first)}’s lessons.`;
+  return { subject, html: parentLayout(env, heading, intro, body, `${test ? '<b>This is a sample.</b> ' : ''}Sent for ${esc(who)} by AlleGrow. Questions about a payment? Just reply to this email. <a href="${off}" style="color:#8a8f9e">Stop payment reminders</a>`) };
+}
+async function sendBill(env, to, mail, replyTo) {
+  if (env.DRY_RUN) { console.log(`[dry run] reminder to ${to}: ${mail.subject}`); return; }
+  const r = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: env.FROM_EMAIL, to: [to], subject: mail.subject, html: mail.html, ...(replyTo || env.REPLY_TO ? { reply_to: replyTo || env.REPLY_TO } : {}) }) });
+  if (!r.ok) throw new Error(`Resend ${r.status}: ${await r.text()}`);
+}
+async function runBillReminders(env, feed, now) {
+  const R = feed.bill, out = [];
+  if (!R?.on || !feed.billTo || now.minutes < 9 * 60 || now.minutes >= 10 * 60) return out;
+  for (const [sid, emails] of Object.entries(feed.billTo)) {
+    if (!validCode(sid) || !(feed.students || []).includes(sid)) continue;
+    const key = `sent:bill:${sid}:${now.key}`;
+    if (await env.KV.get(key)) continue;
+    const s = await getDoc(env, `students/${sid}`);
+    if (!s || s.archived || !s.billShare) continue;
+    const rem = reminderFor(s.billShare, R, now.key);
+    if (!rem) continue;
+    // overdue nudges: never closer together than the teacher's "every N days", even with several overdue charges
+    const lastKey = `lastbill:${sid}`, last = await env.KV.get(lastKey);
+    if (rem.kind === 'overdue' && last && dayDiff(now.key, last) < R.every) continue;
+    await env.KV.put(key, '1', { expirationTtl: 172800 });
+    if (rem.kind === 'overdue') await env.KV.put(lastKey, now.key, { expirationTtl: 90 * 86400 });
+    for (const to of (emails || []).slice(0, 3)) {
+      if (await env.KV.get(`billoff:${sid}:${await sha(to)}`)) continue;
+      try { const mail = await billEmail(env, feed, { ...s, id: sid }, rem, to); await sendBill(env, to, mail, R.replyTo); out.push(['bill', mail.subject]); }
+      catch (e) { console.error('bill', sid.slice(0, 5), e.message); }
+    }
+  }
+  return out;
+}
+async function billApi(req, env, url) {
+  const path = url.pathname;
+  if (path === '/bill/unsubscribe' && req.method === 'GET') {
+    const s = url.searchParams.get('s') || '', e = (url.searchParams.get('e') || '').toLowerCase(), k = url.searchParams.get('k') || '';
+    if (!validCode(s) || !e || k !== await hmac(env, `billoff:${s}:${e}`)) return new Response('This link isn’t valid.', { status: 400 });
+    await env.KV.put(`billoff:${s}:${await sha(e)}`, '1');
+    return new Response(parentLayout(env, 'Payment reminders stopped', `We won’t email ${esc(e)} payment reminders for this student any more. The teacher can still send you statements.`, '', 'AlleGrow'),
+      { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+  }
+  if (env.DRY_RUN && path === '/bill/preview') {                   // local testing only: what today's reminder would look like
+    const feed = await getDoc(env, `feeds/${url.searchParams.get('token')}`), sid = url.searchParams.get('sid'), s = await getDoc(env, `students/${sid}`);
+    const day = url.searchParams.get('day') || localNow(feed.tz || 'UTC').key, rem = reminderFor(s.billShare, feed.bill, day);
+    if (!rem) return new Response(`No reminder on ${day}`);
+    return new Response((await billEmail(env, feed, { ...s, id: sid }, rem, 'parent@example.com')).html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+  }
+  if (path === '/bill/test' && req.method === 'POST') {
+    const { token, sid } = await req.json();
+    if (!validCode(token) || !validCode(sid)) return json({ error: 'bad request' }, 400);
+    if (await env.KV.get(`rl:${token}:bill`)) return json({ error: 'Please wait a minute before sending another sample.' }, 429);
+    const feed = await getDoc(env, `feeds/${token}`);
+    const to = feed?.bill?.replyTo || feed?.email;
+    if (!to || !(feed.students || []).includes(sid)) return json({ error: 'Turn on reminders and save first.' }, 400);
+    const s = await getDoc(env, `students/${sid}`);
+    if (!s?.billShare) return json({ error: 'That student has no billing summary yet – open Billing once, then try again.' }, 400);
+    await env.KV.put(`rl:${token}:bill`, '1', { expirationTtl: 60 });
+    // a sample shows what a real reminder would say today (or, with nothing owed, the next charge)
+    const bs = s.billShare, t = localNow(feed.tz || 'UTC').key, open = (bs.items || []).filter(i => i.open > 0.004);
+    const rem = { overdue: open.filter(i => i.due < t), dueToday: open.filter(i => i.due === t), soon: [...open.filter(i => i.due > t), ...(bs.upcoming || [])].slice(0, 3) };
+    rem.kind = rem.overdue.length ? 'overdue' : rem.dueToday.length ? 'due' : 'soon';
+    if (!rem.soon.length && rem.kind === 'soon') rem.soon = [{ text: 'Nothing is due right now', due: t, amount: 0 }];
+    try { const mail = await billEmail(env, feed || {}, { ...s, id: sid }, rem, to, { test: true }); await sendBill(env, to, mail, to); return json({ ok: true, to, subject: mail.subject }); }
+    catch (e) { console.error(e); return json({ error: sendError(e) }, 500); }
+  }
+  return json({ error: 'not found' }, 404);
+}
 
 async function parentsApi(req, env, url) {
   const path = url.pathname;

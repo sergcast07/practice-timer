@@ -293,6 +293,15 @@
   .moveCard { display: grid; gap: 8px; border: 1.5px solid color-mix(in srgb, var(--leaf) 35%, transparent); }
   .moveCard ol { margin: 0; padding-left: 20px; line-height: 1.6; }
   #bringOver { text-align: center; color: var(--accent); font-weight: 600; text-decoration: none; }
+  .billCard { display: grid; gap: 8px; margin-top: 10px; padding: 14px; border-radius: 14px; background: var(--soft); }
+  .billBig { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .billBig small { font-size: 14px; font-weight: 600; color: var(--muted); }
+  .billBig.late small, .billRows small.late { color: var(--warn); }
+  .billRows { display: grid; gap: 6px; margin-top: 4px; }
+  .billRows > div { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; }
+  .billRows small { display: block; color: var(--muted); font-size: 12.5px; }
+  .billCard details summary { cursor: pointer; font-weight: 600; }
+  .payBtn { justify-self: start; background: var(--good); color: #fff; font-weight: 700; padding: 10px 16px; border-radius: 12px; text-decoration: none; }
   .welcomeList { display: grid; gap: 12px; margin-top: 14px; text-align: left; }
   .welcomeList > * { display: flex; gap: 10px; align-items: flex-start; font-size: 14.5px; line-height: 1.4; }
   .welcomeList .ic { flex: none; width: 20px; height: 20px; color: var(--leaf, var(--good)); margin-top: 1px; }
@@ -1718,6 +1727,25 @@ $('pinForgot').onclick = () => {
 $('changePinBtn').onclick = () => askPin(true);
 
 // Parent accounts on this family, in Devices & sync
+// What the teacher shares about lesson payments (students/{sid}.billShare, kept up to date by their studio)
+function billCard(t) {
+  const b = t && !t.missing && t.billShare;
+  if (!b?.share) return '';
+  const fmt = n => new Intl.NumberFormat(undefined, { style: 'currency', currency: b.currency || 'USD' }).format(n || 0);
+  const day = k => parseDay(k).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }), today0 = dayKey();
+  const open = (b.items || []).filter(i => i.open > 0.004), dueNow = open.filter(i => i.due <= today0).reduce((a, i) => a + i.open, 0);
+  const late = open.some(i => i.due < today0), link = /^https?:\/\//i.test(b.payLink || '') ? b.payLink : '';
+  return `<div class="billCard">
+    <div class="rowBetween"><b>Lessons &amp; payments</b><span class="small muted">as of ${day(b.asOf)}</span></div>
+    <div class="billBig ${late ? 'late' : ''}">${b.balance < -0.004 ? `${fmt(-b.balance)} <small>credit</small>` : dueNow > 0.004 ? `${fmt(dueNow)} <small>${late ? 'overdue' : 'due now'}</small>` : b.balance > 0.004 ? `${fmt(b.balance)} <small>balance</small>` : 'All paid up'}</div>
+    ${dueNow > 0.004 && b.balance - dueNow > 0.004 ? `<div class="small muted" style="margin-top:-4px">Total balance ${fmt(b.balance)}</div>` : ''}
+    ${open.length ? `<div class="billRows">${open.slice(0, 6).map(i => `<div><span>${esc(i.text)}<small class="${i.due < today0 ? 'late' : ''}">${i.due < today0 ? 'was due' : 'due'} ${day(i.due)}</small></span><b>${fmt(i.open)}</b></div>`).join('')}</div>` : ''}
+    ${(b.upcoming || []).slice(0, 2).map(u => `<div class="small muted">Next: ${esc(u.text)} · ${fmt(u.amount)} due ${day(u.due)}</div>`).join('')}
+    ${(b.recent || []).length ? `<details><summary class="small">Recent activity</summary><div class="billRows">${b.recent.map(e => `<div><span>${esc(e.text)}<small>${day(e.date)}</small></span><b>${e.amount < 0 ? '−' + fmt(-e.amount) : fmt(e.amount)}</b></div>`).join('')}</div></details>` : ''}
+    ${link && b.balance > 0.004 ? `<a class="payBtn" href="${esc(link)}" target="_blank" rel="noopener">Pay ${esc(t.teacherName || 'the teacher')}</a>` : ''}
+    ${b.payNote || (!link && b.payLink) ? `<div class="small" style="white-space:pre-line"><b>How to pay:</b> ${esc([b.payNote, link ? '' : b.payLink].filter(Boolean).join('\n'))}</div>` : ''}
+  </div>`;
+}
 function markParentBtn() {
   const list = Object.values(familyParents);
   $('parentBtn').classList.toggle('linked', list.length > 0);
@@ -1783,7 +1811,7 @@ function renderParent() {
         ${k.link ? (t => `<div class="teacherBox"><div class="grow"><span class="muted small">Teacher</span>
             <b>${t?.missing ? 'Connection removed by the teacher' : t ? esc(t.teacherName) : 'Connected to a teacher'}</b>${t && !t.missing ? `<span class="muted small">${esc(t.studioName || '')}</span>` : ''}</div>
           <div class="btnPair">${t?.missing ? '' : `<button class="secondary" data-switch="${k.id}">Switch teacher</button>`}
-            <button class="secondary dangerText" data-unlink="${k.id}">${t?.missing ? 'Remove' : 'Disconnect'}</button></div></div>`)(teacherData[k.link])
+            <button class="secondary dangerText" data-unlink="${k.id}">${t?.missing ? 'Remove' : 'Disconnect'}</button></div></div>${billCard(t)}`)(teacherData[k.link])
           : `<button class="secondary" data-link="${k.id}">${icon('link', 'sm')}Connect to teacher</button>`}
       </div>
     </div>`).join('') || '<div class="muted">Add each child who practices.</div>';

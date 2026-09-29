@@ -1618,6 +1618,26 @@ function billRate(sid) {
   const B = studio?.billing || {}, b = billing[sid] || {};
   return { rate: b.rate ?? B.rate ?? 0, per: b.per || B.per || 'lesson' };
 }
+const dueOf = date => dayKey(addDays(parseDay(date), studio?.billing?.dueDays ?? 7));
+// What's still unpaid, charge by charge: payments and credits settle the oldest charges first
+function openItems(sid) {
+  const L = ledger(sid), charges = L.entries.filter(e => e.amount > 0).map(e => ({ text: e.text, date: e.date, due: dueOf(e.date), amount: e.amount, open: e.amount }));
+  let credit = -L.entries.filter(e => e.amount < 0).reduce((a, e) => a + e.amount, 0);
+  for (const c of charges) { const use = Math.min(credit, c.open); c.open = Math.round((c.open - use) * 100) / 100; credit -= use; }
+  return { items: charges.filter(c => c.open > 0.004), balance: L.balance };
+}
+// Flat fees that will be charged soon (so families can be reminded before they're due)
+function upcomingCharges(sid, days = 45) {
+  const B = studio?.billing, { rate, per } = billRate(sid), out = [], t = today(), end = addDays(t, days);
+  if (!B?.since || !rate || (per !== 'month' && per !== 'semester')) return out;
+  const has = (a, b) => lessonsBetween(a, b, sid).some(countsAsLesson);
+  if (per === 'month') for (let m = new Date(t.getFullYear(), t.getMonth() + 1, 1); m <= end; m = new Date(m.getFullYear(), m.getMonth() + 1, 1)) {
+    if (has(m, new Date(m.getFullYear(), m.getMonth() + 1, 0))) out.push({ text: `${m.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })} tuition`, date: dayKey(m), due: dueOf(dayKey(m)), amount: rate });
+  }
+  else for (const T of studio.terms || []) if (T.start > dayKey(t) && T.start <= dayKey(end) && has(parseDay(T.start), parseDay(T.end)))
+    out.push({ text: `${T.name} tuition`, date: T.start, due: dueOf(T.start), amount: rate });
+  return out;
+}
 // Every charge, adjustment and payment for one student since billing began, oldest first, with a running balance
 function ledger(sid) {
   const B = studio?.billing, b = billing[sid] || {};
@@ -1660,7 +1680,7 @@ function vBilling() {
   const owed = rows.reduce((a, r) => a + Math.max(0, r.L.balance), 0), paidM = rows.reduce((a, r) => a + r.paid, 0), chargedM = rows.reduce((a, r) => a + r.charged, 0);
   const { rate, per } = billRate('');
   return `<div class="pageHead"><div><div class="eyebrow">${money(rate)} per ${per} · since ${fmtDate(B.since, { day: 'numeric', month: 'short', year: 'numeric' })}</div><h1>Billing</h1></div>
-    <div class="actions"><button class="secondary" data-act="billExport">${icon('share', 'sm')}Export CSV</button><button class="secondary" data-act="billSetup">${icon('settings', 'sm')}Settings</button></div></div>
+    <div class="actions"><button class="secondary" data-act="billRemind">${icon('mail', 'sm')}Reminders${B.remind?.on ? ' · on' : ''}</button><button class="secondary" data-act="billExport">${icon('share', 'sm')}Export CSV</button><button class="secondary" data-act="billSetup">${icon('settings', 'sm')}Settings</button></div></div>
   <div class="stack">
     <div class="card"><div class="stats">
       <div class="stat"><b>${money(owed)}</b><span>owed to you now</span></div>
@@ -1688,8 +1708,12 @@ function billSetupModal() {
       <label class="field">Start counting lessons from <input type="date" id="bSince" value="${B.since || first}"></label>
       <p class="small muted" id="bPerNote" style="margin:0"></p>
       <label class="small" id="bNoshowRow" style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" id="bNoshow" style="width:auto" ${B.noshow !== false ? 'checked' : ''}><span>Charge for no-shows</span></label>
-      <label class="field">Payment link or instructions (optional) <input type="text" id="bPay" maxlength="200" value="${esc(B.payLink || '')}" placeholder="e.g. https://venmo.com/u/yourname or “Zelle to 555-0100”"></label>
-      <p class="small muted" style="margin:0">Each student can have their own price (open their details). Statements you send families include the payment link.</p>
+      <label class="field">Payment is due <select id="bDue">${[[0, 'on the day it’s charged'], [3, '3 days after'], [7, '7 days after'], [14, '14 days after'], [30, '30 days after']].map(([v, l]) => `<option value="${v}" ${(B.dueDays ?? 7) === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+      <label class="field">Payment link (optional) <input type="text" id="bPay" maxlength="200" value="${esc(B.payLink || '')}" placeholder="e.g. https://venmo.com/u/yourname"></label>
+      <label class="field">How to pay (optional) <textarea id="bNote" rows="2" maxlength="400" placeholder="e.g. Zelle to 555-0100, or cash or check at the lesson">${esc(B.payNote || '')}</textarea></label>
+      <label class="small" style="display:flex;gap:8px;align-items:flex-start;font-weight:600"><input type="checkbox" id="bShare" style="width:auto;margin-top:2px" ${B.share ? 'checked' : ''}>
+        <span>Show each family their balance in the AlleGrow app<br><span class="muted" style="font-weight:500">Behind the parent PIN: what’s due and when, recent charges and payments, and how to pay. You can hide it for one student in their details.</span></span></label>
+      <p class="small muted" style="margin:0">Each student can have their own price (open their details). Statements, the family app and reminders include how to pay.</p>
       <div class="gateErr" id="bErr"></div>
     </div>
     <footer><div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="bSave">Save</button></div></footer>`, m => {
@@ -1701,7 +1725,8 @@ function billSetupModal() {
       if (val('bPer') === 'semester' && !(studio.terms || []).length) return (m.querySelector('#bErr').textContent = 'Add your semesters first (Settings → Terms).');
       if (!(rate >= 0) || val('bRate') === '') return (m.querySelector('#bErr').textContent = 'Enter your lesson price.');
       if (!val('bSince')) return (m.querySelector('#bErr').textContent = 'Choose a start date.');
-      studio.billing = { rate, per: val('bPer'), currency: val('bCur'), since: val('bSince'), noshow: m.querySelector('#bNoshow').checked, payLink: val('bPay') };
+      studio.billing = { ...studio.billing, rate, per: val('bPer'), currency: val('bCur'), since: val('bSince'), noshow: m.querySelector('#bNoshow').checked, payLink: val('bPay'),
+                         payNote: val('bNote'), dueDays: +val('bDue'), share: m.querySelector('#bShare').checked };
       await api.updateStudio({ billing: studio.billing });
       closeModal(); toast('Billing saved'); render();
     };
@@ -1736,6 +1761,68 @@ function perHelp(p) {
       : 'Semesters come from your terms. <button type="button" class="linkBtn" data-terms style="font-weight:600">Add your semesters</button> first.'; }
   return p === 'hour' ? 'Each lesson is charged by its length, once its time has passed.' : 'Each lesson is charged once its time has passed.';
 }
+// The family-facing summary, kept on students/{sid}.billShare while sharing or reminders are on. It's worked out here
+// (lessons and payments are private to the teacher) and refreshed whenever the studio is open and something changes.
+const billShareOn = sid => { const B = studio?.billing; return !!B?.since && (B.share || B.remind?.on) && billing[sid]?.hidden !== true; };
+function billShareFor(sid) {
+  const B = studio.billing, { items, balance } = openItems(sid), L = ledger(sid);
+  return { asOf: dayKey(), currency: B.currency || 'USD', balance, share: !!B.share, payLink: B.payLink || '', payNote: B.payNote || '',
+           items: items.slice(-20), upcoming: upcomingCharges(sid), recent: L.entries.slice(-6).reverse().map(e => ({ date: e.date, text: e.text, amount: e.amount })) };
+}
+const lastShare = {};
+function publishBilling() {
+  if (DEMO || !studio) return;
+  for (const s of active()) {
+    const want = billShareOn(s.id) ? billShareFor(s.id) : null, sig = JSON.stringify(want);
+    if (lastShare[s.id] === undefined && !want && !s.billShare) { lastShare[s.id] = sig; continue; }
+    if (lastShare[s.id] === sig || (want && JSON.stringify(s.billShare) === sig)) { lastShare[s.id] = sig; continue; }
+    lastShare[s.id] = sig;
+    api.patchStudent(s.id, { billShare: want || DEL });
+  }
+}
+const billEmails = sid => String(billing[sid]?.emails || '').split(/[,;\s]+/).map(x => x.trim().toLowerCase()).filter(x => /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/.test(x)).slice(0, 3);
+// Reminder emails: who gets them and when (the email service reads this from the feed)
+function reminderModal() {
+  const B = studio.billing || {}, R = B.remind || {}, withEmail = active().filter(s => billEmails(s.id).length);
+  const sel = (id, opts, cur) => `<select id="${id}">${opts.map(([v, l]) => `<option value="${v}" ${String(cur) === String(v) ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
+  openModal(`${mhead('Payment reminders')}
+    <div class="fields">
+      <label class="small" style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" id="rOn" style="width:auto" ${R.on ? 'checked' : ''}><span>Email families payment reminders</span></label>
+      <div class="fields three">
+        <label class="field">Before it’s due ${sel('rBefore', [[0, 'Don’t send'], [1, '1 day before'], [2, '2 days before'], [3, '3 days before'], [5, '5 days before'], [7, '7 days before']], R.before ?? 3)}</label>
+        <label class="field">On the due date ${sel('rOnDue', [[1, 'Send'], [0, 'Don’t send']], R.onDue === false ? 0 : 1)}</label>
+        <label class="field">When overdue ${sel('rEvery', [[0, 'Don’t send'], [3, 'Every 3 days'], [7, 'Every week'], [14, 'Every 2 weeks']], R.every ?? 7)}</label></div>
+      <label class="field">Overdue reminders stop after ${sel('rMax', [[1, '1 reminder'], [2, '2 reminders'], [3, '3 reminders'], [5, '5 reminders']], R.max ?? 3)}</label>
+      <label class="field">Your message (optional) <textarea id="rMsg" rows="3" maxlength="600" placeholder="e.g. Thank you for supporting your child’s lessons! Let me know if you have any questions.">${esc(R.message || '')}</textarea></label>
+      <p class="small muted" style="margin:0">Each reminder shows what’s due and when${B.payLink || B.payNote ? ', with your payment link and how to pay' : ' – add a payment link or how to pay in Billing settings'}. They go out around 9 am your time, only when something is due, and replies come to you.</p>
+      <p class="small ${withEmail.length ? 'muted' : ''}" style="margin:0;${withEmail.length ? '' : 'color:var(--warn)'}">${withEmail.length ? `Going to ${withEmail.length} of ${active().length} students’ families.` : 'No billing emails yet.'} Add a family’s email in each student’s billing details.</p>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="secondary small" id="rTest">${icon('mail', 'sm')}Send me a sample</button><span class="small muted" id="rTestMsg"></span></div>
+      <div class="gateErr" id="rErr"></div>
+    </div>
+    <footer><div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="rSave">Save</button></div></footer>`, m => {
+    const read = () => ({ on: m.querySelector('#rOn').checked, before: +val('rBefore'), onDue: val('rOnDue') === '1', every: +val('rEvery'), max: +val('rMax'), message: val('rMsg') });
+    const save = async () => {
+      studio.billing = { ...studio.billing, remind: read() };
+      await api.updateStudio({ billing: studio.billing });
+      if (studio.billing.remind.on && !DEMO) await ensureFeed({ brief: false, digest: false });
+      lastFeedSync = ''; syncFeed(); publishBilling();
+    };
+    m.querySelector('#rSave').onclick = async () => { await save(); closeModal(); toast(studio.billing.remind.on ? 'Reminders on' : 'Saved'); render(); };
+    m.querySelector('#rTest').onclick = async e => {
+      const out = m.querySelector('#rTestMsg');
+      if (DEMO) return (out.textContent = 'Sign in to send a sample – this is the demo.');
+      e.target.disabled = true; out.textContent = 'Sending…';
+      try {
+        await save(); await new Promise(r => setTimeout(r, 800));
+        const sid = (withEmail[0] || active()[0])?.id;
+        const r = await fetch(WORKER_URL + '/bill/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: studio.feedToken, sid }) });
+        const j = await r.json().catch(() => ({}));
+        out.textContent = r.ok ? `Sent a sample to ${j.to}.` : j.error || 'Couldn’t send.';
+      } catch { out.textContent = 'Couldn’t reach the email service.'; }
+      e.target.disabled = false;
+    };
+  });
+}
 // A plain-text statement a teacher can paste into a message or email to the family
 function statementText(sid, from) {
   const s = students[sid], L = ledger(sid), B = studio.billing || {}, first = firstName(s.name);
@@ -1760,6 +1847,7 @@ function billDetailModal(sid) {
     <div class="fields">
       <div class="stats"><div class="stat"><b class="${L.balance > 0.004 ? 'owe' : ''}">${L.balance < -0.004 ? money(-L.balance) + ' credit' : money(L.balance)}</b><span>balance</span></div>
         <div class="stat"><b>${money(r.rate)}</b><span>per ${r.per}${b.rate != null ? ' (their own price)' : ''}</span></div></div>
+      ${(b.hidden ? '<p class="small muted" style="margin:0">Hidden from the family: no balance in their app, no reminders.</p>' : '') + (billEmails(sid).length ? `<p class="small muted" style="margin:0">Reminders go to ${esc(billEmails(sid).join(', '))}.</p>` : '')}
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="accent small" id="dPay">${icon('plus', 'sm')}Record payment</button><button class="secondary small" id="dAdj">Add a charge or credit</button>
         <button class="secondary small" id="dStmt">${icon('copy', 'sm')}Statement for the family</button><button class="ghost small" id="dPrice">Price and opening balance</button></div>
       <div class="billPanel" id="dPanel" hidden></div>
@@ -1792,9 +1880,12 @@ function billDetailModal(sid) {
           <label class="field">Per <select id="rPer"><option value="">Studio setting (${perWord(B.per)})</option>${perOptions(b.per)}</select></label>
           <label class="field">Owed before ${fmtDate(B.since, { month: 'short', day: 'numeric' })} <input type="number" id="rOpen" step="0.01" value="${b.opening || ''}" placeholder="0"></label></div>
         <p class="small muted" style="margin:0">Leave the price empty to use the studio price. A negative opening balance is a credit.</p>
+        <label class="field">Billing emails (for reminders) <input type="text" id="rEmails" maxlength="200" value="${esc(b.emails || '')}" placeholder="parent@example.com, other@example.com"></label>
+        <label class="small" style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" id="rHide" style="width:auto" ${b.hidden ? 'checked' : ''}><span>Don’t show ${esc(firstName(s.name))}’s family their balance or send them reminders</span></label>
         <div style="display:flex;gap:8px;justify-content:flex-end"><button class="primary small" id="rSave">Save</button></div>`);
       panel.querySelector('#rSave').onclick = async () => {
-        await api.saveBilling(sid, { rate: val('rRate') === '' ? DEL : Math.max(0, +val('rRate')), per: val('rPer') || DEL, opening: Math.round((+val('rOpen') || 0) * 100) / 100 });
+        await api.saveBilling(sid, { rate: val('rRate') === '' ? DEL : Math.max(0, +val('rRate')), per: val('rPer') || DEL, opening: Math.round((+val('rOpen') || 0) * 100) / 100,
+                                     emails: val('rEmails'), hidden: panel.querySelector('#rHide').checked });
         billDetailModal(sid); toast('Saved');
       };
     };
@@ -1858,7 +1949,7 @@ function bindView() {
     report: () => { sub = { sid: route.id }; go('reports'); }, addAssign: () => assignModal(route.id),
     addLesson: () => extraLessonModal(route.view === 'student' ? route.id : null),
     calendar: () => calendarEmailModal(),
-    billSetup: () => billSetupModal(), billExport: () => billingCsv(),
+    billSetup: () => billSetupModal(), billExport: () => billingCsv(), billRemind: () => reminderModal(),
     addEvent: () => eventModal(null, route.view === 'student' ? route.id : null),
     unarchive: () => api.patchStudent(route.id, { archived: false }),
     thGoal: () => theoryGoalModal(route.id),
@@ -2749,8 +2840,11 @@ function downloadIcs() {
 
 // The feed: a small settings record the calendar/email service reads (feeds/{token}); the token is the private key
 function feedData(extra = {}) {
+  const B = studio.billing, R = B?.remind?.on && B.since ? B.remind : null;
   return { studioId: me.uid, studioName: studio.studioName, teacherName: studio.teacherName, tz: TZ,
-           students: active().map(s => s.id).sort(), ...extra };
+           students: active().map(s => s.id).sort(),
+           bill: R ? { ...R, replyTo: me.email || '' } : null,
+           billTo: R ? Object.fromEntries(active().filter(s => billEmails(s.id).length && !billing[s.id]?.hidden).map(s => [s.id, billEmails(s.id)])) : null, ...extra };
 }
 let lastFeedSync = '';
 function syncFeed() {
@@ -2761,10 +2855,10 @@ function syncFeed() {
   api.saveFeed(studio.feedToken, d).catch(e => console.error(e));
   for (const s of active()) if (!s.tz) api.patchStudent(s.id, { tz: TZ });      // lets family calendars show the right time zone
 }
-async function ensureFeed() {
+async function ensureFeed(opts = { brief: true, digest: true }) {
   if (studio.feedToken) return studio.feedToken;
   const token = randomCode();
-  await api.saveFeed(token, feedData({ email: me.email || '', brief: true, digest: true }));
+  await api.saveFeed(token, feedData({ email: me.email || '', ...opts }));
   await api.updateStudio({ feedToken: token });
   studio.feedToken = token;
   await fetch(WORKER_URL + '/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) }).catch(() => {});
@@ -2854,7 +2948,7 @@ async function start() {
 function enter() {
   showOnly('shell'); parseRoute();
   api.isAdmin().then(a => { amAdmin = a; $('adminNav').hidden = !a; render(); });
-  let t; api.watch(() => { render(); clearTimeout(t); t = setTimeout(syncFeed, 1500); });
+  let t; api.watch(() => { render(); clearTimeout(t); t = setTimeout(() => { syncFeed(); publishBilling(); }, 1500); });
   render();
 }
 
