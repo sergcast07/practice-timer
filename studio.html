@@ -1609,6 +1609,11 @@ const CURRENCIES = ['USD', 'CAD', 'GBP', 'EUR', 'AUD', 'NZD'];
 const PAY_METHODS = ['Cash', 'Check', 'Card', 'Bank transfer', 'Venmo', 'Zelle', 'PayPal', 'Other'];
 const money = (n, cur = studio?.billing?.currency || 'USD') => new Intl.NumberFormat(undefined, { style: 'currency', currency: cur }).format(Math.round((n || 0) * 100) / 100);
 const lessonPast = l => `${l.date} ${l.time || '00:00'}` <= `${dayKey()} ${pad(new Date().getHours())}:${pad(new Date().getMinutes())}`;
+// How a price is charged: per lesson or hour (from each lesson taught), or a flat fee per month or per semester
+// (a semester = one of the studio's terms, Settings → Terms). Flat fees are charged at the start of each month or
+// semester in which the student has lessons on the schedule, so summer breaks and gaps aren't billed.
+const BILL_PER = { lesson: 'lesson', hour: 'hour', month: 'month', semester: 'semester' };
+const perWord = per => BILL_PER[per] || 'lesson';
 function billRate(sid) {
   const B = studio?.billing || {}, b = billing[sid] || {};
   return { rate: b.rate ?? B.rate ?? 0, per: b.per || B.per || 'lesson' };
@@ -1619,7 +1624,19 @@ function ledger(sid) {
   if (!B?.since) return { entries: [], balance: 0 };
   const { rate, per } = billRate(sid), out = [];
   if (b.opening) out.push({ date: B.since, kind: 'open', text: 'Balance carried over', amount: +b.opening });
-  for (const l of lessonsBetween(parseDay(B.since), today(), sid)) {
+  const hasLessons = (a, b) => lessonsBetween(a, b, sid).some(countsAsLesson);
+  if (per === 'month') {
+    const s0 = parseDay(B.since), end = today();
+    for (let m = new Date(s0.getFullYear(), s0.getMonth(), 1); m <= end; m = new Date(m.getFullYear(), m.getMonth() + 1, 1)) {
+      if (!hasLessons(m, new Date(m.getFullYear(), m.getMonth() + 1, 0))) continue;
+      out.push({ date: [dayKey(m), B.since].sort().at(-1), kind: 'tuition', id: 'm' + dayKey(m), text: `${m.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })} tuition`, amount: rate });
+    }
+  } else if (per === 'semester') {
+    for (const T of studio.terms || []) {
+      if (T.start > dayKey() || T.end < B.since || !hasLessons(parseDay(T.start), parseDay(T.end))) continue;
+      out.push({ date: [T.start, B.since].sort().at(-1), kind: 'tuition', id: 't' + T.id, text: `${T.name} tuition`, amount: rate });
+    }
+  } else for (const l of lessonsBetween(parseDay(B.since), today(), sid)) {
     if (!countsAsLesson(l) || !lessonPast(l) || (l.status === 'noshow' && !B.noshow)) continue;
     const amount = per === 'hour' ? rate * (l.length || 30) / 60 : rate;
     out.push({ date: l.date, kind: 'lesson', id: l.id, text: `${l.status === 'noshow' ? 'No-show' : 'Lesson'} · ${l.length || 30} min`, amount });
@@ -1654,11 +1671,11 @@ function vBilling() {
         ${rows.map(({ s, L, charged, paid, lessonsM }) => { const r = billRate(s.id);
           return `<tr><td><button class="linkBtn" data-bill="${s.id}">${esc(s.name)}</button></td>
             <td><b class="${L.balance > 0.004 ? 'owe' : L.balance < -0.004 ? 'credit' : ''}">${L.balance < -0.004 ? money(-L.balance) + ' credit' : money(L.balance)}</b></td>
-            <td class="wide">${money(charged)}<span class="muted small"> · ${lessonsM} ${lessonsM === 1 ? 'lesson' : 'lessons'}</span></td><td class="wide">${money(paid)}</td>
+            <td class="wide">${money(charged)}${['month', 'semester'].includes(r.per) ? '' : `<span class="muted small"> · ${lessonsM} ${lessonsM === 1 ? 'lesson' : 'lessons'}</span>`}</td><td class="wide">${money(paid)}</td>
             <td class="wide">${money(r.rate)}<span class="muted small"> / ${r.per}</span></td>
             <td style="white-space:nowrap;text-align:right"><button class="secondary small" data-pay="${s.id}">${icon('plus', 'sm')}Payment</button> <button class="ghost small wide" data-bill="${s.id}">Details</button></td></tr>`; }).join('')}
       </tbody></table></div>` : '<div class="empty">Add students to start billing.</div>'}
-      <p class="small muted" style="margin-top:10px">Lessons count once their time has passed, unless you mark them canceled or moved${B.noshow ? '' : ' or a no-show'}. Change a lesson’s status on the Schedule page.</p></div>
+      <p class="small muted" style="margin-top:10px">${B.per === 'month' || B.per === 'semester' ? perHelp(B.per).replace(/<button[^]*$/, '') : `Lessons count once their time has passed, unless you mark them canceled or moved${B.noshow ? '' : ' or a no-show'}. Change a lesson’s status on the Schedule page.`}</p></div>
   </div>`;
 }
 function billSetupModal() {
@@ -1666,17 +1683,22 @@ function billSetupModal() {
   openModal(`${mhead('Billing settings')}
     <div class="fields">
       <div class="fields three"><label class="field">Price <input type="number" id="bRate" min="0" step="0.01" value="${B.rate ?? ''}" placeholder="e.g. 35"></label>
-        <label class="field">Per <select id="bPer"><option value="lesson" ${B.per !== 'hour' ? 'selected' : ''}>lesson</option><option value="hour" ${B.per === 'hour' ? 'selected' : ''}>hour (by lesson length)</option></select></label>
+        <label class="field">Per <select id="bPer">${perOptions(B.per || 'lesson')}</select></label>
         <label class="field">Currency <select id="bCur">${CURRENCIES.map(c => `<option ${(B.currency || 'USD') === c ? 'selected' : ''}>${c}</option>`).join('')}</select></label></div>
       <label class="field">Start counting lessons from <input type="date" id="bSince" value="${B.since || first}"></label>
-      <label class="small" style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" id="bNoshow" style="width:auto" ${B.noshow !== false ? 'checked' : ''}><span>Charge for no-shows</span></label>
+      <p class="small muted" id="bPerNote" style="margin:0"></p>
+      <label class="small" id="bNoshowRow" style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" id="bNoshow" style="width:auto" ${B.noshow !== false ? 'checked' : ''}><span>Charge for no-shows</span></label>
       <label class="field">Payment link or instructions (optional) <input type="text" id="bPay" maxlength="200" value="${esc(B.payLink || '')}" placeholder="e.g. https://venmo.com/u/yourname or “Zelle to 555-0100”"></label>
       <p class="small muted" style="margin:0">Each student can have their own price (open their details). Statements you send families include the payment link.</p>
       <div class="gateErr" id="bErr"></div>
     </div>
     <footer><div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="bSave">Save</button></div></footer>`, m => {
+    const perNote = () => { const p = val('bPer'); m.querySelector('#bPerNote').innerHTML = perHelp(p); m.querySelector('#bNoshowRow').hidden = p === 'month' || p === 'semester'; };
+    m.querySelector('#bPer').onchange = perNote; perNote();
+    m.querySelector('#bPerNote').addEventListener('click', e => { if (e.target.closest('[data-terms]')) termsModal(); });
     m.querySelector('#bSave').onclick = async () => {
       const rate = +val('bRate');
+      if (val('bPer') === 'semester' && !(studio.terms || []).length) return (m.querySelector('#bErr').textContent = 'Add your semesters first (Settings → Terms).');
       if (!(rate >= 0) || val('bRate') === '') return (m.querySelector('#bErr').textContent = 'Enter your lesson price.');
       if (!val('bSince')) return (m.querySelector('#bErr').textContent = 'Choose a start date.');
       studio.billing = { rate, per: val('bPer'), currency: val('bCur'), since: val('bSince'), noshow: m.querySelector('#bNoshow').checked, payLink: val('bPay') };
@@ -1705,6 +1727,15 @@ function paymentModal(sid, pid) {
     m.querySelector('#pDel')?.addEventListener('click', async () => { if (!confirm('Delete this payment?')) return; await api.saveBilling(sid, { [`payments.${pid}`]: DEL }); closeModal(); });
   });
 }
+const perOptions = cur => [['lesson', 'lesson'], ['hour', 'hour (by lesson length)'], ['month', 'month'], ['semester', 'semester']]
+  .map(([v, l]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${l}</option>`).join('');
+function perHelp(p) {
+  if (p === 'month') return 'Charged on the 1st of each month that has lessons on the schedule – months without lessons (like a summer break) aren’t charged.';
+  if (p === 'semester') { const T = studio.terms || [];
+    return T.length ? `Charged at the start of each semester: ${T.map(t => esc(t.name)).join(', ')}. <button type="button" class="linkBtn" data-terms style="font-weight:600">Edit semesters</button>`
+      : 'Semesters come from your terms. <button type="button" class="linkBtn" data-terms style="font-weight:600">Add your semesters</button> first.'; }
+  return p === 'hour' ? 'Each lesson is charged by its length, once its time has passed.' : 'Each lesson is charged once its time has passed.';
+}
 // A plain-text statement a teacher can paste into a message or email to the family
 function statementText(sid, from) {
   const s = students[sid], L = ledger(sid), B = studio.billing || {}, first = firstName(s.name);
@@ -1712,7 +1743,9 @@ function statementText(sid, from) {
   const lessons = inRange.filter(e => e.kind === 'lesson'), charges = lessons.reduce((a, e) => a + e.amount, 0);
   const lines = [`${first}’s lessons with ${studio.teacherName || studio.studioName} since ${fmtDate(from, { month: 'long', day: 'numeric' })}:`, ''];
   if (Math.abs(before) > 0.004) lines.push(`Previous balance: ${money(before)}`);
-  lines.push(`${lessons.length} ${lessons.length === 1 ? 'lesson' : 'lessons'} (${lessons.map(e => fmtDate(e.date, { month: 'short', day: 'numeric' })).join(', ') || 'none'}): ${money(charges)}`);
+  const tuition = inRange.filter(e => e.kind === 'tuition');
+  for (const e of tuition) lines.push(`${e.text}: ${money(e.amount)}`);
+  if (lessons.length || !tuition.length) lines.push(`${lessons.length} ${lessons.length === 1 ? 'lesson' : 'lessons'} (${lessons.map(e => fmtDate(e.date, { month: 'short', day: 'numeric' })).join(', ') || 'none'}): ${money(charges)}`);
   for (const e of inRange.filter(e => e.kind === 'adj')) lines.push(`${e.text}: ${money(e.amount)}`);
   for (const e of inRange.filter(e => e.kind === 'pay')) lines.push(`Paid ${fmtDate(e.date, { month: 'short', day: 'numeric' })}: −${money(-e.amount)}`);
   lines.push('', L.balance > 0.004 ? `Balance due: ${money(L.balance)}` : L.balance < -0.004 ? `Credit: ${money(-L.balance)}` : 'All paid up – thank you!');
@@ -1756,7 +1789,7 @@ function billDetailModal(sid) {
     };
     m.querySelector('#dPrice').onclick = () => {
       showPanel(`<div class="fields three"><label class="field">${esc(firstName(s.name))}’s price <input type="number" id="rRate" min="0" step="0.01" value="${b.rate ?? ''}" placeholder="Studio price: ${B.rate ?? ''}"></label>
-          <label class="field">Per <select id="rPer"><option value="">Studio setting (${B.per === 'hour' ? 'hour' : 'lesson'})</option><option value="lesson" ${b.per === 'lesson' ? 'selected' : ''}>lesson</option><option value="hour" ${b.per === 'hour' ? 'selected' : ''}>hour</option></select></label>
+          <label class="field">Per <select id="rPer"><option value="">Studio setting (${perWord(B.per)})</option>${perOptions(b.per)}</select></label>
           <label class="field">Owed before ${fmtDate(B.since, { month: 'short', day: 'numeric' })} <input type="number" id="rOpen" step="0.01" value="${b.opening || ''}" placeholder="0"></label></div>
         <p class="small muted" style="margin:0">Leave the price empty to use the studio price. A negative opening balance is a credit.</p>
         <div style="display:flex;gap:8px;justify-content:flex-end"><button class="primary small" id="rSave">Save</button></div>`);
@@ -1782,7 +1815,7 @@ function billingCsv() {
   const q = v => /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v);
   const rows = [['Date', 'Student', 'Type', 'Description', 'Amount', 'Balance', 'Currency']];
   for (const s of active()) for (const e of ledger(s.id).entries)
-    rows.push([e.date, s.name, { open: 'Opening balance', lesson: 'Lesson', adj: e.amount < 0 ? 'Credit' : 'Charge', pay: 'Payment' }[e.kind], e.text, e.amount.toFixed(2), e.balance.toFixed(2), studio.billing?.currency || 'USD']);
+    rows.push([e.date, s.name, { open: 'Opening balance', lesson: 'Lesson', tuition: 'Tuition', adj: e.amount < 0 ? 'Credit' : 'Charge', pay: 'Payment' }[e.kind], e.text, e.amount.toFixed(2), e.balance.toFixed(2), studio.billing?.currency || 'USD']);
   const blob = new Blob([rows.map(r => r.map(q).join(',')).join('\r\n')], { type: 'text/csv' }), a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = `allegrow-billing-${dayKey()}.csv`; document.body.append(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
