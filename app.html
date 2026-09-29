@@ -282,6 +282,7 @@
   .trend .ic { width: 12px; height: 12px; stroke-width: 2.6; }
   .chart { position: relative; display: flex; align-items: flex-end; gap: 5px; height: 110px; margin-top: 16px; }
   .chart .col { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
+  .chart .col .editDot { position: absolute; top: -10px; left: 50%; width: 6px; height: 6px; margin-left: -3px; border-radius: 50%; background: var(--gold, #e0b04c); }
   .chart .b { width: 100%; background: var(--kid); opacity: .35; border-radius: 5px 5px 2px 2px; min-height: 3px; }
   .chart .b.met { opacity: 1; }
   .chart .dayGoal { position: absolute; left: -2px; right: -2px; border-top: 2px solid var(--muted); opacity: .55; }
@@ -1093,7 +1094,12 @@ function lastDays(n) {            // oldest → today
 // Recorded = heard by the app; manual = logged by hand. Totals, goals and streaks count both.
 const recordedOn = (kid, d = new Date()) => ((log[kid.id] || {})[dayKey(d)] || 0) + ((pend[kid.id] || {})[dayKey(d)] || 0);
 const manualOn = (kid, d = new Date()) => { const k = dayKey(d); return Object.values(manual[kid.id] || {}).reduce((a, e) => a + (e.day === k ? e.ms : 0), 0); };
-const msOn = (kid, d = new Date()) => recordedOn(kid, d) + manualOn(kid, d);
+// A teacher can correct a day's total (studio → student.practiceEdits[day] = { ms, was, at, note }). Our own data isn't
+// changed; the day's total becomes the teacher's number, plus anything practiced after the edit.
+const editOn = (kid, d = new Date()) => teacherOf(kid)?.practiceEdits?.[dayKey(d)];
+const msOn = (kid, d = new Date()) => { const raw = recordedOn(kid, d) + manualOn(kid, d), e = editOn(kid, d); return e ? Math.max(0, e.ms + raw - e.was) : raw; };
+// Time the app didn't hear: logged by hand, or added by the teacher's edit
+const handOn = (kid, d = new Date()) => editOn(kid, d) ? Math.max(0, msOn(kid, d) - recordedOn(kid, d)) : manualOn(kid, d);
 // Quality stats for one day, including anything not yet synced
 function statsOn(kid, d = new Date()) {
   const k = dayKey(d), r = stats[kid.id]?.[k] || {}, p = pendStats[kid.id]?.[k] || {}, out = { ...r };
@@ -1232,11 +1238,11 @@ function renderPractice(playing, talking) {
   const today = msOn(kid), goal = goalOf(kid) * 60000, frac = goal ? Math.min(today / goal, 1) : (today ? 1 : 0);
   $('time').textContent = clock(today);
   $('ofGoal').textContent = goal ? `of ${goalOf(kid)} min today` : 'Rest day – practice is a bonus';
-  const recFrac = goal ? Math.min(recordedOn(kid) / goal, 1) : (recordedOn(kid) ? 1 : 0), manLen = CIRC * (frac - recFrac), man = manualOn(kid);
+  const heard = Math.min(recordedOn(kid), today), recFrac = goal ? Math.min(heard / goal, 1) : (heard ? 1 : 0), manLen = CIRC * Math.max(0, frac - recFrac), man = manualOn(kid), ed = editOn(kid);
   $('prog').style.strokeDashoffset = CIRC * (1 - recFrac);
   $('progManual').style.strokeDasharray = `${manLen} ${CIRC}`;
   $('progManual').style.strokeDashoffset = -CIRC * recFrac;
-  $('manualNote').innerHTML = man ? `${icon('pencil')}${mins(man)} logged by hand` : '';
+  $('manualNote').innerHTML = ed ? `${icon('pencil')}Changed by ${esc(teacherOf(kid)?.teacherName || 'your teacher')}` : man ? `${icon('pencil')}${mins(man)} logged by hand` : '';
   $('ring').classList.toggle('done', goal > 0 && frac >= 1);
   const floor = planFloor(kid), dow = new Date().getDay(), plan = planFor(kid);
   $('goalLabel').textContent = `${new Date().toLocaleDateString(undefined, { weekday: 'long' })}’s goal`;
@@ -1558,12 +1564,12 @@ function renderHistory() {
         </div>`;
       })()}
       <div class="chart">
-        ${vals.map((v, i) => { const m = manualOn(k, days[i]), g = goals[i]; return `<div class="col" style="position:relative" title="${days[i].toDateString()}: ${mins(v)}${m ? ` (${mins(m)} by hand)` : ''}${g ? ` · goal ${mins(g)}` : ' · rest day'}">
+        ${vals.map((v, i) => { const m = Math.min(handOn(k, days[i]), v), g = goals[i], e = editOn(k, days[i]); return `<div class="col" style="position:relative" title="${days[i].toDateString()}: ${mins(v)}${e ? ` (changed by your teacher, was ${mins(e.was)})` : m ? ` (${mins(m)} by hand)` : ''}${g ? ` · goal ${mins(g)}` : ' · rest day'}">${e ? '<i class="editDot"></i>' : ''}
           ${g ? `<div class="dayGoal" style="bottom:${g / top * 100}%"></div>` : ''}
           ${m ? `<div class="b hatch" style="height:${m / top * 100}%;border-radius:4px 4px 0 0;min-height:0"></div>` : ''}<div class="b ${g && v >= g ? 'met' : ''}" style="height:${(v - m) / top * 100}%;${m ? 'border-radius:0' : ''}"></div></div>`; }).join('')}
       </div>
       <div class="days">${days.map((d, i) => `<span>${i === days.length - 1 ? 'Today' : DOW[d.getDay()]}</span>`).join('')}</div>
-      <div class="footnote">Last two weeks. Dashes mark each day’s goal (plan: ${planText(planFor(k))}); solid bars met it; striped parts were logged by hand.
+      <div class="footnote">Last two weeks. Dashes mark each day’s goal (plan: ${planText(planFor(k))}); solid bars met it; striped parts were logged by hand${days.some(d => editOn(k, d)) ? '; a dot marks a day your teacher changed' : ''}.
         ${(on => on.length ? `${(t => t.charAt(0).toUpperCase() + t.slice(1))(on.map(m => INSIGHTS[m].label.toLowerCase()).join(', ').replace(/, ([^,]*)$/, ' and $1'))} ${on.length === 1 ? 'covers' : 'cover'} the last 7 days, compared with the week before.
           <details class="how"><summary>How ${on.length === 1 ? 'it’s' : 'they’re'} measured</summary>${on.map(m => `<p><b>${INSIGHTS[m].label}.</b> ${INSIGHTS[m].how.join(' ')} <i>${INSIGHTS[m].limits}</i></p>`).join('')}</details>` : '')
           (INSIGHT_ORDER.filter(m => insOf(k, m) !== 'off' && (m !== 'tune' || tracksPitch(k))))}</div>

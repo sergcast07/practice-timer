@@ -275,7 +275,10 @@
   .insData { background: var(--soft); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
   .trend.up { color: var(--good); } .trend.down { color: var(--warn); }
   .chart { position: relative; display: flex; align-items: flex-end; gap: 3px; height: 140px; margin-top: 18px; }
-  .chart .col { flex: 1; height: 100%; display: flex; align-items: flex-end; }
+  .chart .col { flex: 1; height: 100%; display: flex; align-items: flex-end; background: none; border: 0; padding: 0; cursor: pointer; border-radius: 4px; }
+  .chart .col:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+  .chart .col .editDot { position: absolute; top: -10px; left: 50%; width: 6px; height: 6px; margin-left: -3px; border-radius: 50%; background: var(--gold); }
+  .editList { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
   .chart .b { width: 100%; background: var(--kid); opacity: .35; border-radius: 4px 4px 1px 1px; min-height: 2px; }
   .chart .b.met { opacity: 1; }
   .chart .dayGoal { position: absolute; left: -1px; right: -1px; border-top: 2px solid var(--muted); opacity: .6; }
@@ -579,9 +582,14 @@ function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add
 
 // ---------- Practice data (mirrored from the family app) ----------
 // Recorded by the app (log) and logged by hand (manual); totals include both, quality scores only the recorded time
+// A teacher can correct a day's total (student.practiceEdits[day] = { ms, was, at, note }). The original stays in the
+// practice data; the edit records what the total was, and anything practiced after the edit still adds on.
 const recDay = (s, d) => s.practice?.log?.[dayKey(d)] || 0;
-const manDay = (s, d) => s.practice?.manual?.[dayKey(d)] || 0;
-const pDay = (s, d) => recDay(s, d) + manDay(s, d);
+const rawDay = (s, key) => (s.practice?.log?.[key] || 0) + (s.practice?.manual?.[key] || 0);
+const editOf = (s, d) => s.practiceEdits?.[typeof d === 'string' ? d : dayKey(d)];
+const pDay = (s, d) => { const key = typeof d === 'string' ? d : dayKey(d), e = s.practiceEdits?.[key], raw = rawDay(s, key); return e ? Math.max(0, e.ms + raw - e.was) : raw; };
+// Time not heard by the app: logged by hand, or added by a teacher's edit
+const manDay = (s, d) => editOf(s, d) ? Math.max(0, pDay(s, d) - recDay(s, d)) : s.practice?.manual?.[dayKey(d)] || 0;
 // The student's weekly plan (minutes per weekday, Sunday first; 0 = rest). The family's own plan, if they've
 // shared one, shows what the child is actually aiming for; the teacher's plan is the minimum.
 const planOfStudent = s => planOf(s.plan, s.target || 20);
@@ -1086,11 +1094,13 @@ function tProgress(s) {
         <div class="stat"><b>${mins(m.total)}</b><span>last 30 days</span></div>
       </div>
       <div class="chart">
-        ${vals.map((v, i) => { const m = manDay(s, days[i]), g = goals[i]; return `<div class="col" style="flex-direction:column;justify-content:flex-end;position:relative" title="${fmtDate(days[i])}: ${mins(v)}${m ? ` (${mins(m)} by hand)` : ''}${g ? ` · goal ${mins(g)}` : ' · rest day'}">
+        ${vals.map((v, i) => { const m = manDay(s, days[i]), g = goals[i], e = editOf(s, days[i]); return `<button class="col ${e ? 'edited' : ''}" data-pedit="${dayKey(days[i])}" style="flex-direction:column;justify-content:flex-end;position:relative" title="${fmtDate(days[i])}: ${mins(v)}${e ? ` (edited by you, was ${mins(e.was)})` : m ? ` (${mins(m)} by hand)` : ''}${g ? ` · goal ${mins(g)}` : ' · rest day'} – click to edit">
           ${g ? `<div class="dayGoal" style="bottom:${g / top * 100}%"></div>` : ''}
-          ${m ? `<div class="b hatch" style="height:${m / top * 100}%;min-height:0"></div>` : ''}<div class="b ${g && v >= g ? 'met' : ''}" style="height:${(v - m) / top * 100}%;${m ? 'border-radius:0' : ''}"></div></div>`; }).join('')}
+          ${m ? `<div class="b hatch" style="height:${m / top * 100}%;min-height:0"></div>` : ''}<div class="b ${g && v >= g ? 'met' : ''}" style="height:${(v - m) / top * 100}%;${m ? 'border-radius:0' : ''}"></div>${e ? '<i class="editDot"></i>' : ''}</button>`; }).join('')}
       </div>
-      <div class="axis"><span>${fmtDate(days[0], { day: 'numeric', month: 'short' })}</span><span>Last 4 weeks · dashes = each day’s goal (${planText(planOfStudent(s))}) · striped = logged by hand</span><span>Today</span></div>
+      <div class="axis"><span>${fmtDate(days[0], { day: 'numeric', month: 'short' })}</span><span>Last 4 weeks · dashes = each day’s goal (${planText(planOfStudent(s))}) · striped = logged by hand · dot = edited by you · click a day to edit it</span><span>Today</span></div>
+      ${(() => { const eds = Object.entries(s.practiceEdits || {}).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 10); return eds.length ? `<div class="editList"><div class="small" style="font-weight:600;margin-bottom:4px">Days you edited</div>${eds.map(([k, e]) => `<div class="assign"><div class="grow"><div class="t">${fmtDate(parseDay(k))} · ${mins(pDay(s, k))}</div>
+        <div class="d">Was ${mins(e.was)} · changed ${fmtDate(dayKey(new Date(e.at)), { month: 'short', day: 'numeric' })}${e.note ? ` · ${esc(e.note)}` : ''}</div></div><button class="ghost small" data-pedit="${k}">Change</button></div>`).join('')}</div>` : ''; })()}
     </div>
     <p class="small muted">Last practiced: ${lastPracticedText(lastPracticed(s))}. Practice data comes from ${esc(s.kidName || firstName(s.name))}’s Allegrow app.</p>
   </div>`;
@@ -1365,6 +1375,34 @@ function theoryGoalModal(sid) {
   });
 }
 
+// Correct a day's practice total. The family's own data isn't changed: the edit is kept on its own, with what the total
+// was, so it's always clear the number was changed (and it can be undone).
+function practiceEditModal(sid, key) {
+  const s = students[sid], e = editOf(s, key), raw = rawDay(s, key), rec = s.practice?.log?.[key] || 0, hand = s.practice?.manual?.[key] || 0;
+  openModal(`${mhead('Edit practice · ' + esc(fmtDate(parseDay(key), { weekday: 'long', month: 'short', day: 'numeric' })))}
+    <div class="fields">
+      <p class="small muted" style="margin:0">From ${esc(firstName(s.name))}’s app: ${mins(rec)} recorded${hand ? ` + ${mins(hand)} logged by hand` : ''} = <b>${mins(raw)}</b>.
+        ${e ? `You changed it to ${mins(e.ms)} on ${fmtDate(dayKey(new Date(e.at)), { month: 'short', day: 'numeric' })}.` : ''}</p>
+      <label class="field">Practice time that day (minutes) <input type="number" id="peMins" min="0" max="600" step="1" value="${Math.round(pDay(s, key) / 60000)}"></label>
+      <label class="field">Reason (optional) <input type="text" id="peNote" maxlength="80" value="${esc(e?.note || '')}" placeholder="e.g. Timer left running · practiced at lesson"></label>
+      <p class="small muted" style="margin:0">Totals, goals, streaks and badges use your number, marked as edited. The recorded time stays as it was, so focus and in-tune scores aren’t affected, and you can undo this any time.</p>
+      <div class="gateErr" id="peErr"></div>
+    </div>
+    <footer>${e ? '<button class="ghost" id="peUndo">Undo edit</button>' : ''}<div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="peSave">Save</button></div></footer>`, m => {
+    m.querySelector('#peSave').onclick = async () => {
+      const v = +val('peMins');
+      if (!Number.isFinite(v) || v < 0 || v > 600) return (m.querySelector('#peErr').textContent = 'Enter minutes between 0 and 600.');
+      if (!e && Math.round(v * 60000) === Math.round(raw / 60000) * 60000) { closeModal(); return; }
+      await api.patchStudent(sid, { [`practiceEdits.${key}`]: { ms: Math.round(v) * 60000, was: raw, at: new Date().toISOString(), note: val('peNote').trim() } });
+      closeModal(); toast('Practice time updated');
+    };
+    m.querySelector('#peUndo')?.addEventListener('click', async () => {
+      await api.patchStudent(sid, { [`practiceEdits.${key}`]: DEL });
+      closeModal(); toast('Back to the app’s time');
+    });
+  });
+}
+
 function tNotes(s) {
   return `<div class="card"><h2>Private notes</h2>
     <textarea id="noteBox" data-keep="1" style="min-height:260px" placeholder="Anything you want to remember about ${esc(firstName(s.name))}: goals, repertoire, what works, parent conversations…">${esc(notes[s.id] || '')}</textarea>
@@ -1464,6 +1502,7 @@ function bindView() {
   V.querySelectorAll('[data-student]').forEach(b => b.onclick = () => { sub = {}; go('student', { id: b.dataset.student }); });
   V.querySelectorAll('[data-go2]').forEach(b => b.onclick = () => { sub = {}; go(b.dataset.go2); });
   V.querySelectorAll('[data-lesson]').forEach(b => b.onclick = () => lessonModal(b.dataset.lesson));
+  V.querySelectorAll('[data-pedit]').forEach(b => b.onclick = () => practiceEditModal(route.id, b.dataset.pedit));
   V.querySelectorAll('[data-thlevel]').forEach(sel => sel.onchange = () => api.patchStudent(route.id, { [`theoryPlan.levels.${sel.dataset.thlevel}`]: { level: +sel.value, at: new Date().toISOString() } }).then(() => toast('Level set')));
   V.querySelectorAll('[data-thdeck]').forEach(c => c.onchange = () => api.patchStudent(route.id, { [`theoryPlan.decks.${c.dataset.thdeck}`]: c.checked }));
   V.querySelectorAll('[data-thclef]').forEach(c => c.onchange = () => {
@@ -1936,8 +1975,8 @@ $('signOutBtn').onclick = () => api.signOut();
 // ============================================================================================
 // The student's practice days as badges.js expects them (from the practice data the family app shares)
 function studentDays(s) {
-  const keys = new Set([...Object.keys(s.practice?.log || {}), ...Object.keys(s.practice?.manual || {}), ...Object.keys(s.practice?.stats || {})]);
-  return [...keys].map(key => ({ key, ms: (s.practice?.log?.[key] || 0) + (s.practice?.manual?.[key] || 0), stats: s.practice?.stats?.[key] || {} }));
+  const keys = new Set([...Object.keys(s.practice?.log || {}), ...Object.keys(s.practice?.manual || {}), ...Object.keys(s.practice?.stats || {}), ...Object.keys(s.practiceEdits || {})]);
+  return [...keys].map(key => ({ key, ms: pDay(s, key), stats: s.practice?.stats?.[key] || {} }));
 }
 const studentTicks = s => new Set(Object.values(s.progress || {}).flatMap(d => Object.keys(d)));
 function tRewards(s) {

@@ -208,11 +208,16 @@ function studentCalendar(s) {
 // ============================================================================================
 const minsText = ms => { const m = Math.round(ms / 60000); return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m} min`; };
 const pct = x => x == null ? '–' : Math.round(x * 100) + '%';
+// A day's total, with a teacher's correction (student.practiceEdits) applied – see the studio's practiceEditModal
+function dayMs(s, k) {
+  const raw = (s.practice?.log?.[k] || 0) + (s.practice?.manual?.[k] || 0), e = s.practiceEdits?.[k];
+  return e ? Math.max(0, e.ms + raw - e.was) : raw;
+}
 function week(s, endKey, offset = 0) {
   const keys = Array.from({ length: 7 }, (_, i) => addKey(endKey, -6 + i - 7 * offset));
   const t = { total: 0, manual: 0, days: 0, active: 0, played: 0, notes: 0, inTune: 0, beats: 0, steady: 0, longest: 0 };
   for (const k of keys) {
-    const rec = s.practice?.log?.[k] || 0, man = s.practice?.manual?.[k] || 0, ms = rec + man, st = s.practice?.stats?.[k] || {};
+    const rec = s.practice?.log?.[k] || 0, ms = dayMs(s, k), man = s.practiceEdits?.[k] ? Math.max(0, ms - rec) : s.practice?.manual?.[k] || 0, st = s.practice?.stats?.[k] || {};
     t.total += ms; t.manual += man; if (ms >= 60000) t.days++;
     if (st.active) { t.active += st.active; t.played += Math.min(rec, st.active); }
     t.notes += st.notes || 0; t.inTune += st.inTune || 0; t.beats += st.beats || 0; t.steady += st.steady || 0; t.longest = Math.max(t.longest, st.longest || 0);
@@ -220,7 +225,7 @@ function week(s, endKey, offset = 0) {
   return { ...t, focus: t.active >= 60000 ? t.played / t.active : null, tune: t.notes >= 10 ? t.inTune / t.notes : null, rhythm: t.beats >= 8 ? t.steady / t.beats : null };
 }
 function lastPracticed(s, todayKey) {
-  for (let i = 0; i < 60; i++) { const k = addKey(todayKey, -i); if ((s.practice?.log?.[k] || 0) + (s.practice?.manual?.[k] || 0) >= 60000) return i; }
+  for (let i = 0; i < 60; i++) { const k = addKey(todayKey, -i); if (dayMs(s, k) >= 60000) return i; }
   return null;
 }
 // Music theory (the family app's theory.js): names for level-ups in emails
@@ -568,7 +573,7 @@ async function familyEmail(env, parent, { test } = {}) {
     const t = k.link && validCode(k.link) ? await getDoc(env, `students/${k.link}`) : null;
     const linked = t && t.linkedAt;
     const plan = Array.isArray(k.parentPlan) ? k.parentPlan : linked && Array.isArray(t.plan) ? t.plan : Array.isArray(k.plan) ? k.plan : Array(7).fill(k.goal || 20);
-    const s = { name: k.name, practice: { log: fam.log?.[k.id] || {}, manual: man, stats: fam.stats?.[k.id] || {}, plan } };
+    const s = { name: k.name, practice: { log: fam.log?.[k.id] || {}, manual: man, stats: fam.stats?.[k.id] || {}, plan }, practiceEdits: linked ? t.practiceEdits : null };
     const c = week(s, now.key), p = week(s, now.key, 1), planned = plan.filter(n => n > 0).length;
     total += c.total; prevTotal += p.total;
     const lines = [`${c.days} of ${planned} planned ${planned === 1 ? 'day' : 'days'}${c.manual ? ` · ${minsText(c.manual)} logged by hand` : ''}`];
