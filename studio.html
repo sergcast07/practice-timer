@@ -1804,7 +1804,7 @@ function perHelp(p) {
 const billShareOn = sid => { const B = studio?.billing; return !!B?.since && (B.share || B.remind?.on) && billing[sid]?.hidden !== true; };
 function billShareFor(sid) {
   const B = studio.billing, { items, balance } = openItems(sid), L = ledger(sid);
-  return { asOf: dayKey(), currency: B.currency || 'USD', balance, share: !!B.share, payLink: B.payLink || '', payNote: B.payNote || '',
+  return { asOf: dayKey(), currency: B.currency || 'USD', balance, share: !!B.share, payLink: B.payLink || '', payNote: B.payNote || '', pastDue: billing[sid]?.pastDue || null,
            items: items.slice(-20), upcoming: upcomingCharges(sid), recent: L.entries.slice(-6).reverse().map(e => ({ date: e.date, text: e.text, amount: e.amount })) };
 }
 const lastShare = {};
@@ -1819,6 +1819,7 @@ function publishBilling() {
   }
 }
 const billEmails = sid => String(billing[sid]?.emails || '').split(/[,;\s]+/).map(x => x.trim().toLowerCase()).filter(x => /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/.test(x)).slice(0, 3);
+const overdueMode = R => R?.overdueMode || (R?.every > 0 || R?.every == null ? 'auto' : 'off');
 // Reminder emails: who gets them and when (the email service reads this from the feed)
 function reminderModal() {
   const B = studio.billing || {}, R = B.remind || {}, withEmail = active().filter(s => billEmails(s.id).length);
@@ -1826,11 +1827,15 @@ function reminderModal() {
   openModal(`${mhead('Payment reminders')}
     <div class="fields">
       <label class="small" style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" id="rOn" style="width:auto" ${R.on ? 'checked' : ''}><span>Email families payment reminders</span></label>
-      <div class="fields three">
+      <div class="fields two">
         <label class="field">Before it’s due ${sel('rBefore', [[0, 'Don’t send'], [1, '1 day before'], [2, '2 days before'], [3, '3 days before'], [5, '5 days before'], [7, '7 days before']], R.before ?? 3)}</label>
-        <label class="field">On the due date ${sel('rOnDue', [[1, 'Send'], [0, 'Don’t send']], R.onDue === false ? 0 : 1)}</label>
-        <label class="field">When overdue ${sel('rEvery', [[0, 'Don’t send'], [3, 'Every 3 days'], [7, 'Every week'], [14, 'Every 2 weeks']], R.every ?? 7)}</label></div>
-      <label class="field">Overdue reminders stop after ${sel('rMax', [[1, '1 reminder'], [2, '2 reminders'], [3, '3 reminders'], [5, '5 reminders']], R.max ?? 3)}</label>
+        <label class="field">On the due date ${sel('rOnDue', [[1, 'Send'], [0, 'Don’t send']], R.onDue === false ? 0 : 1)}</label></div>
+      <label class="field">Overdue notices ${sel('rMode', [['auto', 'Send automatically after the due date'], ['marked', 'Only after I mark a student past due'], ['off', 'Don’t send']], overdueMode(R))}</label>
+      <div class="fields three" id="rOverdue">
+        <label class="field" id="rAfterBox">First notice ${sel('rAfter', [[1, '1 day after it’s due'], [3, '3 days after'], [7, '7 days after'], [14, '14 days after'], [30, '30 days after']], R.after ?? (R.every || 7))}</label>
+        <label class="field">Then ${sel('rEvery', [[0, 'Don’t repeat'], [3, 'Every 3 days'], [7, 'Every week'], [14, 'Every 2 weeks']], R.every ?? 7)}</label>
+        <label class="field">Up to ${sel('rMax', [[1, '1 notice'], [2, '2 notices'], [3, '3 notices'], [5, '5 notices']], R.max ?? 3)}</label></div>
+      <p class="small muted" id="rModeNote" style="margin:0"></p>
       <label class="field">Your message (optional) <textarea id="rMsg" rows="3" maxlength="600" placeholder="e.g. Thank you for supporting your child’s lessons! Let me know if you have any questions.">${esc(R.message || '')}</textarea></label>
       <p class="small muted" style="margin:0">Each reminder shows what’s due and when${B.payLink || B.payNote ? ', with your payment link and how to pay' : ' – add a payment link or how to pay in Billing settings'}. They go out around 9 am your time, only when something is due, and replies come to you.</p>
       <p class="small ${withEmail.length ? 'muted' : ''}" style="margin:0;${withEmail.length ? '' : 'color:var(--warn)'}">${withEmail.length ? `Going to ${withEmail.length} of ${active().length} students’ families.` : 'No billing emails yet.'} Add a family’s email in each student’s billing details.</p>
@@ -1838,7 +1843,12 @@ function reminderModal() {
       <div class="gateErr" id="rErr"></div>
     </div>
     <footer><div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="rSave">Save</button></div></footer>`, m => {
-    const read = () => ({ on: m.querySelector('#rOn').checked, before: +val('rBefore'), onDue: val('rOnDue') === '1', every: +val('rEvery'), max: +val('rMax'), message: val('rMsg') });
+    const read = () => ({ on: m.querySelector('#rOn').checked, before: +val('rBefore'), onDue: val('rOnDue') === '1', overdueMode: val('rMode'), after: +val('rAfter'),
+                          every: +val('rEvery'), max: +val('rMax'), message: val('rMsg') });
+    const modeNote = () => { const md = val('rMode');
+      m.querySelector('#rOverdue').hidden = md === 'off'; m.querySelector('#rAfterBox').hidden = md !== 'auto';
+      m.querySelector('#rModeNote').textContent = md === 'marked' ? 'Nothing goes out for an overdue charge until you press “Mark past due” in that student’s billing details. The first notice goes the next morning.' : ''; };
+    m.querySelector('#rMode').onchange = modeNote; modeNote();
     const save = async () => {
       studio.billing = { ...studio.billing, remind: read() };
       await api.updateStudio({ billing: studio.billing });
@@ -1913,6 +1923,12 @@ function billDetailModal(sid) {
       <div class="stats"><div class="stat"><b class="${L.balance > 0.004 ? 'owe' : ''}">${L.balance < -0.004 ? money(-L.balance) + ' credit' : money(L.balance)}</b><span>balance</span></div>
         <div class="stat"><b>${money(r.rate)}</b><span>per ${r.per}${b.rate != null ? ' (their own price)' : ''}</span></div></div>
       ${(b.hidden ? '<p class="small muted" style="margin:0">Hidden from the family: no balance in their app, no reminders.</p>' : '') + (billEmails(sid).length ? `<p class="small muted" style="margin:0">Reminders go to ${esc(billEmails(sid).join(', '))}.</p>` : '')}
+      ${(() => { if (!B.remind?.on || overdueMode(B.remind) !== 'marked') return '';
+          const over = openItems(sid).items.filter(i => i.due < dayKey()), marked = b.pastDue ? over.filter(i => i.due < b.pastDue) : [];
+          if (!over.length) return b.pastDue ? '<p class="small muted" style="margin:0">Nothing overdue now.</p>' : '';
+          return `<div class="banner" style="margin:0">${icon('alert')}<div class="grow small">${marked.length === over.length ? `Marked past due ${fmtDate(addDays(parseDay(b.pastDue), -1), { month: 'short', day: 'numeric' })} – overdue notices are going out.`
+            : `${money(over.reduce((a, i) => a + i.open, 0))} is overdue. No notices go out until you mark it.`}</div>
+            ${marked.length === over.length ? '<button class="ghost small" id="dUnmark">Stop notices</button>' : '<button class="accent small" id="dMark">Mark past due</button>'}</div>`; })()}
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="accent small" id="dPay">${icon('plus', 'sm')}Record payment</button><button class="secondary small" id="dAdj">Add a charge or credit</button><button class="secondary small" id="dLate">Add a late fee</button>
         <button class="secondary small" id="dStmt">${icon('copy', 'sm')}Statement for the family</button><button class="ghost small" id="dPrice">Price and opening balance</button></div>
       <div class="billPanel" id="dPanel" hidden></div>
@@ -1940,6 +1956,8 @@ function billDetailModal(sid) {
     m.querySelectorAll('[data-waive]').forEach(x => x.onclick = async () => { await api.saveBilling(sid, { [`waived.${x.dataset.waive}`]: true }); back(); toast('Late fee waived'); });
     m.querySelectorAll('[data-unwaive]').forEach(x => x.onclick = async () => { await api.saveBilling(sid, { [`waived.${x.dataset.unwaive}`]: DEL }); back(); });
     m.querySelector('[data-editopen]')?.addEventListener('click', () => m.querySelector('#dPrice').click());
+    m.querySelector('#dMark')?.addEventListener('click', async () => { await api.saveBilling(sid, { pastDue: dayKey(addDays(today(), 1)) }); back(); toast('Marked past due – notices start tomorrow morning'); });
+    m.querySelector('#dUnmark')?.addEventListener('click', async () => { await api.saveBilling(sid, { pastDue: DEL }); back(); toast('Overdue notices stopped'); });
     m.querySelector('#dPrice').onclick = () => {
       showPanel(`<div class="fields three"><label class="field">${esc(firstName(s.name))}’s price <input type="number" id="rRate" min="0" step="0.01" value="${b.rate ?? ''}" placeholder="Studio price: ${B.rate ?? ''}"></label>
           <label class="field">Per <select id="rPer"><option value="">Studio setting (${perWord(B.per)})</option>${perOptions(b.per)}</select></label>

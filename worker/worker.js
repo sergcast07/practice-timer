@@ -466,18 +466,31 @@ const sendError = e => TEST_SENDER.test(String(e?.message)) || /only send testin
 // ============================================================================================
 const money = (n, cur = 'USD') => new Intl.NumberFormat('en-US', { style: 'currency', currency: cur }).format(Math.round((n || 0) * 100) / 100);
 const dayDiff = (a, b) => Math.round((keyDate(a) - keyDate(b)) / 864e5);
-// What to say today, or null: overdue (every N days after the due date, up to M times), due today, or coming up in N days
-function reminderFor(bs, R, today) {
-  if (!bs) return null;
+// What to say today. Overdue notices follow the teacher's choice (R.overdueMode):
+//   'auto'   – start `after` days past a charge's due date;
+//   'marked' – only for charges the teacher marked past due in the studio (billShare.pastDue = the day they did; charges due before it);
+//   'off'    – none.
+// Then again every `every` days (0 = just once), up to `max` notices, while something stays overdue. state = { ref, last, count }
+// is kept per student (KV) so notices keep their rhythm; returns { rem: {kind, overdue, dueToday, soon} | null, state }.
+function reminderFor(bs, R, today, state = null) {
+  if (!bs) return { rem: null, state };
   const open = (bs.items || []).filter(i => i.open > 0.004);
-  const overdue = open.filter(i => i.due < today), dueToday = open.filter(i => i.due === today);
-  const soonDay = R.before > 0 ? addKey(today, R.before) : null;
+  const mode = R.overdueMode || (R.every > 0 ? 'auto' : 'off'), after = R.after ?? (R.every || 7);
+  const late = mode === 'marked' ? open.filter(i => bs.pastDue && i.due < bs.pastDue && i.due < today)
+    : mode === 'auto' ? open.filter(i => dayDiff(today, i.due) >= Math.max(1, after)) : [];
+  const dueToday = open.filter(i => i.due === today), soonDay = R.before > 0 ? addKey(today, R.before) : null;
   const soon = soonDay ? [...open, ...(bs.upcoming || []).map(u => ({ ...u, open: u.amount }))].filter(i => i.due === soonDay) : [];
-  const nudge = R.every > 0 && overdue.some(i => { const d = dayDiff(today, i.due); return d % R.every === 0 && d / R.every <= (R.max || 3); });
-  if (nudge) return { kind: 'overdue', overdue, dueToday, soon };
-  if (R.onDue !== false && dueToday.length) return { kind: 'due', overdue, dueToday, soon };
-  if (soon.length) return { kind: 'soon', overdue, dueToday, soon };
-  return null;
+  let next = late.length ? state : null, nudge = false;
+  if (late.length) {
+    const ref = mode === 'marked' ? bs.pastDue : state?.ref || today;          // a new marking starts a new round of notices
+    if (!state || state.ref !== ref) { nudge = true; next = { ref, last: today, count: 1 }; }
+    else if (R.every > 0 && dayDiff(today, state.last) >= R.every && state.count < (R.max || 3)) { nudge = true; next = { ...state, last: today, count: state.count + 1 }; }
+  }
+  const pack = kind => ({ kind, overdue: late, dueToday, soon });
+  if (nudge) return { rem: pack('overdue'), state: next };
+  if (R.onDue !== false && dueToday.length) return { rem: pack('due'), state: next };
+  if (soon.length) return { rem: pack('soon'), state: next };
+  return { rem: null, state: next };
 }
 async function billEmail(env, feed, s, rem, to, { test } = {}) {
   const bs = s.billShare, cur = bs.currency || 'USD', first = String(s.name || '').split(' ')[0] || 'your child', who = feed.teacherName || feed.studioName || 'your teacher';
@@ -515,13 +528,11 @@ async function runBillReminders(env, feed, now) {
     if (await env.KV.get(key)) continue;
     const s = await getDoc(env, `students/${sid}`);
     if (!s || s.archived || !s.billShare) continue;
-    const rem = reminderFor(s.billShare, R, now.key);
+    const stKey = `billstate:${sid}`, state = await getJSON(env, stKey);
+    const { rem, state: next } = reminderFor(s.billShare, R, now.key, state);
+    if (JSON.stringify(next) !== JSON.stringify(state)) next ? await env.KV.put(stKey, JSON.stringify(next), { expirationTtl: 180 * 86400 }) : await env.KV.delete(stKey);
     if (!rem) continue;
-    // overdue nudges: never closer together than the teacher's "every N days", even with several overdue charges
-    const lastKey = `lastbill:${sid}`, last = await env.KV.get(lastKey);
-    if (rem.kind === 'overdue' && last && dayDiff(now.key, last) < R.every) continue;
     await env.KV.put(key, '1', { expirationTtl: 172800 });
-    if (rem.kind === 'overdue') await env.KV.put(lastKey, now.key, { expirationTtl: 90 * 86400 });
     for (const to of (emails || []).slice(0, 3)) {
       if (await env.KV.get(`billoff:${sid}:${await sha(to)}`)) continue;
       try { const mail = await billEmail(env, feed, { ...s, id: sid }, rem, to); await sendBill(env, to, mail, R.replyTo); out.push(['bill', mail.subject]); }
@@ -541,7 +552,7 @@ async function billApi(req, env, url) {
   }
   if (env.DRY_RUN && path === '/bill/preview') {                   // local testing only: what today's reminder would look like
     const feed = await getDoc(env, `feeds/${url.searchParams.get('token')}`), sid = url.searchParams.get('sid'), s = await getDoc(env, `students/${sid}`);
-    const day = url.searchParams.get('day') || localNow(feed.tz || 'UTC').key, rem = reminderFor(s.billShare, feed.bill, day);
+    const day = url.searchParams.get('day') || localNow(feed.tz || 'UTC').key, { rem } = reminderFor(s.billShare, feed.bill, day, JSON.parse(url.searchParams.get('state') || 'null'));
     if (!rem) return new Response(`No reminder on ${day}`);
     return new Response((await billEmail(env, feed, { ...s, id: sid }, rem, 'parent@example.com')).html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
   }
