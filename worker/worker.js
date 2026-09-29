@@ -510,7 +510,7 @@ async function parentsApi(req, env, url) {
     return json({ error: `Please confirm ${me.email} first – use the link we emailed you.`, unverified: true }, 403);
   const old = await getJSON(env, `parent:${me.uid}`);
   if (path === '/parents/link' || path === '/parents/prefs') {
-    const weekly = path === '/parents/prefs' ? !!body.weekly : !!old?.weekly;
+    const weekly = path === '/parents/prefs' ? !!body.weekly : old ? !!old.weekly : !!body.weekly;   // a first link can ask for the summary
     const rec = { family: me.family, email: me.email, name: me.name, tz: validTz(body.tz) ? body.tz : old?.tz || 'UTC', weekly };
     if (old?.family && old.family !== me.family) await env.KV.delete(`fam:${old.family}:${me.uid}`);
     await env.KV.put(`parent:${me.uid}`, JSON.stringify(rec));

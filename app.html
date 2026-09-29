@@ -293,6 +293,12 @@
   .moveCard { display: grid; gap: 8px; border: 1.5px solid color-mix(in srgb, var(--leaf) 35%, transparent); }
   .moveCard ol { margin: 0; padding-left: 20px; line-height: 1.6; }
   #bringOver { text-align: center; color: var(--accent); font-weight: 600; text-decoration: none; }
+  .welcomeList { display: grid; gap: 12px; margin-top: 14px; text-align: left; }
+  .welcomeList > * { display: flex; gap: 10px; align-items: flex-start; font-size: 14.5px; line-height: 1.4; }
+  .welcomeList .ic { flex: none; width: 20px; height: 20px; color: var(--leaf, var(--good)); margin-top: 1px; }
+  .welcomeList label span { flex: 1; }
+  #parentBtn.linked { position: relative; }
+  #parentBtn.linked::after { content: ''; position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--good); }
   .accountBlock { display: grid; gap: 8px; padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--line); }
   .parentList .opt { font-size: 14.5px; }
   .forgotBox { display: grid; gap: 8px; text-align: left; background: var(--card); border-radius: 14px; padding: 14px; box-shadow: var(--shadow); }
@@ -523,6 +529,7 @@
   <symbol id="i-award" viewBox="0 0 24 24"><circle cx="12" cy="9" r="6"/><path d="m8.5 14 -1.5 7 5-2.5 5 2.5-1.5-7"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
   <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 6.5 8.5 6.5 8.5-6.5"/></symbol>
   <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4"/></symbol>
  <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21a2 2 0 0 1 2-2h13v2"/></symbol>
   <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"/></symbol>
@@ -908,7 +915,7 @@ function onRemote(snap) {
   // Don't let an older server copy overwrite a change still waiting to be sent
   if (!pendingFields.kids) kids = d.kids || [];
   if (!pendingFields.settings) settings = Object.assign(settings, d.settings || {});
-  familyParents = d.parents || {};
+  familyParents = d.parents || {}; markParentBtn();
   upgradePin();
   log = d.log || {};
   stats = d.stats || {};
@@ -990,12 +997,48 @@ async function parentApi(path, data = {}) {
   return j;
 }
 const parentRecord = async uid => { const snap = await F.getDoc(F.doc(db, 'parents', uid)); return snap.exists() ? snap.data() : null; };
-async function linkParent(u) {
-  const me = { email: u.email || '', name: u.displayName || '', at: new Date().toISOString() };
-  await F.setDoc(F.doc(db, 'parents', u.uid), { family, ...me });
+async function linkParent(u, wantWeekly = false) {
+  const me = { email: u.email || '', name: u.displayName || '', at: new Date().toISOString(), wantWeekly };
+  await F.setDoc(F.doc(db, 'parents', u.uid), { family, email: me.email, name: me.name, at: me.at });
   await F.updateDoc(ref, { ['parents.' + u.uid]: me });
   familyParents[u.uid] = me;
-  parentApi('link').catch(console.error);        // lets the email service send this parent PIN codes and summaries
+  syncParent();
+}
+// Tell the email service about this parent (it needs a confirmed email). Their weekly-summary choice, made when they signed
+// in, is applied the first time this succeeds – which may be later, after they click the confirmation link.
+async function syncParent() {
+  const uid = auth?.currentUser?.uid, mine = uid && familyParents[uid];
+  if (!mine) return;
+  try {
+    const r = await parentApi('link', { weekly: !!mine.wantWeekly });
+    if (!!r.weekly !== !!mine.weekly) { mine.weekly = r.weekly; F.updateDoc(ref, { [`parents.${uid}.weekly`]: r.weekly }).catch(() => {}); }
+  } catch (e) { if (!/confirm/i.test(e.message)) console.error(e); }
+  if (screen === 'parent') renderAccount();
+}
+// Right after signing in: what it's for, the weekly summary choice, and the one step left if the email isn't confirmed yet
+function parentWelcome(u) {
+  const card = $('linkCard'), mine = familyParents[u.uid] || {};
+  card.style.setProperty('--kid', 'var(--brand)');
+  card.innerHTML = `<div class="medal">${icon('check')}</div>
+    <h2 style="text-align:center">You’re signed in</h2>
+    <p class="muted" style="text-align:center;margin-top:-4px">${esc(u.email || u.displayName || '')} is now this family’s parent account.</p>
+    <div class="welcomeList">
+      <div>${icon('lock')}<span><b>Forgot the PIN?</b> Tap “Forgot PIN” and we’ll email you a code.</span></div>
+      <div>${icon('refresh')}<span><b>New phone or tablet?</b> Sign in there to bring your players and practice back.</span></div>
+      <label>${icon('mail')}<span><b>Weekly summary</b> – each child’s practice and what their teacher sent, Sunday evenings.</span><input type="checkbox" class="toggle" id="pwWeekly" ${mine.wantWeekly || mine.weekly ? 'checked' : ''}></label>
+    </div>
+    ${!u.emailVerified && u.email ? `<p class="small" style="text-align:center;color:var(--warn);margin-top:10px"><b>One more step:</b> we sent a link to ${esc(u.email)}. Open it to confirm your email – until then we can’t send you PIN codes or summaries. (Check spam too.)</p>` : ''}
+    <button class="primary" id="pwOk" style="margin-top:14px;color:var(--bg);justify-content:center">Done</button>`;
+  $('linkDlg').hidden = false;
+  $('pwOk').onclick = async () => {
+    const want = $('pwWeekly').checked;
+    $('linkDlg').hidden = true;
+    if (want !== !!mine.wantWeekly) {
+      mine.wantWeekly = want; F.updateDoc(ref, { [`parents.${u.uid}.wantWeekly`]: want }).catch(() => {});
+      if (u.emailVerified) parentApi('prefs', { weekly: want }).then(() => { mine.weekly = want; F.updateDoc(ref, { [`parents.${u.uid}.weekly`]: want }).catch(() => {}); renderAccount(); }).catch(console.error);
+    }
+    renderParent();
+  };
 }
 // From Settings: add a parent account to this family (turning on sync first if needed)
 async function addParentAccount() {
@@ -1013,8 +1056,8 @@ async function addParentAccount() {
   try {
     if (!family) await createFamily();
     await linkParent(u);
-  } catch (e) { console.error(e); alert('Couldn’t link your account right now. Check the internet connection and try again.'); }
-  renderParent();
+  } catch (e) { console.error(e); alert('Couldn’t link your account right now. Check the internet connection and try again.'); return renderParent(); }
+  renderParent(); parentWelcome(u);
 }
 // From a new device: sign in and bring the family back
 async function restoreWithAccount() {
@@ -1675,21 +1718,23 @@ $('pinForgot').onclick = () => {
 $('changePinBtn').onclick = () => askPin(true);
 
 // Parent accounts on this family, in Devices & sync
+function markParentBtn() {
+  const list = Object.values(familyParents);
+  $('parentBtn').classList.toggle('linked', list.length > 0);
+  $('parentBtn').title = list.length ? `Parent account: ${list.map(p => p.email || p.name).join(', ')}` : '';
+}
 function renderAccount() {
+  markParentBtn();
   const list = Object.entries(familyParents), me = auth?.currentUser?.uid;
   if (list.length && !A) loadAuth().then(renderAccount).catch(console.error);   // to know who's signed in here
   const mine = me && familyParents[me];
   // Once per visit, check the email service's copy (e.g. they unsubscribed from an email) and keep the switch honest
-  if (mine && !renderAccount.checked) {
-    renderAccount.checked = true;
-    parentApi('link').then(r => { if (!!r.weekly !== !!mine.weekly) { mine.weekly = r.weekly; F.updateDoc(ref, { [`parents.${me}.weekly`]: r.weekly }).catch(() => {}); } renderAccount(); })
-      .catch(() => renderAccount());              // (also refreshes the "confirm your email" note)
-  }
+  if (mine && !renderAccount.checked) { renderAccount.checked = true; syncParent(); }   // (also refreshes the "confirm your email" note)
   $('accountBlock').innerHTML = `<b>Parent account</b>
     ${list.length ? `<div class="parentList">${list.map(([uid, p]) => `<div class="opt"><span>${icon('user', 'sm')} ${esc(p.email || p.name)}${uid === me ? ' <span class="muted small">(signed in here)</span>' : ''}</span>
       <button class="ghost small" data-unparent="${uid}">Remove</button></div>`).join('')}</div>
       ${mine ? `<label class="opt">Weekly summary email<br><small class="muted">Sunday evenings: each child’s practice time and what their teacher sent</small>
-          <input type="checkbox" class="toggle" id="weeklyToggle" ${mine.weekly ? 'checked' : ''}></label>
+          <input type="checkbox" class="toggle" id="weeklyToggle" ${mine.weekly || mine.wantWeekly ? 'checked' : ''}></label>
         <div class="rowBetween"><button class="ghost small" id="testSummary" style="margin-left:-10px">Send me a test</button><span class="small muted" id="summaryMsg"></span></div>` : ''}
       <p class="muted small">Forgot the PIN? We’ll email a reset code to ${list.length === 1 ? 'this address' : 'these addresses'}. On a new device, signing in brings your family back.</p>
       <button class="secondary" id="addParent" style="justify-self:start">${icon('plus', 'sm')}Add another parent</button>`
@@ -1703,8 +1748,9 @@ function renderAccount() {
   const msg = t => { const el = $('summaryMsg'); if (el) el.textContent = t; };
   $('weeklyToggle')?.addEventListener('change', async e => {
     const on = e.target.checked;
+    familyParents[me].wantWeekly = on; F.updateDoc(ref, { [`parents.${me}.wantWeekly`]: on }).catch(() => {});
     try { await parentApi('prefs', { weekly: on }); await F.updateDoc(ref, { [`parents.${me}.weekly`]: on }); familyParents[me].weekly = on; msg(on ? 'On – first one this Sunday' : 'Off'); }
-    catch (err) { e.target.checked = !on; msg(err.message); }
+    catch (err) { if (/confirm/i.test(err.message) && on) msg('Starts once you confirm your email'); else { e.target.checked = !on; msg(err.message); } }
   });
   $('testSummary')?.addEventListener('click', async () => {
     msg('Sending…');
