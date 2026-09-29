@@ -1464,7 +1464,7 @@ function addPractice(ms) {
     store.set('pt-pend', pend);
   } else {
     log[kid.id] = log[kid.id] || {};
-    log[kid.id][k] = before + ms;
+    log[kid.id][k] = (log[kid.id][k] || 0) + ms;       // recorded time only – `before` also counts time logged by hand
     saveLog();
   }
   sessionMs += ms;
