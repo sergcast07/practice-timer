@@ -1267,7 +1267,7 @@ function renderPractice(playing, talking) {
   if (document.activeElement !== $('bpmVal')) $('bpmVal').value = kid.bpm || 80;
   if (!$('metroSound').options.length)
     $('metroSound').innerHTML = Object.entries(METRO_SOUNDS).map(([v, m]) => `<option value="${v}">${m.label}</option>`).join('');
-  $('metroSound').value = kid.metroSound || 'loud';
+  $('metroSound').value = kid.metroSound || METRO_DEFAULT;
   if (!$('tempoMark').options.length)
     $('tempoMark').innerHTML = '<option value="">Choose a tempo…</option>' + TEMPOS.map(([n, lo, hi]) => `<option value="${n}">${n} (${lo}–${hi})</option>`).join('');
   $('tempoMark').value = tempoFor(kid.bpm || 80);
@@ -2060,6 +2060,10 @@ const metro = { timer: null, next: 0, anchor: 0, period: 0, onsets: [], count: 0
 // 3.5–5 kHz is where phone speakers are loudest and ears most sensitive, while staying well above
 // the ~1.5 kHz cut-off the note detector listens below. Square waves sound fuller than pure tones.
 const METRO_SOUNDS = {
+  // A mechanical metronome: a sharp strike, a wooden "tock" (a strong tone plus an off-key overtone, like a wood block)
+  // and a bell on the first beat. Two tones in different pitch ranges sound louder than one at the same level. Kept
+  // just under the limiter so it never squashes them together (that would create low tones the note detector hears).
+  classic: { label: 'Classic metronome (wood block + bell)', wood: true, body: [3200, 5200], accentBody: [4000, 6500], bell: [4000, 10000], hold: 0.07, decay: 0.19 },
   // One full-strength square wave near 3.2 kHz (where hearing is most sensitive), held for most of 120 ms.
   // A single tone keeps it clean: mixing tones through anything non-linear creates low 'difference' tones the note detector would hear.
   loud:  { label: 'Loud – best with instruments', wave: 'square', tones: [3200], accent: [4000], decay: 0.12, hold: 0.8, peak: [0.97, 0.97] },
@@ -2068,6 +2072,7 @@ const METRO_SOUNDS = {
   tick:  { label: 'Tick (soft)', noise: true, cut: 3500, decay: 0.03, peak: [0.4, 0.55] },
   bell:  { label: 'Bell (soft)', tones: [3600, 5200, 7100], accent: [4300, 6200, 8400], decay: 0.25, peak: [0.75, 0.95] }
 };
+const METRO_DEFAULT = 'loud';
 // Italian tempo markings (common metronome ranges); choosing one sets a typical bpm for it
 const TEMPOS = [['Grave', 30, 44, 40], ['Largo', 45, 59, 50], ['Larghetto', 60, 65, 63], ['Adagio', 66, 75, 70], ['Andante', 76, 97, 88],
                 ['Moderato', 98, 111, 104], ['Allegretto', 112, 119, 116], ['Allegro', 120, 155, 132], ['Vivace', 156, 175, 164],
@@ -2090,7 +2095,9 @@ function metroOut(ctx) {
   return ctx.__metroOut;
 }
 function playMetroSound(ctx, t, name, accent) {
-  const m = METRO_SOUNDS[name] || METRO_SOUNDS.loud, g = ctx.createGain(), peak = m.peak[accent ? 1 : 0];
+  const m = METRO_SOUNDS[name] || METRO_SOUNDS[METRO_DEFAULT];
+  if (m.wood) return playWood(ctx, t, m, accent);
+  const g = ctx.createGain(), peak = m.peak[accent ? 1 : 0];
   g.connect(metroOut(ctx));
   g.gain.setValueAtTime(0.0001, t);
   g.gain.exponentialRampToValueAtTime(peak, t + 0.004);      // soft-ish attack: a sharper one leaks into low pitches
@@ -2111,11 +2118,35 @@ function playMetroSound(ctx, t, name, accent) {
     });
   }
 }
+function playWood(ctx, t, m, accent) {
+  const out = metroOut(ctx), [f1, f2] = accent ? m.accentBody : m.body, scale = accent ? 0.8 : 1;   // room for the bell
+  // the strike: 2.5 ms of noise, high-passed three times at 4 kHz
+  const n = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.0025), ctx.sampleRate), d = n.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.sin(Math.PI * i / d.length);
+  const src = ctx.createBufferSource(); src.buffer = n;
+  let node = src;
+  for (let k = 0; k < 3; k++) { const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 4000; node.connect(f); node = f; }
+  const sg = ctx.createGain(); sg.gain.value = 0.3; node.connect(sg); sg.connect(out); src.start(t);
+  // the tock: a square tone and a wood-block overtone, full level for 70 ms, then a quick decay
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(scale, t + 0.003);
+  g.gain.setValueAtTime(scale, t + m.hold); g.gain.setTargetAtTime(0.0001, t + m.hold, (m.decay - m.hold) / 5); g.connect(out);
+  [[f1, 'square', 0.64], [f2, 'sine', 0.24]].forEach(([f, type, level]) => {
+    const o = ctx.createOscillator(), og = ctx.createGain(); o.type = type; o.frequency.value = f; og.gain.value = level;
+    o.connect(og); og.connect(g); o.start(t); o.stop(t + m.decay + 0.02);
+  });
+  // the bell on the first beat of the bar (its partials match the tock's, so nothing beats against it)
+  if (accent) m.bell.forEach((f, i) => {
+    const b = ctx.createOscillator(), bg = ctx.createGain(); b.frequency.value = f;
+    bg.gain.setValueAtTime(0.0001, t); bg.gain.exponentialRampToValueAtTime(0.16 / (i + 1), t + 0.003); bg.gain.exponentialRampToValueAtTime(0.0001, t + 0.5 / (i + 1));
+    b.connect(bg); bg.connect(out); b.start(t); b.stop(t + 0.55);
+  });
+}
 function previewSound() {
   try {
     const ctx = listening ? audioCtx : new AudioContext();
-    playMetroSound(ctx, ctx.currentTime + 0.02, kid.metroSound || 'loud', false);
-    playMetroSound(ctx, ctx.currentTime + 0.4, kid.metroSound || 'loud', true);
+    playMetroSound(ctx, ctx.currentTime + 0.02, kid.metroSound || METRO_DEFAULT, false);
+    playMetroSound(ctx, ctx.currentTime + 0.4, kid.metroSound || METRO_DEFAULT, true);
   } catch {}
 }
 function metroStart() {
@@ -2129,7 +2160,7 @@ function metroStart() {
 function metroSchedule() {
   while (metro.next < audioCtx.currentTime + 0.12) {
     const t = metro.next, accent = kid.accent > 0 && metro.count % kid.accent === 0;
-    playMetroSound(audioCtx, t, kid.metroSound || 'loud', accent);
+    playMetroSound(audioCtx, t, kid.metroSound || METRO_DEFAULT, accent);
     metro.count++;
     setTimeout(() => {
       $('beatDot').classList.add('on'); setTimeout(() => $('beatDot').classList.remove('on'), 100);
