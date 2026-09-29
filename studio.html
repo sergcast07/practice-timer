@@ -1811,11 +1811,15 @@ function reminderModal() {
     m.querySelector('#rTest').onclick = async e => {
       const out = m.querySelector('#rTestMsg');
       if (DEMO) return (out.textContent = 'Sign in to send a sample – this is the demo.');
+      const sid = (withEmail[0] || active()[0])?.id;
+      if (!sid) return (out.textContent = 'Add a student first.');
       e.target.disabled = true; out.textContent = 'Sending…';
       try {
-        await save(); await new Promise(r => setTimeout(r, 800));
-        const sid = (withEmail[0] || active()[0])?.id;
-        const r = await fetch(WORKER_URL + '/bill/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: studio.feedToken, sid }) });
+        // the sample works before reminders are switched on: it needs the email settings record, and uses today's numbers
+        await save(); await ensureFeed({ brief: false, digest: false }); lastFeedSync = ''; syncFeed();
+        await new Promise(r => setTimeout(r, 800));
+        const r = await fetch(WORKER_URL + '/bill/test', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: studio.feedToken, sid, share: billShareFor(sid), message: read().message, to: me.email || '' }) });
         const j = await r.json().catch(() => ({}));
         out.textContent = r.ok ? `Sent a sample to ${j.to}.` : j.error || 'Couldn’t send.';
       } catch { out.textContent = 'Couldn’t reach the email service.'; }

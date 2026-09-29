@@ -546,21 +546,30 @@ async function billApi(req, env, url) {
     return new Response((await billEmail(env, feed, { ...s, id: sid }, rem, 'parent@example.com')).html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
   }
   if (path === '/bill/test' && req.method === 'POST') {
-    const { token, sid } = await req.json();
-    if (!validCode(token) || !validCode(sid)) return json({ error: 'bad request' }, 400);
+    const body = await req.json().catch(() => ({})), { token, sid } = body;
+    if (!validCode(token)) return json({ error: 'Your studio’s email settings aren’t set up yet. Reload the page and try again.' }, 400);
+    if (!validCode(sid)) return json({ error: 'Add a student first.' }, 400);
     if (await env.KV.get(`rl:${token}:bill`)) return json({ error: 'Please wait a minute before sending another sample.' }, 429);
     const feed = await getDoc(env, `feeds/${token}`);
-    const to = feed?.bill?.replyTo || feed?.email;
-    if (!to || !(feed.students || []).includes(sid)) return json({ error: 'Turn on reminders and save first.' }, 400);
+    if (!feed) return json({ error: 'Your studio’s email settings aren’t saved yet. Try again in a moment.' }, 400);
+    // the sample goes to the teacher (their sign-in email, or the one in Calendar & email settings) – never to a family
+    const to = [feed.bill?.replyTo, feed.email].find(x => /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(x || ''));
+    if (!to) return json({ error: 'Add your email address in Calendar & email settings first.' }, 400);
+    if (!(feed.students || []).includes(sid)) return json({ error: 'That student isn’t in your studio’s email settings yet. Try again in a moment.' }, 400);
     const s = await getDoc(env, `students/${sid}`);
-    if (!s?.billShare) return json({ error: 'That student has no billing summary yet – open Billing once, then try again.' }, 400);
+    const sent = body.share && typeof body.share === 'object' ? body.share : null;          // today's numbers from the studio
+    const bs = sent ? { asOf: String(sent.asOf || ''), currency: String(sent.currency || 'USD').slice(0, 3), balance: +sent.balance || 0,
+                        payLink: String(sent.payLink || '').slice(0, 200), payNote: String(sent.payNote || '').slice(0, 400),
+                        items: (Array.isArray(sent.items) ? sent.items : []).slice(0, 20), upcoming: (Array.isArray(sent.upcoming) ? sent.upcoming : []).slice(0, 5) } : s?.billShare;
+    if (!s || !bs) return json({ error: 'Couldn’t find that student’s billing yet. Try again in a moment.' }, 400);
     await env.KV.put(`rl:${token}:bill`, '1', { expirationTtl: 60 });
     // a sample shows what a real reminder would say today (or, with nothing owed, the next charge)
-    const bs = s.billShare, t = localNow(feed.tz || 'UTC').key, open = (bs.items || []).filter(i => i.open > 0.004);
+    const t = localNow(feed.tz || 'UTC').key, open = (bs.items || []).filter(i => i.open > 0.004);
     const rem = { overdue: open.filter(i => i.due < t), dueToday: open.filter(i => i.due === t), soon: [...open.filter(i => i.due > t), ...(bs.upcoming || [])].slice(0, 3) };
     rem.kind = rem.overdue.length ? 'overdue' : rem.dueToday.length ? 'due' : 'soon';
     if (!rem.soon.length && rem.kind === 'soon') rem.soon = [{ text: 'Nothing is due right now', due: t, amount: 0 }];
-    try { const mail = await billEmail(env, feed || {}, { ...s, id: sid }, rem, to, { test: true }); await sendBill(env, to, mail, to); return json({ ok: true, to, subject: mail.subject }); }
+    const f = { ...feed, bill: { ...(feed.bill || {}), message: String(body.message ?? feed.bill?.message ?? '').slice(0, 600) } };
+    try { const mail = await billEmail(env, f, { ...s, id: sid, billShare: bs }, rem, to, { test: true }); await sendBill(env, to, mail, to); return json({ ok: true, to, subject: mail.subject }); }
     catch (e) { console.error(e); return json({ error: sendError(e) }, 500); }
   }
   return json({ error: 'not found' }, 404);
