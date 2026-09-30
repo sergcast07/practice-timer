@@ -874,7 +874,7 @@ let F, db, ref, unsubscribe, syncState = 'local';
 let familyParents = {};                          // parent accounts linked to this family: {uid: {email, name, at}}
 let pend = store.get('pt-pend', {});              // practice time not yet sent: {kidId: {day: ms}}
 let pendStats = store.get('pt-pendstats', {});    // quality stats not yet sent, same shape as `stats`
-let pendingFields = {}, fieldTimer, lastFlush = 0;
+let pendingFields = {}, fieldTimer, lastFlush = 0, listenerDown = false;
 
 async function loadFirebase() {
   if (F) return;
@@ -894,8 +894,10 @@ async function connect() {
   if (deviceRole) { try { await loadAuth(); } catch (e) { console.error(e); } }
   if (deviceRole && !auth?.currentUser) return accessLost(deviceRole === 'device' ? 'removed' : 'signed-out');
   ref = F.doc(db, 'families', family);
-  unsubscribe = F.onSnapshot(ref, { includeMetadataChanges: true }, onRemote,
-    e => { console.error(e); if (e.code === 'permission-denied') accessLost('removed'); else setSync('error'); });
+  unsubscribe = F.onSnapshot(ref, { includeMetadataChanges: true }, snap => { listenerDown = false; onRemote(snap); },
+    e => { console.error(e); listenerDown = true;
+      if (e.code === 'permission-denied') accessLost('removed');
+      else { setSync('error'); clearTimeout(connect.retry); connect.retry = setTimeout(() => family && connect(), 20000); } });
   flushPractice(); flushFields();
 }
 
@@ -957,9 +959,26 @@ function flushPractice() {
     const v = pendStats[id][day][f];
     upd[`stats.${id}.${day}.${f}`] = f === 'longest' ? Math.round(Math.max(v, stats[id]?.[day]?.longest || 0)) : F.increment(Math.round(v));
   }
+  const sent = { pend, pendStats };
   pend = {}; store.set('pt-pend', pend);
   pendStats = {}; store.set('pt-pendstats', pendStats);
-  if (Object.keys(upd).length) F.updateDoc(ref, upd).catch(e => { console.error(e); setSync('error'); });
+  if (!Object.keys(upd).length) return;
+  F.updateDoc(ref, upd).then(() => {
+    if (listenerDown) foldIn(sent.pend, sent.pendStats, log, stats);       // no live copy to show it: count it here
+  }).catch(e => {
+    console.error(e);
+    // Not saved: put it back, so no practice is ever lost; it's sent again next time (or kept on this device)
+    foldIn(sent.pend, sent.pendStats, pend, pendStats); store.set('pt-pend', pend); store.set('pt-pendstats', pendStats);
+    if (e.code === 'permission-denied') accessLost('removed'); else setSync('error');
+  });
+}
+// Add practice time and stats from `p`/`ps` into `into`/`intoStats` (same shapes as log/stats)
+function foldIn(p, ps, into, intoStats) {
+  for (const id in p) for (const day in p[id]) (into[id] ??= {})[day] = (into[id][day] || 0) + p[id][day];
+  for (const id in ps) for (const day in ps[id]) for (const f in ps[id][day]) {
+    const d = ((intoStats[id] ??= {})[day] ??= {}), v = ps[id][day][f];
+    d[f] = f === 'longest' ? Math.max(d[f] || 0, v) : (d[f] || 0) + v;
+  }
 }
 
 // ---------- Parent account (optional Google sign-in) ----------
@@ -1211,6 +1230,7 @@ async function removeMember(uid) {
 function accessLost(why) {
   unsubscribe?.(); unsubscribe = ref = null;
   const wasDevice = deviceRole === 'device';
+  foldIn(pend, pendStats, log, stats); pend = {}; pendStats = {}; store.set('pt-pend', {}); store.set('pt-pendstats', {}); saveLog(); store.set('pt-stats', stats);
   family = null; store.set('pt-family', null); deviceRole = null; store.set('pt-role', null); members = null;
   if (wasDevice || why === 'removed-self') {                        // a practice device keeps nothing of the family
     kids = []; log = {}; stats = {}; manual = {}; theory = {}; pend = {}; pendStats = {};
@@ -1219,7 +1239,8 @@ function accessLost(why) {
   }
   store.set('pt-notice', why === 'removed-self' ? 'This device was removed from your family.' : wasDevice ? 'A parent removed this device from the family. They can add it again with a new code.'
     : 'Your family now uses parent sign-in. Ask a parent to add this device (Parent settings → Add a practice device), or sign in as a parent.');
-  setSync('local'); show('home');
+  setSync('local');
+  if (!(listening && !wasDevice && why !== 'removed-self')) show('home');   // mid-practice on a family device: keep going, it's saved here
 }
 function renderDevices() {
   const box = $('devicesBlock'); if (!box) return;
