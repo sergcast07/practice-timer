@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Book a lesson – AlleGrow</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#f6f3ee" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14171f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="brand/allegrow-icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css">
+<style>
+  .page { max-width: 640px; margin: 0 auto; padding: 24px 16px 60px; }
+  .card { background: var(--card); border-radius: 20px; padding: 22px; box-shadow: var(--shadow); margin-top: 16px; }
+  h1 { font-size: clamp(30px, 6vw, 42px); }
+  .muted { color: var(--muted); }
+  .small { font-size: 14px; }
+  .choices { display: grid; gap: 10px; margin-top: 14px; }
+  .choice { text-align: left; font: inherit; padding: 14px 16px; border-radius: 14px; border: 1.5px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
+  .choice.on { border-color: var(--leaf); box-shadow: 0 0 0 1px var(--leaf); }
+  .choice b { display: block; }
+  .days { display: grid; gap: 14px; margin-top: 10px; }
+  .slots { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+  .slot { font: inherit; font-size: 15px; font-weight: 600; padding: 8px 12px; border-radius: 999px; border: 1.5px solid var(--line); background: none; color: var(--ink); cursor: pointer; }
+  .slot.on { background: var(--leaf); border-color: var(--leaf); color: #fff; }
+  label.f { display: grid; gap: 6px; font-size: 14px; font-weight: 600; color: var(--ink-2); }
+  input, select, textarea { font: inherit; font-size: 16px; padding: 11px 12px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--bg); color: var(--ink); width: 100%; }
+  .grid { display: grid; gap: 12px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 520px) { .two { grid-template-columns: 1fr; } }
+  .policy { white-space: pre-line; max-height: 220px; overflow: auto; background: var(--soft); border-radius: 12px; padding: 12px; font-size: 14px; line-height: 1.5; }
+  .agree { display: flex; gap: 10px; align-items: flex-start; font-size: 15px; } .agree input { width: auto; margin-top: 4px; }
+  .err { color: var(--danger); min-height: 1.2em; font-size: 14px; }
+  footer { text-align: center; margin-top: 26px; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="page" id="app"><p class="muted">Loading…</p></div>
+<footer class="muted">Booking by <a href="./?about">AlleGrow</a> · <a href="privacy">Privacy</a></footer>
+<script type="module">
+// A teacher's public booking page: bookpages/{token} (their open times, published by their studio). A family asks for a
+// trial lesson at one of the times, or signs up without one; the request goes to the teacher to accept.
+const FB = 'https://www.gstatic.com/firebasejs/12.19.0';
+const EMULATOR = ['localhost', '127.0.0.1'].includes(location.hostname) && new URLSearchParams(location.search).has('emulator');
+const CONFIG = EMULATOR ? { apiKey: 'demo-key', projectId: 'demo-practice' } : { apiKey: 'AIzaSyAUn6GqVxRR-m9i5kjTH9dY7-nGWCo1374', projectId: 'music-practice-tracker-d77f7', appId: '1:933602552014:web:1b19df5cc27f55fc58c89f' };
+const [{ initializeApp }, F] = await Promise.all([import(FB + '/firebase-app.js'), import(FB + '/firebase-firestore.js')]);
+const db = F.getFirestore(initializeApp(CONFIG));
+if (EMULATOR) F.connectFirestoreEmulator(db, '127.0.0.1', 8080);
+const $ = id => document.getElementById(id), app = $('app');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const token = new URLSearchParams(location.search).get('t') || '';
+const day = k => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); };
+const tm = (k, t) => { const [h, m] = t.split(':').map(Number), d = day(k); d.setHours(h, m); return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }); };
+let page = null;
+try { const s = token.length >= 20 ? await F.getDoc(F.doc(db, 'bookpages', token)) : null; page = s?.exists() ? s.data() : null; } catch (e) { console.error(e); }
+if (!page || !page.open) {
+  app.innerHTML = `<h1>Booking</h1><div class="card"><p>${page ? 'This teacher isn’t taking bookings online right now.' : 'This booking link isn’t valid.'} Please contact them directly.</p></div>`;
+} else {
+  document.title = `Book a lesson with ${page.teacherName} – AlleGrow`;
+  const now = new Date(), todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const slots = (page.slots || []).filter(x => x.date > todayKey), days = [...new Set(slots.map(x => x.date))];
+  let mode = page.trials && slots.length ? 'trial' : 'signup', pick = null;
+  const draw = () => {
+    app.innerHTML = `<div class="chip">${esc(page.studioName)}</div>
+      <h1 style="margin-top:12px">Lessons with ${esc(page.teacherName)}</h1>
+      ${page.message ? `<p class="muted" style="margin-top:10px;white-space:pre-line">${esc(page.message)}</p>` : ''}
+      <div class="card"><div class="choices">
+        ${page.trials && slots.length ? `<button class="choice ${mode === 'trial' ? 'on' : ''}" data-mode="trial"><b>Book a trial lesson</b><span class="small muted">Pick a time below – ${esc(page.teacherName)} confirms it.</span></button>` : ''}
+        <button class="choice ${mode === 'signup' ? 'on' : ''}" data-mode="signup"><b>Sign up</b><span class="small muted">Send your details and ${esc(page.teacherName)} will be in touch about a time.</span></button></div>
+        ${mode === 'trial' ? `<div class="days">${days.slice(0, 21).map(d => `<div><b class="small">${day(d).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</b>
+          <div class="slots">${slots.filter(x => x.date === d).map(x => `<button class="slot ${pick && pick.date === d && pick.time === x.time ? 'on' : ''}" data-slot="${d}|${x.time}|${x.length}">${tm(d, x.time)}</button>`).join('')}</div></div>`).join('')}</div>` : ''}
+      </div>
+      <div class="card grid">
+        <div class="two"><label class="f">Student’s name <input id="fStudent" maxlength="80" autocomplete="off"></label><label class="f">Age (optional) <input id="fAge" maxlength="20"></label></div>
+        <div class="two"><label class="f">Instrument <input id="fInstrument" maxlength="60" placeholder="e.g. Piano"></label>
+          <label class="f">Experience <select id="fExp"><option>New to it</option><option>Up to a year</option><option>1–3 years</option><option>More than 3 years</option></select></label></div>
+        <div class="two"><label class="f">Parent or guardian <input id="fParent" maxlength="120" autocomplete="name"></label><label class="f">Email <input id="fEmail" type="email" maxlength="120" autocomplete="email"></label></div>
+        <label class="f">Phone (optional) <input id="fPhone" type="tel" maxlength="40" autocomplete="tel"></label>
+        <label class="f">Anything else? (optional) <textarea id="fNotes" rows="3" maxlength="1000"></textarea></label>
+        ${page.policy ? `<div><b class="small">Studio policies</b><div class="policy" style="margin-top:6px">${esc(page.policy)}</div></div>
+          <label class="agree"><input type="checkbox" id="fAgree"><span>I agree to ${esc(page.studioName)}’s studio policies.</span></label>` : ''}
+        <div class="err" id="fErr"></div>
+        <button class="btn primary" id="fGo" style="justify-self:start">${mode === 'trial' ? 'Request this trial lesson' : 'Send'}</button>
+      </div>`;
+    app.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { keep(); mode = b.dataset.mode; draw(); restore(); });
+    app.querySelectorAll('[data-slot]').forEach(b => b.onclick = () => { keep(); const [date, time, length] = b.dataset.slot.split('|'); pick = { date, time, length: +length }; draw(); restore(); });
+    $('fGo').onclick = send;
+  };
+  // keep what's typed while the page redraws
+  let typed = {};
+  const ids = ['fStudent', 'fAge', 'fInstrument', 'fExp', 'fParent', 'fEmail', 'fPhone', 'fNotes'];
+  const keep = () => { typed = Object.fromEntries(ids.map(i => [i, $(i)?.value || ''])); typed.fAgree = $('fAgree')?.checked; };
+  const restore = () => { for (const i of ids) if (typed[i] && $(i)) $(i).value = typed[i]; if ($('fAgree')) $('fAgree').checked = !!typed.fAgree; };
+  async function send() {
+    const v = i => $(i).value.trim(), err = t => { $('fErr').textContent = t; };
+    if (mode === 'trial' && !pick) return err('Pick a time for the trial lesson.');
+    if (!v('fStudent') || !v('fParent')) return err('Please add the student’s and a parent’s name.');
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(v('fEmail'))) return err('Please add an email address so the teacher can reply.');
+    if (page.policy && !$('fAgree').checked) return err('Please agree to the studio policies.');
+    $('fGo').disabled = true;
+    const form = { student: v('fStudent'), age: v('fAge'), instrument: v('fInstrument'), experience: v('fExp'), parent: v('fParent'), email: v('fEmail'), phone: v('fPhone'), notes: v('fNotes') };
+    try {
+      await F.addDoc(F.collection(db, 'bookpages', token, 'requests'), { form, slot: mode === 'trial' ? pick : null, agreed: !!page.policy, at: new Date().toISOString(), status: 'pending' });
+      app.innerHTML = `<h1>Thank you!</h1><div class="card"><p>${mode === 'trial' ? `Your trial lesson request for <b>${day(pick.date).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })} at ${tm(pick.date, pick.time)}</b> was sent.` : 'Your details were sent.'}
+        ${esc(page.teacherName)} will reply to ${esc(form.email)}.</p></div>`;
+    } catch (e) { console.error(e); err('Couldn’t send – that time may have just been taken, or the page closed. Please reload and try again.'); $('fGo').disabled = false; }
+  }
+  draw();
+}
+</script>
+</body>
+</html>

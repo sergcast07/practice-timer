@@ -153,6 +153,25 @@ service cloud.firestore {
       allow list: if false;
     }
 
+    // A teacher's public booking page (open times, trial lessons, sign-ups), read by its long random key. Anyone can send
+    // a request (a trial lesson or a sign-up, with a few short fields); only the teacher reads and answers them.
+    match /bookpages/{token} {
+      allow get: if token.size() >= 20;
+      allow create: if request.auth != null && token.size() >= 20 && request.resource.data.studioId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.studioId == request.auth.uid && request.resource.data.studioId == request.auth.uid;
+      match /requests/{id} {
+        allow create: if request.resource.data.keys().hasOnly(['form', 'slot', 'agreed', 'at', 'status'])
+          && request.resource.data.status == 'pending' && request.resource.data.form.size() <= 12
+          && request.resource.data.form.get('student', '') is string && request.resource.data.form.get('student', '').size() <= 80
+          && request.resource.data.form.get('notes', '').size() <= 1000 && request.resource.data.form.get('email', '').size() <= 120
+          && request.resource.data.form.get('parent', '').size() <= 120 && request.resource.data.form.get('phone', '').size() <= 40
+          && request.resource.data.form.get('instrument', '').size() <= 60 && request.resource.data.form.get('experience', '').size() <= 200
+          && request.resource.data.form.get('age', '').size() <= 20
+          && get(/databases/$(db)/documents/bookpages/$(token)).data.open == true;
+        allow read, update, delete: if request.auth != null && get(/databases/$(db)/documents/bookpages/$(token)).data.studioId == request.auth.uid;
+      }
+    }
+
     // Beta codes: single use. A signed-in teacher can look up a code they were given and claim it once.
     match /betaCodes/{code} {
       allow get: if request.auth != null;
@@ -189,7 +208,8 @@ service cloud.firestore {
       // earned badges, which stars they've seen, which challenges they've finished, consent, and the child's photo
       allow get: if sid.size() >= 20;
       allow update: if sid.size() >= 20
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['practice', 'progress', 'linkedAt', 'kidName', 'badges', 'cheersSeen', 'challengeDone', 'consent', 'photo'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['practice', 'progress', 'linkedAt', 'kidName', 'badges', 'cheersSeen', 'challengeDone', 'consent', 'photo',
+                                                                           'familyCancels', 'makeupRequests'])
         // a photo is a small picture (about 10 KB), never a big file
         && (!('photo' in request.resource.data) || request.resource.data.photo == null
             || (request.resource.data.photo is string && request.resource.data.photo.size() < 40000));

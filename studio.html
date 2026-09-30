@@ -81,6 +81,7 @@
   .linkBtn:hover { text-decoration: underline; }
   .owe { color: var(--warn); } .credit { color: var(--good); }
   .billTable td { vertical-align: middle; }
+  .bkDays { display: grid; gap: 6px; }
   .viewBar { display: flex; gap: 10px; align-items: center; background: color-mix(in srgb, var(--accent) 14%, var(--card)); border-radius: 12px; padding: 10px 14px; margin-bottom: 18px; font-size: 14px; }
   .seGroups { display: grid; gap: 10px; max-height: 280px; overflow: auto; padding: 10px; border-radius: 12px; background: var(--soft); }
   .seGroup { display: grid; gap: 4px; }
@@ -605,7 +606,7 @@ const EVENT_TYPES = { recital: 'Recital', concert: 'Concert', performance: 'Perf
   community: 'Community event', competition: 'Competition', audition: 'Audition', exam: 'Exam', jury: 'Jury', masterclass: 'Masterclass', other: 'Other' };
 const ASSESSED = ['exam', 'audition', 'jury', 'competition'];      // shown with a blue chip, performances with gold
 const eventChip = e => `<span class="chip ${ASSESSED.includes(e.type) ? 'info' : 'gold'}">${esc(e.type === 'other' && e.typeLabel ? e.typeLabel : EVENT_TYPES[e.type] || 'Event')}</span>`;
-const STATUS = { scheduled: ['Scheduled', ''], done: ['Done', 'good'], cancelled: ['Canceled', 'bad'], noshow: ['No-show', 'warn'], moved: ['Moved', ''] };
+const STATUS = { scheduled: ['Scheduled', ''], done: ['Done', 'good'], cancelled: ['Canceled', 'bad'], noshow: ['No-show', 'warn'], moved: ['Moved', ''], latecancel: ['Late cancel', 'warn'] };
 const RATINGS = [['preparation', 'Preparation'], ['technique', 'Technique'], ['musicality', 'Musicality']];
 function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2200); }
 
@@ -759,6 +760,9 @@ async function firebaseApi() {
     clipAudio: async (sid, id) => (await F.getDoc(F.doc(db, 'students', sid, 'clipData', id))).data(),
     patchClip: (sid, id, patch) => F.updateDoc(F.doc(db, 'students', sid, 'clips', id), patch).catch(fail),
     deleteClip: (sid, id) => Promise.all([F.deleteDoc(F.doc(db, 'students', sid, 'clipData', id)), F.deleteDoc(F.doc(db, 'students', sid, 'clips', id))]).catch(fail),
+    saveBookPage: (token, data) => F.setDoc(F.doc(db, 'bookpages', token), data).catch(fail),
+    watchBookRequests(token, cb) { unsubs.push(F.onSnapshot(F.collection(db, 'bookpages', token, 'requests'), q => { const o = {}; q.forEach(d => o[d.id] = { id: d.id, ...d.data() }); cb(o); }, e => console.error(e))); },
+    patchBookRequest: (token, id, patch) => F.updateDoc(F.doc(db, 'bookpages', token, 'requests', id), patch).catch(fail),
     saveBilling: async (sid, patch) => { const ref = F.doc(db, 'studios', SU, 'billing', sid); await F.setDoc(ref, {}, { merge: true }); return F.updateDoc(ref, conv(patch)).catch(fail); },
     getFeed: async token => { const s = await F.getDoc(F.doc(db, 'feeds', token)); return s.exists() ? s.data() : null; },
     saveFeed: (token, data) => F.setDoc(F.doc(db, 'feeds', token), data, { merge: true }),
@@ -871,6 +875,8 @@ function demoApi() {
     deleteEvent: async id => { delete events[id]; later(); },
     saveNote: async (sid, t) => { notes[sid] = t; },
     saveBilling: async (sid, p) => { applyPatch(billing[sid] ??= {}, p); later(); },
+    saveBookPage: async () => {}, watchBookRequests: () => {},
+    patchBookRequest: async (t, id, p) => { Object.assign(bookRequests[id], p); later(); },
     clipAudio: async () => demoClipAudio(),
     schoolUpdate: async p => { applyPatch(school, p); later(); },
     schoolInvite: async (code, d) => { (demoStudios.invites ??= {})[code] = { ...d, id: code }; },
@@ -1018,18 +1024,24 @@ function lessonsBetween(start, end, sid) {
         const k = dayKey(d);
         if ((L.start && k < L.start) || (L.end && k > L.end)) continue;
         const id = `${s.id}_${k}`;
-        out[id] = { id, sid: s.id, date: k, time: L.time, length: L.length || 30, status: 'scheduled', ...(lessons[id] || {}) };
+        out[id] = familyCancel(s, { id, sid: s.id, date: k, time: L.time, length: L.length || 30, status: 'scheduled', ...(lessons[id] || {}) });
       }
     }
   }
   for (const l of Object.values(lessons)) {             // one-off / moved lessons
     if (!l.extra || (sid && l.sid !== sid) || !students[l.sid] || students[l.sid].archived) continue;
     const d = parseDay(l.date);
-    if (d >= start && d <= end) out[l.id] = { length: 30, status: 'scheduled', ...l };
+    if (d >= start && d <= end) out[l.id] = familyCancel(students[l.sid], { length: 30, status: 'scheduled', ...l });
   }
   return Object.values(out).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
 }
 const countsAsLesson = l => l.status !== 'moved' && l.status !== 'cancelled';
+// A family canceled this lesson in their app (and the teacher hasn't marked it otherwise)
+function familyCancel(s, l) {
+  const c = s?.familyCancels?.[l.date];
+  if (!c || (l.status && l.status !== 'scheduled')) return l;
+  return { ...l, status: c.late ? 'latecancel' : 'cancelled', byFamily: true };
+}
 
 // ---------- Router ----------
 let route = { view: 'overview' }, sub = {};
@@ -1070,6 +1082,10 @@ function vOverview() {
   const thisWeek = lessonsBetween(weekStart(t), addDays(weekStart(t), 6)).filter(countsAsLesson);
   const todays = lessonsBetween(t, t);
   const attention = [];
+  for (const q of lessonRequests()) attention.push([q.s, q.kind === 'makeup' ? 'info' : 'warn', 'calendar', q.kind === 'makeup' ? 'Makeup requested' : q.r.late ? 'Late cancel' : 'Family canceled',
+    q.kind === 'makeup' ? `${fmtDate(q.r.date)} at ${fmtTime(q.r.time)} – tap to accept or decline` : `${fmtDate(q.id)} lesson${q.r.late ? ' – within your cutoff' : ''}`, null, q.kind === 'makeup' ? `mk:${q.id}` : `fc:${q.id}`]);
+  for (const r of Object.values(bookRequests).filter(x => x.status === 'pending')) attention.unshift([{ id: '', name: r.form?.student || 'New family', color: '#888' }, 'info', 'plus',
+    r.slot ? 'Trial lesson request' : 'New sign-up', r.slot ? `${fmtDate(r.slot.date)} at ${fmtTime(r.slot.time)} · ${r.form?.parent || ''}` : r.form?.parent || '', null, `br:${r.id}`]);
   for (const s of all) { const n = newClips(s.id).length; if (n) attention.push([s, 'info', 'mic', n === 1 ? 'New recording' : `${n} new recordings`, clipsOf(s.id)[0].title ? `Latest: ${clipsOf(s.id)[0].title}` : 'Listen and reply', 'assignments']); }
   for (const s of all) {
     if (leftAt(s)) { attention.push([s, 'bad', 'link', leftText(s), s.consent.removedData ? 'They also removed the practice they’d shared. Archive the student, or send a new invite.' : 'Archive the student if they’ve moved on, or send a new invite.']); continue; }
@@ -1101,8 +1117,8 @@ function vOverview() {
       <section class="card"><h2>Today’s lessons <button class="ghost small" data-go2="schedule">Schedule ${icon('chev', 'sm')}</button></h2>
         <div class="list">${todays.length ? todays.map(lessonRow).join('') : '<div class="empty">No lessons today.</div>'}</div></section>
       <section class="card"><h2>Needs attention</h2>
-        <div class="list">${attention.length ? attention.slice(0, 7).map(([s, kind, ic, t1, t2, stab]) => `
-          <button class="rowLink" data-student="${s.id}" ${stab ? `data-stab="${stab}"` : ''} style="--kid:${s.color}">
+        <div class="list">${attention.length ? attention.slice(0, 9).map(([s, kind, ic, t1, t2, stab, req]) => `
+          <button class="rowLink" ${req ? `data-req="${req}" data-reqsid="${s.id}"` : `data-student="${s.id}"`} ${stab ? `data-stab="${stab}"` : ''} style="--kid:${s.color}">
             <div class="avatar sm">${face(s)}</div>
             <div class="grow"><div class="t">${esc(s.name)} <span class="chip ${kind}">${icon(ic)}${t1}</span></div><div class="d">${esc(t2)}</div></div>
           </button>`).join('') : '<div class="empty">Everyone is on track. Nice.</div>'}</div></section>
@@ -1630,7 +1646,7 @@ function vSchedule() {
   const total = list.filter(countsAsLesson);
   return `
   <div class="pageHead"><div><div class="eyebrow">${total.length} lessons · ${mins(total.reduce((a, l) => a + l.length * 60000, 0))} teaching</div><h1>Schedule</h1></div>
-    <div class="actions"><button class="secondary" data-act="calendar">${icon('calendar', 'sm')}Add to calendar</button><button class="accent" data-act="addLesson">${icon('plus', 'sm')}Add lesson</button></div></div>
+    <div class="actions"><button class="secondary" data-act="booking">${icon('calendar', 'sm')}Booking${studio.booking?.on ? ' · on' : ''}</button><button class="secondary" data-act="calendar">${icon('calendar', 'sm')}Add to calendar</button><button class="accent" data-act="addLesson">${icon('plus', 'sm')}Add lesson</button></div></div>
   <div class="card">
     <div class="rowBetween" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
       <div class="weekNav"><button class="secondary icon" data-week="-7" aria-label="Previous week">${icon('back')}</button>
@@ -1772,6 +1788,7 @@ function ledger(sid) {
   const B = studio?.billing, b = billing[sid] || {};
   if (!B?.since) return { entries: [], balance: 0 };
   const { rate, per } = billRate(sid), out = [];
+  let packLeft = 0;
   if (b.opening) out.push({ date: B.since, kind: 'open', text: 'Balance carried over', amount: +b.opening });
   const hasLessons = (a, b) => lessonsBetween(a, b, sid).some(countsAsLesson);
   if (per === 'month') {
@@ -1785,18 +1802,27 @@ function ledger(sid) {
       if (T.start > dayKey() || T.end < B.since || !hasLessons(parseDay(T.start), parseDay(T.end))) continue;
       out.push({ date: [T.start, B.since].sort().at(-1), kind: 'tuition', id: 't' + T.id, text: `${T.name} tuition`, amount: rate });
     }
-  } else for (const l of lessonsBetween(parseDay(B.since), today(), sid)) {
-    if (!countsAsLesson(l) || !lessonPast(l) || (l.status === 'noshow' && !B.noshow)) continue;
-    const amount = per === 'hour' ? rate * (l.length || 30) / 60 : rate;
-    out.push({ date: l.date, kind: 'lesson', id: l.id, text: `${l.status === 'noshow' ? 'No-show' : 'Lesson'} · ${l.length || 30} min`, amount });
+  } else {
+    // prepaid packages: each lesson uses a credit from the oldest package bought on or before it
+    const packs = Object.entries(b.packages || {}).map(([id, p]) => ({ id, date: p.date, left: +p.lessons || 0 })).sort((x, y) => x.date.localeCompare(y.date));
+    for (const l of lessonsBetween(parseDay(B.since), today(), sid)) {
+      if (!countsAsLesson(l) || !lessonPast(l) || (l.status === 'noshow' && !B.noshow) || (l.status === 'latecancel' && !policy().chargeLate)) continue;
+      const word = l.status === 'noshow' ? 'No-show' : l.status === 'latecancel' ? 'Late cancel' : l.makeup ? 'Makeup lesson' : 'Lesson';
+      const p = packs.find(x => x.date <= l.date && x.left > 0);
+      if (p) { p.left--; out.push({ date: l.date, kind: 'lesson', id: l.id, text: `${word} · ${l.length || 30} min · from package (${packs.reduce((a, x) => a + x.left, 0)} left)`, amount: 0 }); continue; }
+      const amount = per === 'hour' ? rate * (l.length || 30) / 60 : rate;
+      out.push({ date: l.date, kind: 'lesson', id: l.id, text: `${word} · ${l.length || 30} min`, amount });
+    }
+    packLeft = packs.reduce((a, x) => a + x.left, 0);
   }
+  for (const [id, p] of Object.entries(b.packages || {})) out.push({ date: p.date, kind: 'package', id, text: `Package · ${p.lessons} lessons${p.note ? ' · ' + p.note : ''}`, amount: +p.price || 0 });
   for (const [id, a] of Object.entries(b.adjustments || {})) out.push({ date: a.date, kind: a.late ? 'lateAdj' : 'adj', id, text: a.note || (a.late ? 'Late fee' : a.amount < 0 ? 'Credit' : 'Charge'), amount: +a.amount });
   for (const [id, p] of Object.entries(b.payments || {})) out.push({ date: p.date, kind: 'pay', id, text: `Payment${p.method ? ' · ' + p.method : ''}${p.note ? ' · ' + p.note : ''}`, amount: -p.amount });
   out.push(...lateFees(out, b));
   const waived = out.filter(e => e.waived), live = out.filter(e => !e.waived);
   live.sort((x, y) => x.date.localeCompare(y.date) || (x.kind === 'pay') - (y.kind === 'pay'));
   let run = 0; for (const e of live) e.balance = run = Math.round((run + e.amount) * 100) / 100;
-  return { entries: live, balance: run, waived };
+  return { entries: live, balance: run, waived, packLeft };
 }
 function vBilling() {
   if (billLocked()) return vBillingLocked();
@@ -1911,7 +1937,7 @@ const billShareOn = sid => { const B = studio?.billing; return !!B?.since && (B.
 function billShareFor(sid) {
   const B = studio.billing, { items, balance } = openItems(sid), L = ledger(sid);
   return { asOf: dayKey(), currency: B.currency || 'USD', balance, share: !!B.share, payLink: B.payLink || '', payNote: B.payNote || '', pastDue: billing[sid]?.pastDue || null,
-           items: items.slice(-20), upcoming: upcomingCharges(sid), recent: L.entries.slice(-6).reverse().map(e => ({ date: e.date, text: e.text, amount: e.amount })) };
+           items: items.slice(-20), upcoming: upcomingCharges(sid), packLeft: L.packLeft || 0, recent: L.entries.slice(-6).reverse().map(e => ({ date: e.date, text: e.text, amount: e.amount })) };
 }
 const lastShare = {};
 function publishBilling() {
@@ -1981,6 +2007,26 @@ function reminderModal() {
     };
   });
 }
+// A prepaid package (e.g. 10 lessons for $350): charged once; lessons after it use its credits instead of the lesson price
+function packageModal(sid, pid) {
+  const s = students[sid], p = pid ? billing[sid]?.packages?.[pid] : null, back = () => billDetailModal(sid);
+  openModal(`${mhead((p ? 'Edit package · ' : 'Lesson package · ') + esc(firstName(s.name)))}
+    <div class="fields"><div class="fields three"><label class="field">Lessons <input type="number" id="pkN" min="1" max="100" value="${p?.lessons || 10}"></label>
+        <label class="field">Price <input type="number" id="pkPrice" min="0" step="0.01" value="${p?.price ?? ''}" placeholder="e.g. 350"></label>
+        <label class="field">Starts <input type="date" id="pkDate" value="${p?.date || dayKey()}"></label></div>
+      <label class="field">Note (optional) <input type="text" id="pkNote" maxlength="60" value="${esc(p?.note || '')}" placeholder="e.g. Fall package"></label>
+      <p class="small muted" style="margin:0">The price is charged once. Lessons from the start date use the package first; after that, your usual price applies.</p>
+      <div class="gateErr" id="pkErr"></div></div>
+    <footer>${p ? `<button class="danger" id="pkDel">${icon('trash', 'sm')}Delete</button>` : ''}<div class="right"><button class="secondary" id="pkCancel">Cancel</button><button class="primary" id="pkSave">Save</button></div></footer>`, m => {
+    m.querySelector('#pkCancel').onclick = back;
+    m.querySelector('#pkSave').onclick = async () => {
+      if (!(+val('pkN') >= 1) || val('pkPrice') === '') return (m.querySelector('#pkErr').textContent = 'Enter the number of lessons and the price.');
+      await api.saveBilling(sid, { [`packages.${pid || newId()}`]: { lessons: Math.round(+val('pkN')), price: Math.round(+val('pkPrice') * 100) / 100, date: val('pkDate') || dayKey(), note: val('pkNote') } });
+      back(); toast('Package saved');
+    };
+    m.querySelector('#pkDel')?.addEventListener('click', async () => { if (confirm('Delete this package?')) { await api.saveBilling(sid, { [`packages.${pid}`]: DEL }); back(); } });
+  });
+}
 function adjustmentModal(sid, aid, preset) {
   const s = students[sid], a = aid ? billing[sid]?.adjustments?.[aid] : null, late = a ? !!a.late : preset === 'late', LF = studio.billing?.late;
   const back = () => billDetailModal(sid);
@@ -2035,7 +2081,8 @@ function billDetailModal(sid) {
           return `<div class="banner" style="margin:0">${icon('alert')}<div class="grow small">${marked.length === over.length ? `Marked past due ${fmtDate(addDays(parseDay(b.pastDue), -1), { month: 'short', day: 'numeric' })} – overdue notices are going out.`
             : `${money(over.reduce((a, i) => a + i.open, 0))} is overdue. No notices go out until you mark it.`}</div>
             ${marked.length === over.length ? '<button class="ghost small" id="dUnmark">Stop notices</button>' : '<button class="accent small" id="dMark">Mark past due</button>'}</div>`; })()}
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="accent small" id="dPay">${icon('plus', 'sm')}Record payment</button><button class="secondary small" id="dAdj">Add a charge or credit</button><button class="secondary small" id="dLate">Add a late fee</button>
+      ${L.packLeft ? `<p class="small" style="margin:0"><b>${L.packLeft} ${L.packLeft === 1 ? 'lesson' : 'lessons'} left</b> in prepaid packages.</p>` : ''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="accent small" id="dPay">${icon('plus', 'sm')}Record payment</button><button class="secondary small" id="dAdj">Add a charge or credit</button><button class="secondary small" id="dLate">Add a late fee</button><button class="secondary small" id="dPack">Add a lesson package</button>
         <button class="secondary small" id="dStmt">${icon('copy', 'sm')}Statement for the family</button><button class="ghost small" id="dPrice">Price and opening balance</button></div>
       <div class="billPanel" id="dPanel" hidden></div>
       <div class="tableWrap" style="max-height:340px;overflow:auto"><table class="impTable ledgerTable"><thead><tr><th>Date</th><th>What</th><th style="text-align:right">Amount</th><th style="text-align:right">Balance</th><th></th></tr></thead><tbody>
@@ -2045,6 +2092,7 @@ function billDetailModal(sid) {
           <td class="rowActs">${e.kind === 'pay' ? `<button class="ghost small" data-editpay="${e.id}">${icon('edit', 'sm')}Edit</button>`
             : e.kind === 'adj' || e.kind === 'lateAdj' ? `<button class="ghost small" data-editadj="${e.id}">${icon('edit', 'sm')}Edit</button>`
             : e.kind === 'late' ? `<button class="ghost small" data-waive="${e.id}">Waive</button>`
+            : e.kind === 'package' ? `<button class="ghost small" data-editpack="${e.id}">${icon('edit', 'sm')}Edit</button>`
             : e.kind === 'open' ? `<button class="ghost small" data-editopen>${icon('edit', 'sm')}Edit</button>` : ''}</td></tr>`).join('')
           : '<tr><td colspan="5" class="muted">No lessons or payments yet.</td></tr>'}</tbody></table></div>
       ${L.waived?.length ? `<p class="small muted" style="margin:0">Waived: ${L.waived.map(e => `${esc(e.text)} (${money(e.amount)}) <button class="linkBtn" data-unwaive="${e.id}" style="font-weight:600">Put back</button>`).join(' · ')}</p>` : ''}
@@ -2059,6 +2107,8 @@ function billDetailModal(sid) {
     m.querySelectorAll('[data-editadj]').forEach(x => x.onclick = () => adjustmentModal(sid, x.dataset.editadj));
     m.querySelector('#dAdj').onclick = () => adjustmentModal(sid);
     m.querySelector('#dLate').onclick = () => adjustmentModal(sid, null, 'late');
+    m.querySelector('#dPack').onclick = () => packageModal(sid);
+    m.querySelectorAll('[data-editpack]').forEach(x => x.onclick = () => packageModal(sid, x.dataset.editpack));
     m.querySelectorAll('[data-waive]').forEach(x => x.onclick = async () => { await api.saveBilling(sid, { [`waived.${x.dataset.waive}`]: true }); back(); toast('Late fee waived'); });
     m.querySelectorAll('[data-unwaive]').forEach(x => x.onclick = async () => { await api.saveBilling(sid, { [`waived.${x.dataset.unwaive}`]: DEL }); back(); });
     m.querySelector('[data-editopen]')?.addEventListener('click', () => m.querySelector('#dPrice').click());
@@ -2069,7 +2119,7 @@ function billDetailModal(sid) {
           <label class="field">Per <select id="rPer"><option value="">Studio setting (${perWord(B.per)})</option>${perOptions(b.per)}</select></label>
           <label class="field">Owed before ${fmtDate(B.since, { month: 'short', day: 'numeric' })} <input type="number" id="rOpen" step="0.01" value="${b.opening || ''}" placeholder="0"></label></div>
         <p class="small muted" style="margin:0">Leave the price empty to use the studio price. A negative opening balance is a credit.</p>
-        <label class="field">Billing emails (for reminders) <input type="text" id="rEmails" maxlength="200" value="${esc(b.emails || '')}" placeholder="parent@example.com, other@example.com"></label>
+        <label class="field">Family emails (lesson and payment reminders) <input type="text" id="rEmails" maxlength="200" value="${esc(b.emails || '')}" placeholder="parent@example.com, other@example.com"></label>
         <label class="small" style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" id="rHide" style="width:auto" ${b.hidden ? 'checked' : ''}><span>Don’t show ${esc(firstName(s.name))}’s family their balance or send them reminders</span></label>
         <div style="display:flex;gap:8px;justify-content:flex-end"><button class="primary small" id="rSave">Save</button></div>`);
       panel.querySelector('#rSave').onclick = async () => {
@@ -2095,12 +2145,180 @@ function billingCsv() {
   const q = v => /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v);
   const rows = [['Date', 'Student', 'Type', 'Description', 'Amount', 'Balance', 'Currency']];
   for (const s of active()) for (const e of ledger(s.id).entries)
-    rows.push([e.date, s.name, { open: 'Opening balance', lesson: 'Lesson', tuition: 'Tuition', late: 'Late fee', lateAdj: 'Late fee', adj: e.amount < 0 ? 'Credit' : 'Charge', pay: 'Payment' }[e.kind], e.text, e.amount.toFixed(2), e.balance.toFixed(2), studio.billing?.currency || 'USD']);
+    rows.push([e.date, s.name, { open: 'Opening balance', lesson: 'Lesson', tuition: 'Tuition', late: 'Late fee', lateAdj: 'Late fee', package: 'Package', adj: e.amount < 0 ? 'Credit' : 'Charge', pay: 'Payment' }[e.kind], e.text, e.amount.toFixed(2), e.balance.toFixed(2), studio.billing?.currency || 'USD']);
   const blob = new Blob([rows.map(r => r.map(q).join(',')).join('\r\n')], { type: 'text/csv' }), a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = `allegrow-billing-${dayKey()}.csv`; document.body.append(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 
+// ============================================================================================
+// Studio policies, family cancellations, makeups and booking
+// studio.policy = { cutoff (hours), makeups, makeupDays, teacherCredit, chargeLate, text } – copied onto each student record
+// (students/{sid}.policy) so the family app can follow it. A family cancels in their app: students/{sid}.familyCancels[date]
+// = { at, late }. On time → the lesson counts as canceled and earns a makeup credit; late → it's a "late cancel" (charged
+// unless the policy says otherwise). A family with a credit asks for a makeup (students/{sid}.makeupRequests[id]); new
+// families ask for a trial lesson or sign up on the public booking page (bookpages/{token}/requests). The teacher accepts or
+// declines each from Needs attention.
+// ============================================================================================
+const POLICY_DEFAULT = { cutoff: 24, makeups: true, makeupDays: 60, teacherCredit: true, chargeLate: true, text: '' };
+const policy = () => ({ ...POLICY_DEFAULT, ...(studio?.policy || {}) });
+function makeupCredits(s, P = s.policy ? { ...POLICY_DEFAULT, ...s.policy } : policy()) {
+  if (!P.makeups) return { earned: 0, used: 0, left: 0 };
+  const since = dayKey(addDays(today(), -P.makeupDays));
+  const earned = Object.entries(s.familyCancels || {}).filter(([d, c]) => !c.late && d >= since).length
+    + (P.teacherCredit ? Object.entries(s.lessonChanges || {}).filter(([d, c]) => c.status === 'cancelled' && !c.byFamily && !s.familyCancels?.[d] && d >= since).length : 0);
+  const used = Object.values(s.makeupRequests || {}).filter(r => r.status !== 'declined' && String(r.at).slice(0, 10) >= since).length;
+  return { earned, used, left: Math.max(0, earned - used) };
+}
+function policyModal() {
+  const P = policy();
+  openModal(`${mhead('Lesson policies')}
+    <div class="fields">
+      <div class="fields three">
+        <label class="field">Families can cancel up to <select id="poCut">${[[0, 'any time before'], [12, '12 hours before'], [24, '24 hours before'], [48, '48 hours before']].map(([v, l]) => `<option value="${v}" ${P.cutoff === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+        <label class="field">Later than that ${`<select id="poLate"><option value="1" ${P.chargeLate ? 'selected' : ''}>counts as a late cancel (charged)</option><option value="0" ${!P.chargeLate ? 'selected' : ''}>is still canceled (not charged)</option></select>`}</label>
+        <label class="field">Makeup credits <select id="poMk"><option value="1" ${P.makeups ? 'selected' : ''}>for on-time cancels</option><option value="0" ${!P.makeups ? 'selected' : ''}>none</option></select></label></div>
+      <div class="fields two">
+        <label class="field">Credits can be used for <select id="poDays">${[[30, '30 days'], [60, '60 days'], [90, '90 days'], [180, '6 months']].map(([v, l]) => `<option value="${v}" ${P.makeupDays === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+        <label class="field">When you cancel <select id="poTc"><option value="1" ${P.teacherCredit ? 'selected' : ''}>the family gets a makeup credit</option><option value="0" ${!P.teacherCredit ? 'selected' : ''}>no credit</option></select></label></div>
+      <label class="field">Lesson reminders to families <select id="poRem">${[['', 'Don’t send'], ['evening', 'The evening before (6 pm)'], ['morning', 'The morning of (8 am)']].map(([v, l]) => `<option value="${v}" ${(studio.lessonRemind || '') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+      <p class="small muted" style="margin:-6px 0 0">Emailed to the family emails in each student’s billing details (${active().filter(x => billEmails(x.id).length).length} of ${active().length} students have one).</p>
+      <label class="field">Your studio policies (families agree to these when they connect or book) <textarea id="poText" rows="5" maxlength="3000" placeholder="e.g. Lessons are billed monthly. Please cancel at least 24 hours ahead to receive a makeup lesson…">${esc(P.text)}</textarea></label>
+      <p class="small muted" style="margin:0">Families cancel from their app. A makeup is booked from your open times (Schedule → Booking).</p>
+    </div>
+    <footer><div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="poSave">Save</button></div></footer>`, m => {
+    m.querySelector('#poSave').onclick = async () => {
+      studio.policy = { cutoff: +val('poCut'), chargeLate: val('poLate') === '1', makeups: val('poMk') === '1', makeupDays: +val('poDays'), teacherCredit: val('poTc') === '1', text: val('poText') };
+      studio.lessonRemind = val('poRem') || null;
+      await api.updateStudio({ policy: studio.policy, lessonRemind: studio.lessonRemind });
+      if (studio.lessonRemind && !DEMO) await ensureFeed({ brief: false, digest: false });
+      lastFeedSync = ''; syncFeed();
+      await syncStudentPolicy();
+      closeModal(); toast('Policies saved'); render();
+    };
+  });
+}
+// What families need to follow the policy and book makeups: the policy and the booking page's key
+async function syncStudentPolicy(list = active()) {
+  const want = { policy: policy(), bookToken: studio.booking?.on ? studio.bookToken || null : null };
+  await Promise.all(list.map(s => JSON.stringify({ policy: s.policy, bookToken: s.bookToken ?? null }) === JSON.stringify(want) ? null : api.patchStudent(s.id, want)));
+}
+// Family cancellations and makeup requests that need the teacher (Needs attention)
+function lessonRequests() {
+  const out = [];
+  for (const s of active()) {
+    for (const [id, r] of Object.entries(s.makeupRequests || {})) if (r.status === 'pending') out.push({ s, kind: 'makeup', id, r });
+    for (const [d, c] of Object.entries(s.familyCancels || {})) if (!c.seen && d >= dayKey(addDays(today(), -7))) out.push({ s, kind: 'cancel', id: d, r: c });
+  }
+  return out;
+}
+function makeupModal(sid, rid) {
+  const s = students[sid], r = s.makeupRequests[rid], cr = makeupCredits(s);
+  const clash = lessonsBetween(parseDay(r.date), parseDay(r.date)).filter(countsAsLesson).find(l => overlap(l.time, l.length, r.time, r.length));
+  openModal(`${mhead('Makeup request · ' + esc(s.name))}
+    <div class="fields"><p style="margin:0"><b>${fmtDate(r.date, { weekday: 'long', month: 'long', day: 'numeric' })} at ${fmtTime(r.time)}</b> · ${r.length} min</p>
+      <p class="small muted" style="margin:0">${cr.earned} makeup ${cr.earned === 1 ? 'credit' : 'credits'} earned in the last ${policy().makeupDays} days${r.note ? ` · “${esc(r.note)}”` : ''}</p>
+      ${clash ? `<div class="banner">${icon('alert')}<div class="grow small">That time now overlaps ${esc(students[clash.sid]?.name || 'another lesson')} at ${fmtTime(clash.time)}.</div></div>` : ''}</div>
+    <footer><button class="danger" id="mkNo">Decline</button><div class="right"><button class="secondary" data-close>Later</button><button class="primary" id="mkYes">Accept</button></div></footer>`, m => {
+    m.querySelector('#mkYes').onclick = async () => {
+      await api.saveLesson(`${sid}_${r.date}`, { sid, date: r.date, time: r.time, length: r.length, status: 'scheduled', extra: true, makeup: true });
+      await mirrorLesson(sid, r.date, { status: 'extra', time: r.time, makeup: true });
+      await api.patchStudent(sid, { [`makeupRequests.${rid}.status`]: 'accepted' });
+      closeModal(); toast('Makeup booked – the family sees it in their app');
+    };
+    m.querySelector('#mkNo').onclick = async () => { await api.patchStudent(sid, { [`makeupRequests.${rid}.status`]: 'declined' }); closeModal(); toast('Declined – their credit is back'); };
+  });
+}
+const overlap = (t1, l1, t2, l2) => { const a = toMinutes(t1), b = toMinutes(t2); return a < b + l2 && b < a + l1; };
+const toMinutes = t => { const [h, m] = String(t || '0:0').split(':').map(Number); return h * 60 + m; };
+
+// ---- booking: your open times, published for trial lessons and makeups ----
+// studio.booking = { on, open: {dow: [{from, to}]}, length, days, trials, message }; studio.bookToken = the page's key
+function freeSlots(days = studio.booking?.days || 21, length = studio.booking?.length || 30) {
+  const B = studio.booking, out = []; if (!B?.on) return out;
+  const pendingReq = [...active().flatMap(s => Object.values(s.makeupRequests || {}).filter(r => r.status === 'pending')), ...Object.values(bookRequests).filter(r => r.status === 'pending' && r.slot).map(r => r.slot)];
+  for (let i = 1; i <= days; i++) {
+    const d = addDays(today(), i), k = dayKey(d), ranges = B.open?.[d.getDay()] || [];
+    if (!ranges.length) continue;
+    const busy = lessonsBetween(d, d).filter(countsAsLesson).map(l => [l.time, l.length]).concat(pendingReq.filter(r => r.date === k).map(r => [r.time, r.length]));
+    for (const { from, to } of ranges) for (let t = toMinutes(from); t + length <= toMinutes(to); t += length) {
+      const time = `${pad(Math.floor(t / 60))}:${pad(t % 60)}`;
+      if (!busy.some(([bt, bl]) => overlap(bt, bl, time, length))) out.push({ date: k, time, length });
+    }
+  }
+  return out.slice(0, 300);
+}
+let bookRequests = {}, lastBookSig = '', bookWatching = null;
+// requests from your booking page (only for your own studio)
+function watchBooking() {
+  if (DEMO || !myStudio() || !studio.bookToken || bookWatching === studio.bookToken) return;
+  bookWatching = studio.bookToken;
+  api.watchBookRequests(studio.bookToken, o => { bookRequests = o; render(); });
+}
+function publishBooking() {
+  if (DEMO || !myStudio() || !studio.bookToken) return;
+  const B = studio.booking || {};
+  const page = { studioId: me.uid, studioName: studio.studioName, teacherName: studio.teacherName, tz: TZ, open: !!B.on, trials: B.trials !== false,
+                 message: B.message || '', policy: policy().text || '', slots: B.on ? freeSlots() : [] };
+  const sig = JSON.stringify(page); if (sig === lastBookSig) return;
+  lastBookSig = sig; api.saveBookPage(studio.bookToken, { ...page, updated: new Date().toISOString() });
+}
+const bookUrl = () => `${location.origin}${location.pathname.replace(/[^/]*$/, '')}book?t=${studio.bookToken}`;
+function bookingModal() {
+  const B = { length: 30, days: 21, trials: true, open: {}, ...(studio.booking || {}) };
+  const ranges = d => (B.open[d] || []).map(r => `${r.from}-${r.to}`).join(', ');
+  openModal(`${mhead('Booking: your open times')}
+    <div class="fields"><label class="small" style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" id="bkOn" style="width:auto" ${B.on ? 'checked' : ''}><span>Let families book makeups, and new families ask for a trial lesson</span></label>
+      <div class="field">Open times <span class="small muted" style="font-weight:500">e.g. 15:00-19:00, or 9:00-12:00, 14:00-17:00</span></div>
+      <div class="bkDays">${[1, 2, 3, 4, 5, 6, 0].map(d => `<label class="field" style="flex-direction:row;align-items:center;gap:10px"><span style="width:44px">${DAYS[d].slice(0, 3)}</span><input type="text" data-bkd="${d}" value="${ranges(d)}" placeholder="Closed"></label>`).join('')}</div>
+      <div class="fields three"><label class="field">Lesson length <select id="bkLen">${[30, 45, 60].map(v => `<option ${B.length === v ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+        <label class="field">Book up to <select id="bkDaysAhead">${[[7, '1 week'], [14, '2 weeks'], [21, '3 weeks'], [28, '4 weeks']].map(([v, l]) => `<option value="${v}" ${B.days === v ? 'selected' : ''}>${l}</option>`).join('')} ahead</select></label>
+        <label class="field">Trial lessons <select id="bkTrial"><option value="1" ${B.trials ? 'selected' : ''}>offered</option><option value="0" ${!B.trials ? 'selected' : ''}>not offered</option></select></label></div>
+      <label class="field">Message on your booking page (optional) <textarea id="bkMsg" rows="2" maxlength="600">${esc(B.message || '')}</textarea></label>
+      <p class="small muted" style="margin:0">Only times with no lesson are offered. You accept or decline each request.</p>
+      ${studio.bookToken && B.on ? `<div class="field">Your booking page<div class="codeBox" style="font-size:13px">${esc(bookUrl())}</div><button class="secondary small" id="bkCopy" style="justify-self:start">${icon('copy', 'sm')}Copy link</button></div>` : ''}
+      <div class="gateErr" id="bkErr"></div></div>
+    <footer><div class="right"><button class="secondary" data-close>Cancel</button><button class="primary" id="bkSave">Save</button></div></footer>`, m => {
+    m.querySelector('#bkCopy')?.addEventListener('click', async () => { try { await navigator.clipboard.writeText(bookUrl()); toast('Link copied'); } catch { prompt('Copy this link:', bookUrl()); } });
+    m.querySelector('#bkSave').onclick = async () => {
+      const open = {}; let bad = false;
+      m.querySelectorAll('[data-bkd]').forEach(i => {
+        const parts = i.value.split(',').map(x => x.trim()).filter(Boolean).map(x => x.match(/^(\d{1,2})(?::(\d\d))?\s*-\s*(\d{1,2})(?::(\d\d))?$/));
+        if (parts.some(p => !p)) bad = true;
+        const list = parts.filter(Boolean).map(p => ({ from: `${pad(+p[1])}:${p[2] || '00'}`, to: `${pad(+p[3])}:${p[4] || '00'}` })).filter(r => r.from < r.to);
+        if (list.length) open[i.dataset.bkd] = list;
+      });
+      if (bad) return (m.querySelector('#bkErr').textContent = 'Write times like 15:00-19:00 (24-hour), separated by commas.');
+      studio.booking = { on: m.querySelector('#bkOn').checked, open, length: +val('bkLen'), days: +val('bkDaysAhead'), trials: val('bkTrial') === '1', message: val('bkMsg') };
+      const patch = { booking: studio.booking };
+      if (!studio.bookToken) { studio.bookToken = randomCode(); patch.bookToken = studio.bookToken; }
+      await api.updateStudio(patch);
+      lastBookSig = ''; publishBooking(); watchBooking(); await syncStudentPolicy();
+      closeModal(); toast(studio.booking.on ? 'Booking is on' : 'Saved'); if (studio.booking.on) bookingModal();
+    };
+  });
+}
+// A trial lesson or sign-up request from the booking page
+function bookRequestModal(rid) {
+  const r = bookRequests[rid], f = r.form || {};
+  openModal(`${mhead((r.slot ? 'Trial lesson request' : 'New family sign-up') + ' · ' + esc(f.student || ''))}
+    <div class="fields">${r.slot ? `<p style="margin:0"><b>${fmtDate(r.slot.date, { weekday: 'long', month: 'long', day: 'numeric' })} at ${fmtTime(r.slot.time)}</b> · ${r.slot.length} min</p>` : ''}
+      <div class="small" style="line-height:1.7">${[['Student', f.student], ['Age', f.age], ['Instrument', f.instrument], ['Experience', f.experience], ['Parent', f.parent], ['Email', f.email], ['Phone', f.phone], ['Notes', f.notes]]
+        .filter(([, v]) => v).map(([k, v]) => `<b>${k}:</b> ${esc(v)}`).join('<br>')}</div>
+      ${r.agreed ? `<p class="small muted" style="margin:0">${icon('check', 'sm')} Agreed to your studio policies ${fmtDate(dayKey(new Date(r.at)), { month: 'short', day: 'numeric' })}</p>` : ''}</div>
+    <footer><button class="danger" id="brNo">Decline</button><div class="right"><button class="secondary" data-close>Later</button><button class="primary" id="brYes">${r.slot ? 'Accept and add student' : 'Add as a student'}</button></div></footer>`, m => {
+    m.querySelector('#brNo').onclick = async () => { await api.patchBookRequest(studio.bookToken, rid, { status: 'declined' }); closeModal(); toast('Declined'); };
+    m.querySelector('#brYes').onclick = async () => {
+      if (!canAddStudent()) return betaCodeModal(`The free plan includes ${FREE_STUDENTS} students.`);
+      const sid = randomCode();
+      await api.createStudent(sid, newStudentRecord({ name: f.student || 'New student', instrument: instrumentFrom(f.instrument || '') || '', color: COLORS[active().length % COLORS.length], plan: planOf(null, studio.defaultMinutes || 20) }));
+      await api.saveBilling(sid, { emails: f.email || '' });
+      if (r.slot) { await api.saveLesson(`${sid}_${r.slot.date}`, { sid, date: r.slot.date, time: r.slot.time, length: r.slot.length, status: 'scheduled', extra: true, trial: true }); await mirrorLesson(sid, r.slot.date, { status: 'extra', time: r.slot.time }); }
+      await api.patchBookRequest(studio.bookToken, rid, { status: 'accepted', sid });
+      closeModal(); toast('Student added'); go('student', { id: sid }); setTimeout(() => inviteModal(sid), 500);
+    };
+  });
+}
 // ============================================================================================
 // Music school: an admin (who can also teach) runs up to 25 teachers. Each teacher has their own studio as usual;
 // the school record lists them, whether the school or the teacher handles their billing, and who was revoked.
@@ -2173,7 +2391,8 @@ async function switchStudio(uid) {
   students = {}; lessons = {}; events = {}; notes = {}; billing = {}; clips = {};
   const target = uid === me.uid ? ownStudio : await api.getStudio(uid).catch(() => null);
   if (!target) return toast('Couldn’t open that studio');
-  SU = uid; studio = target;
+  SU = uid; studio = target; bookWatching = null; bookRequests = {};
+  if (uid === me.uid) setTimeout(watchBooking, 0);
   let t; api.watch(() => { render(); clearTimeout(t); t = setTimeout(() => { syncFeed(); publishBilling(); }, 1500); });
   sub = {}; location.hash = '#/overview'; render();
 }
@@ -2445,6 +2664,12 @@ function bindView() {
   V.querySelectorAll('[data-lesson]').forEach(b => b.onclick = () => lessonModal(b.dataset.lesson));
   V.querySelectorAll('[data-pedit]').forEach(b => b.onclick = () => practiceEditModal(route.id, b.dataset.pedit));
   V.querySelectorAll('[data-bill]').forEach(b => b.onclick = () => billDetailModal(b.dataset.bill));
+  V.querySelectorAll('[data-req]').forEach(b => b.onclick = () => {
+    const [k, id] = b.dataset.req.split(/:(.*)/s), sid = b.dataset.reqsid;
+    if (k === 'mk') makeupModal(sid, id);
+    else if (k === 'br') bookRequestModal(id);
+    else { api.patchStudent(sid, { [`familyCancels.${id}.seen`]: true }); sub = { tab: 'lessons' }; go('student', { id: sid }); }
+  });
   // music school
   V.querySelectorAll('[data-schooltab]').forEach(b => b.onclick = () => { sub.stab = b.dataset.schooltab; render(); });
   V.querySelectorAll('[data-openstudio]').forEach(b => b.onclick = () => switchStudio(b.dataset.openstudio));
@@ -2489,7 +2714,7 @@ function bindView() {
     addStudent: () => canAddStudent() ? studentModal() : betaCodeModal(`The free plan includes ${FREE_STUDENTS} students.`), editStudent: () => studentModal(route.id), invite: () => inviteModal(route.id),
     report: () => { sub = { sid: route.id }; go('reports'); }, addAssign: () => assignModal(route.id),
     addLesson: () => extraLessonModal(route.view === 'student' ? route.id : null),
-    calendar: () => calendarEmailModal(),
+    calendar: () => calendarEmailModal(), booking: () => bookingModal(),
     billSetup: () => billSetupModal(), billExport: () => billingCsv(), billRemind: () => reminderModal(),
     schoolRefresh: () => loadSchoolData(true), schoolInvite: () => teacherInviteModal(), schoolEvent: () => schoolEventModal(), schoolTask: () => schoolTaskModal(),
     addEvent: () => eventModal(null, route.view === 'student' ? route.id : null),
@@ -2654,7 +2879,7 @@ function studentModal(sid, scrollTo) {
 function newStudentRecord(data) {
   return { ...data, insights: insightsFor(studio.insights, data.insightOverride), tz: TZ, studioId: SU || me.uid, ...(studio.school ? { schoolId: studio.school } : {}), studioName: studio.studioName, teacherName: studio.teacherName,
     assignments: {}, upcoming: {}, lessonChanges: {}, cheers: {}, challenges: {}, badgeRules: studio.badgeRules || {}, badgeSet: studio.badgeSet || null,
-    created: dayKey(), archived: false };
+    created: dayKey(), archived: false, policy: policy(), bookToken: studio.booking?.on ? studio.bookToken || null : null };
 }
 // The family app lives next to the studio: …/studio → …/app
 function inviteLink(sid) { return location.origin + location.pathname.replace(/[^/]*$/, '') + 'app#link=' + sid; }
@@ -2899,6 +3124,8 @@ function studioModal() {
       <label class="field">Your name, as students know you <input type="text" id="sTeacher" value="${esc(studio.teacherName)}" maxlength="60"></label>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="secondary" id="sCal" type="button">${icon('calendar', 'sm')}Calendar &amp; email</button>
         <button class="secondary" id="sTerms" type="button">${icon('calendar', 'sm')}Terms</button>
+        <button class="secondary" id="sPolicy" type="button">${icon('flag', 'sm')}Lesson policies</button>
+        <button class="secondary" id="sBooking" type="button">${icon('calendar', 'sm')}Booking</button>
         <button class="secondary" id="sBadges" type="button">${icon('award', 'sm')}Studio badges</button>
         <button class="secondary" id="sInsights" type="button">${icon('tune', 'sm')}Practice insights</button></div>
       ${myStudio() ? `<div class="planBox" style="display:grid;margin-top:0">${school ? `<div><b>${esc(school.name)}</b> · ${isSchoolAdmin() ? `you’re the admin · ${activeTeachers().length} of ${SCHOOL_MAX} teachers` : 'you teach here'}</div>`
@@ -2920,6 +3147,8 @@ function studioModal() {
     m.querySelector('#sBadges').onclick = () => badgeRulesModal();
     m.querySelector('#sInsights').onclick = () => insightsModal();
     m.querySelector('#sTerms').onclick = () => termsModal();
+    m.querySelector('#sPolicy').onclick = () => policyModal();
+    m.querySelector('#sBooking').onclick = () => bookingModal();
     m.querySelector('#sCode')?.addEventListener('click', () => betaCodeModal());
     m.querySelector('#sSchool')?.addEventListener('click', () => createSchoolModal());
     if (!myStudio()) m.querySelector('#sCal').hidden = true;
@@ -3390,7 +3619,9 @@ function feedData(extra = {}) {
   return { studioId: me.uid, studioName: studio.studioName, teacherName: studio.teacherName, tz: TZ,
            students: active().map(s => s.id).sort(),
            bill: R ? { ...R, replyTo: me.email || '' } : null,
-           billTo: R ? Object.fromEntries(active().filter(s => billEmails(s.id).length && !billing[s.id]?.hidden).map(s => [s.id, billEmails(s.id)])) : null, ...extra };
+           billTo: R ? Object.fromEntries(active().filter(s => billEmails(s.id).length && !billing[s.id]?.hidden).map(s => [s.id, billEmails(s.id)])) : null,
+           lessonRemind: studio.lessonRemind || null,
+           famTo: studio.lessonRemind ? Object.fromEntries(active().filter(s => billEmails(s.id).length).map(s => [s.id, billEmails(s.id)])) : null, ...extra };
 }
 let lastFeedSync = '';
 function syncFeed() {
@@ -3495,8 +3726,9 @@ function enter() {
   showOnly('shell'); parseRoute();
   ownStudio = studio;
   api.isAdmin().then(a => { amAdmin = a; $('adminNav').hidden = !a; render(); });
-  let t; api.watch(() => { render(); clearTimeout(t); t = setTimeout(() => { syncFeed(); publishBilling(); }, 1500); });
-  if (DEMO) ownStudio = studio;                      // the demo builds its studio as it starts
+  let t; api.watch(() => { render(); clearTimeout(t); t = setTimeout(() => { syncFeed(); publishBilling(); publishBooking(); }, 1500); });
+  if (DEMO) ownStudio = studio;
+  watchBooking();                      // the demo builds its studio as it starts
   startSchool();
   render();
 }

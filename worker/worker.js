@@ -62,7 +62,7 @@ export default {
         return json({ ok: true, to: feed.email, subject: mail.subject });
       }
       if (path.startsWith('/parents/')) return await parentsApi(req, env, url);
-      if (path.startsWith('/bill/')) return await billApi(req, env, url);
+      if (path.startsWith('/bill/') || path.startsWith('/remind/')) return await billApi(req, env, url);
       if (env.DRY_RUN && (m = path.match(/^\/preview\/([a-z0-9-]+)\/(brief|digest)$/))) {
         const feed = await getDoc(env, `feeds/${m[1]}`);
         if (!feed) return new Response('Not found', { status: 404 });
@@ -158,6 +158,7 @@ const lessonSlots = s => (Array.isArray(s.slots) && s.slots.length ? s.slots : s
 const slotOn = (s, key) => lessonSlots(s).find(l => dow(key) === +l.day && (!l.start || key >= l.start) && (!l.end || key <= l.end)) || null;
 function lessonsOn(s, key) {
   const L = slotOn(s, key), c = s.lessonChanges?.[key], len = (L || lessonSlots(s)[0])?.length || 30;
+  if (s.familyCancels?.[key]) return [];
   if (c?.status === 'extra') return [{ time: c.time, length: len }];
   if (!L) return [];
   if (c && (c.status === 'cancelled' || c.status === 'moved')) return [];
@@ -425,6 +426,7 @@ async function processFeed(env, token) {
   if (!feed) { await env.KV.delete(`feed:${token}`); return []; }
   const tz = feed.tz || 'UTC', now = localNow(tz), out = [];
   out.push(...await runBillReminders(env, feed, now));
+  out.push(...await runLessonReminders(env, feed, now));
   if (!feed.email || (!feed.brief && !feed.digest)) return out;
   if (feed.brief) {
     const key = `sent:brief:${token}:${now.key}`;
@@ -564,8 +566,56 @@ async function runBillReminders(env, feed, now) {
   }
   return out;
 }
+// ============================================================================================
+// Lesson reminders to families (feed.lessonRemind: 'evening' = 6 pm the day before, 'morning' = 8 am the same day) to the
+// family emails the teacher added (feed.famTo). KV: sent:les:{sid}:{day}, lessonoff:{sid}:{email hash} (stopped).
+// ============================================================================================
+async function runLessonReminders(env, feed, now) {
+  const when = feed.lessonRemind, out = [];
+  if (!['evening', 'morning'].includes(when) || !feed.famTo) return out;
+  const hour = when === 'evening' ? 18 : 8;
+  if (now.minutes < hour * 60 || now.minutes >= (hour + 1) * 60) return out;
+  const day = when === 'evening' ? addKey(now.key, 1) : now.key;
+  for (const [sid, emails] of Object.entries(feed.famTo)) {
+    if (!validCode(sid) || !(feed.students || []).includes(sid)) continue;
+    const key = `sent:les:${sid}:${day}`;
+    if (await env.KV.get(key)) continue;
+    const s = await getDoc(env, `students/${sid}`);
+    if (!s || s.archived) continue;
+    const ls = lessonsOn(s, day);
+    if (!ls.length) continue;
+    await env.KV.put(key, '1', { expirationTtl: 172800 });
+    for (const to of (emails || []).slice(0, 3)) {
+      if (await env.KV.get(`lessonoff:${sid}:${await sha(to)}`)) continue;
+      try { const mail = await lessonEmail(env, feed, { ...s, id: sid }, day, ls[0], to, when); await sendBill(env, to, mail, feed.bill?.replyTo || feed.email); out.push(['lesson', mail.subject]); }
+      catch (e) { console.error('lesson', sid.slice(0, 5), e.message); }
+    }
+  }
+  return out;
+}
+async function lessonEmail(env, feed, s, day, l, to, when) {
+  const first = String(s.name || '').split(' ')[0] || 'your child', who = feed.teacherName || 'your teacher', P = { cutoff: 24, makeups: true, ...(s.policy || {}) };
+  const dayWord = when === 'evening' ? 'tomorrow' : 'today';
+  const subject = `Reminder: ${first}’s lesson ${dayWord} at ${fmtTime(l.time)}`;
+  const off = `${env.WORKER_URL || ''}/remind/unsubscribe?s=${encodeURIComponent(s.id)}&e=${encodeURIComponent(to)}&k=${await hmac(env, `lessonoff:${s.id}:${to}`)}`;
+  const body = `<p style="margin:0 0 14px;font-size:17px"><b>${esc(fmtDay(day))} at ${fmtTime(l.time)}</b> · ${l.length} min with ${esc(who)}</p>
+    <p style="margin:0;font-size:14px;color:#3d4760">Can’t make it? A parent can cancel in the AlleGrow app (Parents → Settings → Lessons)${P.cutoff ? ` at least ${P.cutoff} hours ahead` : ''}${P.makeups ? ' to get a makeup credit' : ''}.</p>`;
+  return { subject, html: parentLayout(env, `${esc(first)}’s lesson is ${dayWord}`, `A reminder from ${esc(who)}${feed.studioName && feed.studioName !== who ? ` (${esc(feed.studioName)})` : ''}.`, body,
+    `Sent for ${esc(who)} by AlleGrow. Questions? Just reply to this email. <a href="${off}" style="color:#8a8f9e">Stop lesson reminders</a>`) };
+}
 async function billApi(req, env, url) {
   const path = url.pathname;
+  if (env.DRY_RUN && path === '/remind/preview') {                 // local testing only
+    const feed = await getDoc(env, `feeds/${url.searchParams.get('token')}`), sid = url.searchParams.get('sid'), s = await getDoc(env, `students/${sid}`), day = url.searchParams.get('day');
+    const ls = lessonsOn(s, day); if (!ls.length) return new Response(`No lesson on ${day}`);
+    return new Response((await lessonEmail(env, feed, { ...s, id: sid }, day, ls[0], 'parent@example.com', 'evening')).html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+  }
+  if (path === '/remind/unsubscribe' && req.method === 'GET') {
+    const s = url.searchParams.get('s') || '', e = (url.searchParams.get('e') || '').toLowerCase(), k = url.searchParams.get('k') || '';
+    if (!validCode(s) || !e || k !== await hmac(env, `lessonoff:${s}:${e}`)) return new Response('This link isn’t valid.', { status: 400 });
+    await env.KV.put(`lessonoff:${s}:${await sha(e)}`, '1');
+    return new Response(parentLayout(env, 'Lesson reminders stopped', `We won’t email ${esc(e)} lesson reminders for this student any more.`, '', 'AlleGrow'), { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+  }
   if (path === '/bill/unsubscribe' && req.method === 'GET') {
     const s = url.searchParams.get('s') || '', e = (url.searchParams.get('e') || '').toLowerCase(), k = url.searchParams.get('k') || '';
     if (!validCode(s) || !e || k !== await hmac(env, `billoff:${s}:${e}`)) return new Response('This link isn’t valid.', { status: 400 });

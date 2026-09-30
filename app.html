@@ -293,6 +293,11 @@
   .moveCard { display: grid; gap: 8px; border: 1.5px solid color-mix(in srgb, var(--leaf) 35%, transparent); }
   .moveCard ol { margin: 0; padding-left: 20px; line-height: 1.6; }
   #bringOver { text-align: center; color: var(--accent); font-weight: 600; text-decoration: none; }
+  .lessonsBox { display: grid; gap: 6px; margin-top: 10px; padding: 14px; border-radius: 14px; background: var(--soft); }
+  .lessonsBox small.late, .lessonsBox .late { color: var(--warn); }
+  .slotDays { display: grid; gap: 12px; max-height: 55vh; overflow: auto; margin-top: 8px; }
+  .slotRow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .linkBtn { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
   .billCard { display: grid; gap: 8px; margin-top: 10px; padding: 14px; border-radius: 14px; background: var(--soft); }
   .billBig { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
   .billBig small { font-size: 14px; font-weight: 600; color: var(--muted); }
@@ -1923,6 +1928,7 @@ function billCard(t) {
     <div class="billBig ${late ? 'late' : ''}">${b.balance < -0.004 ? `${fmt(-b.balance)} <small>credit</small>` : dueNow > 0.004 ? `${fmt(dueNow)} <small>${late ? 'overdue' : 'due now'}</small>` : b.balance > 0.004 ? `${fmt(b.balance)} <small>balance</small>` : 'All paid up'}</div>
     ${dueNow > 0.004 && b.balance - dueNow > 0.004 ? `<div class="small muted" style="margin-top:-4px">Total balance ${fmt(b.balance)}</div>` : ''}
     ${open.length ? `<div class="billRows">${open.slice(0, 6).map(i => `<div><span>${esc(i.text)}<small class="${i.due < today0 ? 'late' : ''}">${i.due < today0 ? 'was due' : 'due'} ${day(i.due)}</small></span><b>${fmt(i.open)}</b></div>`).join('')}</div>` : ''}
+    ${b.packLeft ? `<div class="small"><b>${b.packLeft} prepaid ${b.packLeft === 1 ? 'lesson' : 'lessons'} left</b> in your package</div>` : ''}
     ${(b.upcoming || []).slice(0, 2).map(u => `<div class="small muted">Next: ${esc(u.text)} · ${fmt(u.amount)} due ${day(u.due)}</div>`).join('')}
     ${(b.recent || []).length ? `<details><summary class="small">Recent activity</summary><div class="billRows">${b.recent.map(e => `<div><span>${esc(e.text)}<small>${day(e.date)}</small></span><b>${e.amount < 0 ? '−' + fmt(-e.amount) : fmt(e.amount)}</b></div>`).join('')}</div></details>` : ''}
     ${link && b.balance > 0.004 ? `<a class="payBtn" href="${esc(link)}" target="_blank" rel="noopener">Pay ${esc(t.teacherName || 'the teacher')}</a>` : ''}
@@ -1994,7 +2000,7 @@ function renderParent() {
         ${k.link ? (t => `<div class="teacherBox"><div class="grow"><span class="muted small">Teacher</span>
             <b>${t?.missing ? 'Connection removed by the teacher' : t ? esc(t.teacherName) : 'Connected to a teacher'}</b>${t && !t.missing ? `<span class="muted small">${esc(t.studioName || '')}</span>` : ''}</div>
           <div class="btnPair">${t?.missing ? '' : `<button class="secondary" data-switch="${k.id}">Switch teacher</button>`}
-            <button class="secondary dangerText" data-unlink="${k.id}">${t?.missing ? 'Remove' : 'Disconnect'}</button></div></div>${billCard(t)}`)(teacherData[k.link])
+            <button class="secondary dangerText" data-unlink="${k.id}">${t?.missing ? 'Remove' : 'Disconnect'}</button></div></div>${lessonsBox(k, t)}${billCard(t)}`)(teacherData[k.link])
           : `<button class="secondary" data-link="${k.id}">${icon('link', 'sm')}Connect to teacher</button>`}
       </div>
     </div>`).join('') || '<div class="muted">Add each child who practices.</div>';
@@ -2019,6 +2025,10 @@ function renderParent() {
     k.photo = null; saveKids(); pushTeacher(k); renderParent();
   });
   document.querySelectorAll('[data-plan]').forEach(b => b.onclick = () => planDialog(kids.find(k => k.id === b.dataset.plan), 'parent'));
+  document.querySelectorAll('[data-cancel]').forEach(b => b.onclick = () => { const [id, key, ms] = b.dataset.cancel.split('|'); cancelLesson(kids.find(k => k.id === id), key, +ms); });
+  document.querySelectorAll('[data-uncancel]').forEach(b => b.onclick = () => { const [id, key] = b.dataset.uncancel.split('|'); uncancelLesson(kids.find(k => k.id === id), key); });
+  document.querySelectorAll('[data-makeup]').forEach(b => b.onclick = () => makeupDialog(kids.find(k => k.id === b.dataset.makeup)));
+  document.querySelectorAll('[data-policy]').forEach(b => b.onclick = () => policyDialog(teacherData[kids.find(k => k.id === b.dataset.policy).link]));
   document.querySelectorAll('[data-allowrec]').forEach(c => c.onchange = () => { kids.find(k => k.id === c.dataset.allowrec).allowRec = c.checked; saveKids(); });
   document.querySelectorAll('[data-chime]').forEach(c => c.onchange = () => {
     kids.find(k => k.id === c.dataset.chime).chime = c.checked; saveKids();
@@ -2467,6 +2477,7 @@ function pushTeacher(k) {
     .catch(e => console.error(e));
 }
 
+let policyAgreed = false;
 async function startLink(code, forKid) {
   code = code.trim().toLowerCase().replace(/\s+/g, '');
   if (deviceRole !== 'parent') return requireParent('To connect a child to their teacher, a parent agrees and signs in.', () => startLink(code, forKid));
@@ -2486,6 +2497,8 @@ async function startLink(code, forKid) {
     <label class="consent"><input type="checkbox" id="lkConsent"><span>I’m this child’s parent or guardian. I agree to share their practice time, practice scores, badges and photo (if I add one) with
       ${esc(t.teacherName)}, and to receive their assignments and lesson times, as described in the <a href="privacy" target="_blank" rel="noopener">privacy policy</a>.
       The practice timer never records sound; recordings for the teacher stay off unless you turn them on.</span></label>
+    ${t.policy?.text ? `<label class="consent"><input type="checkbox" id="lkPolicy"><span>I agree to ${esc(t.studioName || t.teacherName)}’s studio policies: <button type="button" class="linkBtn" id="lkPolicyShow">read them</button></span></label>
+      <div class="small" id="lkPolicyText" hidden style="white-space:pre-line;max-height:30vh;overflow:auto;background:var(--soft);border-radius:12px;padding:10px">${esc(t.policy.text)}</div>` : ''}
     <p class="small" id="lkErr" style="color:var(--danger);min-height:1.2em;text-align:center"></p>
     <div class="pickList">
       ${choices.map(k => `<button class="secondary block" data-pick="${k.id}"><div class="avatar" style="--kid:${kidColor(k)}">${face(k)}</div>${forKid ? `Connect ${esc(k.name)}` : esc(k.name)}${k.link === code ? '<span class="muted small">(already connected)</span>' : ''}</button>`).join('')}
@@ -2494,8 +2507,10 @@ async function startLink(code, forKid) {
     </div>
     <p class="muted small" style="margin-top:12px;text-align:center">Only this player’s practice is shared with the teacher. You can disconnect any time in Parent settings.</p>`;
   $('linkDlg').hidden = false;
+  $('lkPolicyShow')?.addEventListener('click', () => { $('lkPolicyText').hidden = !$('lkPolicyText').hidden; });
   card.querySelectorAll('[data-pick]').forEach(b => b.onclick = async () => {
-    if (b.dataset.pick !== 'cancel' && !$('lkConsent').checked) return ($('lkErr').textContent = 'Please tick the box to agree first.');
+    if (b.dataset.pick !== 'cancel' && (!$('lkConsent').checked || ($('lkPolicy') && !$('lkPolicy').checked))) return ($('lkErr').textContent = 'Please tick the boxes to agree first.');
+    policyAgreed = !!$('lkPolicy')?.checked;
     $('linkDlg').hidden = true;
     if (b.dataset.pick === 'cancel') return;
     const wipe = !!$('lkWipe')?.checked;
@@ -2510,7 +2525,7 @@ async function finishLink(k, code, t) {
   k.link = code;
   if (!k.instrument && t.instrument) k.instrument = t.instrument;
   saveKids();
-  try { await F.updateDoc(F.doc(db, 'students', code), { linkedAt: new Date().toISOString(), kidName: k.name, consent: { by: 'parent', at: new Date().toISOString(), version: 1 } }); } catch (e) { console.error(e); }
+  try { await F.updateDoc(F.doc(db, 'students', code), { linkedAt: new Date().toISOString(), kidName: k.name, consent: { by: 'parent', at: new Date().toISOString(), version: 1, ...(policyAgreed ? { policyAt: new Date().toISOString() } : {}) } }); } catch (e) { console.error(e); }
   await watchTeachers();
   pushTeacher(k);
   const card = $('linkCard');
@@ -2566,7 +2581,7 @@ function nextLesson(t) {
     let time = null, len = slot?.length || 30;
     if (c?.status === 'extra') time = c.time;
     else if (slot && !(c && ['cancelled', 'moved'].includes(c.status))) time = slot.time;
-    if (!time) continue;
+    if (!time || t.familyCancels?.[k]) continue;
     const [h, m] = time.split(':').map(Number), when = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m);
     if (when.getTime() + len * 60000 > now.getTime()) return when;
   }
@@ -2594,7 +2609,7 @@ function renderTeacherCard() {
           <button class="chipBtn" data-rec="${a.id}" title="Record yourself playing it for ${esc(t.teacherName)}">${icon('mic')}Record</button></div>
         ${(c => c ? `<div class="clipNote">${icon('mic')}<span>Sent ${new Date(c.at).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}${c.reply ? ` · <span class="who">${esc(t.teacherName)}:</span> “${esc(c.reply)}”` : c.heard ? ` · ${esc(t.teacherName)} listened` : ''}</span></div>` : '')((clips[kid.link] || []).find(c => c.assignment === a.id))}</div></div>`; }).join('')
       : '<p class="muted small" style="padding:4px 0 2px">No assignments right now.</p>'}
-    ${nl ? `<div class="tInfo">${icon('calendar')}<span class="grow">Next lesson ${lessonLabel(nl)}</span><button class="ghost small" data-cal style="padding:4px 6px">Add to calendar</button></div>` : ''}
+    ${nl ? `<div class="tInfo">${icon('calendar')}<span class="grow">Next lesson ${lessonLabel(nl)}<br><small class="muted">Can’t make it? A parent can cancel in Parent settings.</small></span><button class="ghost small" data-cal style="padding:4px 6px">Add to calendar</button></div>` : ''}
     ${evs.map(e => `<div class="tInfo">${icon('trophy')}<span>${esc(e.title)}${e.piece ? ' · ' + esc(e.piece) : ''} · <b>${countdown(e.date)}</b></span></div>`).join('')}
     ${activeChallenges(kid, t).map(({ c, p }) => `<div class="challenge ${p.done ? 'done' : ''}"><b>${esc(challengeTitle(c))}<span>${p.done ? 'Done!' : `${Math.min(p.value, c.target)} of ${c.target}`}</span></b>
       <div class="bbar"><div style="width:${Math.min(p.value / c.target, 1) * 100}%"></div></div>
@@ -2695,6 +2710,92 @@ function recordDialog(k, a) {
   }
   $('linkDlg').hidden = false;
   idle();
+}
+
+// ---------- Lessons: cancel, makeup credits, book a makeup (Parent settings) ----------
+// The teacher's policy (students/{sid}.policy) says how far ahead a family can cancel and whether that earns a makeup.
+// A cancel is written to students/{sid}.familyCancels[date]; a makeup request to makeupRequests[id], and the teacher
+// accepts it from their open times (bookpages/{bookToken}).
+const POLICY_DEFAULT = { cutoff: 24, makeups: true, makeupDays: 60, teacherCredit: true, chargeLate: true, text: '' };
+const polOf = t => ({ ...POLICY_DEFAULT, ...(t?.policy || {}) });
+function upcomingLessons(t, n = 6) {
+  const out = [], now = new Date(), ch = t.lessonChanges || {}, fc = t.familyCancels || {};
+  for (let i = 0; i < 70 && out.length < n; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i), k = dayKey(d), c = ch[k], slot = slotOn(t, k);
+    let time = null, len = slot?.length || 30, makeup = false;
+    if (c?.status === 'extra') { time = c.time; makeup = !!c.makeup; }
+    else if (slot && !(c && ['cancelled', 'moved'].includes(c.status))) time = slot.time;
+    if (!time) continue;
+    const [h, m] = time.split(':').map(Number), when = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m);
+    if (when.getTime() <= now.getTime()) continue;
+    out.push({ key: k, when, length: len, makeup, canceled: fc[k] || null });
+  }
+  return out;
+}
+function creditsOf(t) {
+  const P = polOf(t); if (!P.makeups) return { left: 0, earned: 0 };
+  const since = dayKey(new Date(Date.now() - P.makeupDays * 864e5));
+  const earned = Object.entries(t.familyCancels || {}).filter(([d, c]) => !c.late && d >= since).length
+    + (P.teacherCredit ? Object.entries(t.lessonChanges || {}).filter(([d, c]) => c.status === 'cancelled' && !t.familyCancels?.[d] && d >= since).length : 0);
+  const used = Object.values(t.makeupRequests || {}).filter(r => r.status !== 'declined' && String(r.at).slice(0, 10) >= since).length;
+  return { earned, left: Math.max(0, earned - used) };
+}
+function lessonsBox(k, t) {
+  if (!t || t.missing || !lessonSlots(t).length && !Object.keys(t.lessonChanges || {}).length) return '';
+  const P = polOf(t), up = upcomingLessons(t), cr = creditsOf(t), wait = Object.entries(t.makeupRequests || {}).filter(([, r]) => r.status === 'pending');
+  const fmt = w => w.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  return `<div class="lessonsBox"><div class="rowBetween"><b>Lessons</b>${P.makeups ? `<span class="small muted">${cr.left} makeup ${cr.left === 1 ? 'credit' : 'credits'}</span>` : ''}</div>
+    ${up.length ? up.slice(0, 4).map(l => `<div class="opt"><span>${fmt(l.when)}${l.makeup ? ' <small class="muted">makeup</small>' : ''}${l.canceled ? `<br><small class="${l.canceled.late ? 'late' : 'muted'}">${l.canceled.late ? 'Late cancel' : 'Canceled'}${P.makeups && !l.canceled.late ? ' · makeup credit' : ''}</small>` : ''}</span>
+      ${l.canceled ? `<button class="ghost small" data-uncancel="${k.id}|${l.key}">Undo</button>` : `<button class="ghost small dangerText" data-cancel="${k.id}|${l.key}|${l.when.getTime()}">Can’t make it</button>`}</div>`).join('')
+      : '<p class="muted small">No lessons coming up.</p>'}
+    ${wait.map(([, r]) => `<div class="small muted">${icon('clock', 'sm')} Makeup requested: ${new Date(`${r.date}T${r.time}`).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} – waiting for ${esc(t.teacherName)}</div>`).join('')}
+    ${Object.values(t.makeupRequests || {}).filter(r => r.status === 'declined' && r.date >= dayKey()).map(r => `<div class="small late">Makeup on ${parseDay(r.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} was declined – your credit is back.</div>`).join('')}
+    ${cr.left && t.bookToken ? `<button class="secondary" data-makeup="${k.id}" style="justify-self:start">${icon('calendar', 'sm')}Book a makeup</button>` : ''}
+    <p class="muted small" style="margin:0">${P.cutoff ? `Cancel at least ${P.cutoff} hours ahead${P.makeups ? ' for a makeup credit' : ''}.` : P.makeups ? 'Canceling earns a makeup credit.' : ''}${P.text ? ' <button class="linkBtn small" data-policy="' + k.id + '">Studio policies</button>' : ''}</p></div>`;
+}
+async function cancelLesson(k, key, ms) {
+  const t = teacherData[k.link], P = polOf(t), late = P.cutoff > 0 && ms - Date.now() < P.cutoff * 3600e3;
+  const when = new Date(ms).toLocaleString(undefined, { weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  if (!confirm(`Cancel ${k.name}’s lesson on ${when}?\n\n${late ? `This is less than ${P.cutoff} hours away, so it counts as a late cancel${P.chargeLate ? ' and is still charged' : ''}${P.makeups ? ' – no makeup credit' : ''}.` : P.makeups ? 'You’ll get a makeup credit to book another time.' : ''}\n${t.teacherName} will see it in their studio.`)) return;
+  try { await F.updateDoc(F.doc(db, 'students', k.link), { [`familyCancels.${key}`]: { at: new Date().toISOString(), late } }); }
+  catch (e) { console.error(e); return alert('Couldn’t cancel – check the internet connection.'); }
+  renderParent();
+}
+async function uncancelLesson(k, key) {
+  if (!confirm('Put this lesson back on?')) return;
+  try { await F.updateDoc(F.doc(db, 'students', k.link), { [`familyCancels.${key}`]: F.deleteField() }); } catch (e) { console.error(e); }
+  renderParent();
+}
+async function makeupDialog(k) {
+  const t = teacherData[k.link], card = $('linkCard');
+  let page = null;
+  try { const snap = await F.getDoc(F.doc(db, 'bookpages', t.bookToken)); page = snap.exists() ? snap.data() : null; } catch (e) { console.error(e); }
+  const slots = (page?.open && page.slots || []).filter(x => x.date > dayKey());
+  const days = [...new Set(slots.map(x => x.date))].slice(0, 14);
+  card.style.setProperty('--kid', kidColor(k));
+  card.innerHTML = `<h2 style="text-align:center">Book a makeup</h2>
+    <p class="muted" style="text-align:center">${esc(t.teacherName)}’s open times. Pick one – ${esc(t.teacherName)} confirms it.</p>
+    ${days.length ? `<div class="slotDays">${days.map(d => `<div><b class="small">${parseDay(d).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}</b>
+      <div class="slotRow">${slots.filter(x => x.date === d).map(x => `<button class="chipBtn" data-slot="${d}|${x.time}|${x.length}">${new Date(`${d}T${x.time}`).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</button>`).join('')}</div></div>`).join('')}</div>`
+      : `<p class="muted" style="text-align:center">No open times right now. Ask ${esc(t.teacherName)} about a makeup.</p>`}
+    <button class="ghost block" id="mkClose" style="margin-top:10px;justify-content:center">Close</button>`;
+  $('linkDlg').hidden = false;
+  $('mkClose').onclick = () => { $('linkDlg').hidden = true; };
+  card.querySelectorAll('[data-slot]').forEach(b => b.onclick = async () => {
+    const [date, time, length] = b.dataset.slot.split('|');
+    if (!confirm(`Ask for a makeup on ${parseDay(date).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })} at ${b.textContent}?`)) return;
+    try { await F.updateDoc(F.doc(db, 'students', k.link), { [`makeupRequests.${Date.now().toString(36)}`]: { date, time, length: +length, at: new Date().toISOString(), status: 'pending' } }); }
+    catch (e) { console.error(e); return alert('Couldn’t send the request – check the internet connection.'); }
+    card.innerHTML = `<div class="medal" style="--kid:var(--good)">${icon('check')}</div><h2 style="text-align:center">Request sent</h2><p class="muted" style="text-align:center">${esc(t.teacherName)} will confirm it. You’ll see it in the app.</p>
+      <button class="primary" id="mkOk" style="margin-top:14px;--kid:var(--brand);color:var(--bg)">Done</button>`;
+    $('mkOk').onclick = () => { $('linkDlg').hidden = true; renderParent(); };
+  });
+}
+function policyDialog(t) {
+  const card = $('linkCard');
+  card.innerHTML = `<h2>${esc(t.studioName || t.teacherName)} – studio policies</h2><div class="small" style="white-space:pre-line;max-height:50vh;overflow:auto;line-height:1.5">${esc(polOf(t).text)}</div>
+    <button class="primary" id="plOk" style="margin-top:14px;--kid:var(--brand);color:var(--bg)">Close</button>`;
+  $('linkDlg').hidden = false; $('plOk').onclick = () => { $('linkDlg').hidden = true; };
 }
 
 // ---------- Calendar ----------
